@@ -1,0 +1,61 @@
+/**
+ * global.css — CSS custom properties (design tokens).
+ *
+ * RULE: This is the ONLY file allowed to declare :root colour custom properties.
+ * All other CSS files must consume these vars via var(--*).
+ * Values must be literal hex — no chained var() references (guideline §7.3 RULE 7).
+ */
+
+:root {
+  /* ── Brand ─────────────────────────────────────────────── */
+  --color-brand: #56c8b1;
+  --color-brand-dark: #3aad97;
+
+  --color-secondary: #3b82f6;
+  --color-secondary-dark: #2563eb;
+
+  /* ── Neutral scale ─────────────────────────────────────── */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111826;
+
+  /* ── Semantic ───────────────────────────────────────────── */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  /* ── Chrome text ────────────────────────────────────────── */
+  --color-chrome-text: #ffffff;
+
+  /* ── Sidebar ────────────────────────────────────────────── */
+  --sidebar-bg: #111826;
+  --sidebar-text: #ffffff;
+  --sidebar-muted: #9ca3af;
+  --sidebar-border: #000000;
+  --sidebar-hover: #1f2937;
+  --sidebar-active: #374151;
+  --sidebar-submenu-bg: #1f2937;
+  --sidebar-submenu-sep: #374151;
+  --sidebar-scroll-track: #111826;
+  --sidebar-scroll-thumb: #374151;
+  --sidebar-scroll-thumb-hover: #4b5563;
+
+  /* ── Table chrome ───────────────────────────────────────── */
+  --table-header-bg: #ededed;
+  --table-header-text: #111826;
+  --table-border: #e5e7eb;
+  --table-row-hover: #f9fafb;
+
+  /* ── UI one-offs ────────────────────────────────────────── */
+  --ui-login-bg: #111826;
+  --ui-login-bg-hover: #1f2937;
+  --ui-home-beige: #ede8df;
+}

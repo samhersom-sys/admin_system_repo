@@ -1,0 +1,5 @@
+const { Pool } = require('pg')
+const p = new Pool({ connectionString: 'postgres://policyforge:changeme@127.0.0.1:5432/policyforge_cleaned' })
+p.query("DELETE FROM users WHERE email LIKE 'test%@example.com'")
+ .then(r => { console.log('Cleaned', r.rowCount, 'test users'); return p.end() })
+ .catch(e => { console.error(e.message); process.exit(1) })

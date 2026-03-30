@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Environment — never commit real production secrets
+# .env.production is committed with placeholder values only; real values are injected by CI/CD
+.env.local
+.env.*.local
+.env.production.local
+
+# Build outputs
+dist/
+build/
+.next/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Playwright
+/playwright-report/
+/test-results/

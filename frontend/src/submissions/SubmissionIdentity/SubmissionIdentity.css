@@ -1,0 +1,26 @@
+/* SubmissionIdentity status badge colours */
+
+.status--blue {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+.status--amber {
+    background-color: #fef3c7;
+    color: #b45309;
+}
+
+.status--red {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+.status--green {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.status--dark-green {
+    background-color: #6ee7b7;
+    color: #064e3b;
+}

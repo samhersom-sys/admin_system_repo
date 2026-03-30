@@ -1,0 +1,41 @@
+/* Design tokens — CSS custom properties (colours, sidebar, table vars) */
+@import './shared/lib/design-tokens/global.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === app-table — shared table component === */
+.app-table {
+  width: 100%;
+  border: 1px solid var(--table-border);
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.875rem;
+  background-color: white;
+}
+
+.app-table thead th {
+  background-color: var(--table-header-bg);
+  color: var(--table-header-text);
+  font-weight: 600;
+  text-align: left;
+  position: relative;
+}
+
+.app-table th,
+.app-table td {
+  padding: 0.2rem 0.5rem;
+  border-top: 1px solid var(--table-border);
+  white-space: nowrap;
+  text-align: left; /* default: all cells left-aligned; apply text-right on <td> for financial data */
+}
+
+.app-table tbody tr:hover {
+  background-color: var(--table-row-hover);
+}
+
+/* === table-wrapper === */
+.table-wrapper {
+  overflow-x: auto;
+}

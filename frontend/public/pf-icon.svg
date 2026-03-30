@@ -1,0 +1,19 @@
+<!-- PolicyForge app icon — used in the web app manifest.
+     SVG satisfies Chrome/Edge PWA installability icon criteria (96+).
+     sizes="any" in manifest.json covers 192x192 and 512x512 requirements. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Dark background tile -->
+  <rect width="512" height="512" rx="80" fill="#111826"/>
+  <!-- Brand teal shield shape -->
+  <path d="M256 96 L368 144 L368 272 Q368 352 256 416 Q144 352 144 272 L144 144 Z"
+        fill="#56c8b1" opacity="0.15"/>
+  <path d="M256 112 L356 156 L356 272 Q356 344 256 400 Q156 344 156 272 L156 156 Z"
+        fill="none" stroke="#56c8b1" stroke-width="12" stroke-linejoin="round"/>
+  <!-- PF monogram -->
+  <text x="256" y="310"
+        font-family="system-ui, -apple-system, sans-serif"
+        font-size="140"
+        font-weight="700"
+        text-anchor="middle"
+        fill="#ffffff">PF</text>
+</svg>

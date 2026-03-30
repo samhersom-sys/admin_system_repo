@@ -1,0 +1,28 @@
+{
+  "name": "PolicyForge",
+  "short_name": "PolicyForge",
+  "description": "Insurance policy management platform",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#111826",
+  "background_color": "#111826",
+  "icons": [
+    {
+      "src": "/pf-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pf-icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/pf-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

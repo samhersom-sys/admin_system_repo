@@ -1,0 +1,37 @@
+# docker-compose.yml — Cleaned project (local development)
+#
+# Starts a Postgres instance for the Cleaned project.
+# Uses a SEPARATE database (policyforge_cleaned) from the BackUp project (policyforge_dev)
+# so both projects can coexist on the same machine without interfering.
+#
+# Usage:
+#   docker compose up -d          # start Postgres in background
+#   docker compose down           # stop (data is preserved in named volume)
+#   docker compose down -v        # stop and destroy data
+#
+# NOTE: If the BackUp project's Postgres container is already running on port 5432,
+# this service will conflict. In that case, either:
+#   a) Use the BackUp container directly (policyforge_cleaned DB is created inside it), OR
+#   b) Change the port mapping below to "5433:5432" and update DATABASE_URL accordingly.
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: policyforge
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: policyforge_cleaned
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_cleaned:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U policyforge -d policyforge_cleaned" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata_cleaned:
+    driver: local

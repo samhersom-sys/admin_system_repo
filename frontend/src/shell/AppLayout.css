@@ -1,0 +1,12 @@
+/* AppLayout.css — layout shell: full-viewport flex row */
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--color-gray-50);
+}
