@@ -2,6 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const previewAllowedHosts = [
+    'app.thepolicyforge.com',
+]
+
 export default defineConfig({
     plugins: [react()],
     resolve: {
@@ -16,6 +20,9 @@ export default defineConfig({
                 changeOrigin: true,
             },
         },
+    },
+    preview: {
+        allowedHosts: previewAllowedHosts,
     },
     build: {
         // No source maps in production — prevents users from reading the original
