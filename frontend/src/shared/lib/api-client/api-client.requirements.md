@@ -37,6 +37,12 @@
 
 **REQ-API-CLIENT-S-004:** The api-client module shall omit the `x-org-code` header from requests when no session exists.
 
+**REQ-API-CLIENT-C-001:** When a caller passes an absolute `http://` or `https://` URL, the api-client module shall use that URL unchanged.
+
+**REQ-API-CLIENT-C-002:** When the browser hostname is `localhost` or `127.0.0.1`, the api-client module shall preserve relative API URLs so local development continues to use the Vite `/api` proxy.
+
+**REQ-API-CLIENT-C-003:** When the browser hostname starts with `app.`, the api-client module shall resolve relative API URLs against the sibling `api.` hostname on the same protocol. Example: `https://app.policyforge.com` + `/api/health` → `https://api.policyforge.com/api/health`.
+
 ---
 
 ## 3. Traceability
@@ -53,6 +59,9 @@
 | REQ-API-CLIENT-S-002 | `lib/api-client/api-client.test.ts` | pending |
 | REQ-API-CLIENT-S-003 | `lib/api-client/api-client.test.ts` | pending |
 | REQ-API-CLIENT-S-004 | `lib/api-client/api-client.test.ts` | pending |
+| REQ-API-CLIENT-C-001 | `lib/api-client/api-client.test.ts` | pending |
+| REQ-API-CLIENT-C-002 | `lib/api-client/api-client.test.ts` | pending |
+| REQ-API-CLIENT-C-003 | `lib/api-client/api-client.test.ts` | pending |
 
 ---
 
@@ -68,6 +77,7 @@ None.
 |------|--------|
 | 2026-03-11 | Initial requirements written |
 | 2026-03-11 | Rewritten into formal REQ-API-CLIENT-{TYPE}-{NNN} format per Guideline 13 |
+| 2026-03-30 | Added deployment URL-resolution requirements for local proxy preservation and app→api hostname mapping |
 
 ---
 

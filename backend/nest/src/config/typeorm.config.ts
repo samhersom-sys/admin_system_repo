@@ -11,6 +11,8 @@ import { Policy } from '../entities/policy.entity'
 // Resolve .env.local from workspace root (4 levels up from backend/nest/src/config/)
 dotenv.config({ path: path.resolve(__dirname, '../../../../.env.local') })
 
+const shouldUseDatabaseSsl = process.env.DATABASE_SSL === 'true'
+
 export const typeOrmOptions: DataSourceOptions = {
   type: 'postgres',
   url:
@@ -29,6 +31,8 @@ export const typeOrmOptions: DataSourceOptions = {
 
   // Run migrations automatically on startup once the baseline is established
   migrationsRun: false,
+
+  ssl: shouldUseDatabaseSsl ? { rejectUnauthorized: false } : false,
 
   logging: process.env.NODE_ENV === 'development' ? ['query', 'error'] : ['error'],
 

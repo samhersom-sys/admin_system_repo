@@ -1,5 +1,5 @@
 /**
- * TESTS — lib/api-client
+ * TESTS - lib/api-client
  * Second artifact. Requirements: lib/api-client/api-client.requirements.md
  * Test ID format: T-lib-api-client-R[NN]
  * Run: npx jest --config jest.config.js --testPathPattern=api-client.test
@@ -28,6 +28,16 @@ import { getSession } from '@/shared/lib/auth-session/auth-session'
 // Helpers
 // ---------------------------------------------------------------------------
 
+function mockRuntimeLocation(url: string) {
+    const nextLocation = new URL(url)
+    ; (globalThis as typeof globalThis & {
+        __POLICYFORGE_RUNTIME_LOCATION__?: { protocol: string; hostname: string }
+    }).__POLICYFORGE_RUNTIME_LOCATION__ = {
+        protocol: nextLocation.protocol,
+        hostname: nextLocation.hostname,
+    }
+}
+
 function mockResponse(status: number, body: unknown) {
     mockFetch.mockResolvedValueOnce({
         ok: status >= 200 && status < 300,
@@ -44,11 +54,19 @@ const WITH_SESSION = {
 
 beforeEach(() => {
     mockFetch.mockReset()
-        ; (getSession as jest.Mock).mockReturnValue(NO_SESSION)
+    ;(getSession as jest.Mock).mockReturnValue(NO_SESSION)
+    mockRuntimeLocation('http://localhost/')
+})
+
+afterEach(() => {
+    delete (globalThis as typeof globalThis & {
+        __POLICYFORGE_RUNTIME_LOCATION__?: { protocol: string; hostname: string }
+    }).__POLICYFORGE_RUNTIME_LOCATION__
+    jest.clearAllMocks()
 })
 
 // ---------------------------------------------------------------------------
-// R01 — get()
+// R01 - get()
 // ---------------------------------------------------------------------------
 
 describe('T-lib-api-client-R01: get() sends GET and returns parsed body', () => {
@@ -66,7 +84,7 @@ describe('T-lib-api-client-R01: get() sends GET and returns parsed body', () => 
 })
 
 // ---------------------------------------------------------------------------
-// R02 — post()
+// R02 - post()
 // ---------------------------------------------------------------------------
 
 describe('T-lib-api-client-R02: post() sends POST with JSON body', () => {
@@ -86,7 +104,7 @@ describe('T-lib-api-client-R02: post() sends POST with JSON body', () => {
 })
 
 // ---------------------------------------------------------------------------
-// R03 — put()
+// R03 - put()
 // ---------------------------------------------------------------------------
 
 describe('T-lib-api-client-R03: put() sends PUT with JSON body', () => {
@@ -99,7 +117,7 @@ describe('T-lib-api-client-R03: put() sends PUT with JSON body', () => {
 })
 
 // ---------------------------------------------------------------------------
-// R04 — del()
+// R04 - del()
 // ---------------------------------------------------------------------------
 
 describe('T-lib-api-client-R04: del() sends DELETE', () => {
@@ -112,12 +130,12 @@ describe('T-lib-api-client-R04: del() sends DELETE', () => {
 })
 
 // ---------------------------------------------------------------------------
-// R05 — Auth header injection
+// R05 - Auth header injection
 // ---------------------------------------------------------------------------
 
 describe('T-lib-api-client-R05: Authorization header injected from session', () => {
     it('includes Authorization header when session token exists', async () => {
-        ; (getSession as jest.Mock).mockReturnValue(WITH_SESSION)
+        ;(getSession as jest.Mock).mockReturnValue(WITH_SESSION)
         mockResponse(200, {})
         await get('/api/test')
         const headers = mockFetch.mock.calls[0][1].headers
@@ -125,7 +143,7 @@ describe('T-lib-api-client-R05: Authorization header injected from session', () 
     })
 
     it('omits Authorization header when no session exists', async () => {
-        ; (getSession as jest.Mock).mockReturnValue(null)
+        ;(getSession as jest.Mock).mockReturnValue(null)
         mockResponse(200, {})
         await get('/api/test')
         const headers = mockFetch.mock.calls[0][1].headers
@@ -134,12 +152,12 @@ describe('T-lib-api-client-R05: Authorization header injected from session', () 
 })
 
 // ---------------------------------------------------------------------------
-// R06 — x-org-code header injection
+// R06 - x-org-code header injection
 // ---------------------------------------------------------------------------
 
 describe('T-lib-api-client-R06: x-org-code header injected from session', () => {
     it('includes x-org-code header when session orgCode exists', async () => {
-        ; (getSession as jest.Mock).mockReturnValue(WITH_SESSION)
+        ;(getSession as jest.Mock).mockReturnValue(WITH_SESSION)
         mockResponse(200, {})
         await get('/api/test')
         const headers = mockFetch.mock.calls[0][1].headers
@@ -147,7 +165,7 @@ describe('T-lib-api-client-R06: x-org-code header injected from session', () => 
     })
 
     it('omits x-org-code when no session exists', async () => {
-        ; (getSession as jest.Mock).mockReturnValue(null)
+        ;(getSession as jest.Mock).mockReturnValue(null)
         mockResponse(200, {})
         await get('/api/test')
         const headers = mockFetch.mock.calls[0][1].headers
@@ -156,7 +174,7 @@ describe('T-lib-api-client-R06: x-org-code header injected from session', () => 
 })
 
 // ---------------------------------------------------------------------------
-// R07 — Error shape
+// R07 - Error shape
 // ---------------------------------------------------------------------------
 
 describe('T-lib-api-client-R07: non-2xx throws a typed ApiError', () => {
@@ -171,5 +189,43 @@ describe('T-lib-api-client-R07: non-2xx throws a typed ApiError', () => {
         expect(caught).toBeInstanceOf(Error)
         expect((caught as any).status).toBe(500)
         expect((caught as any).body).toEqual({ message: 'Server error' })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Deployment URL resolution
+// ---------------------------------------------------------------------------
+
+describe('Deployment URL resolution', () => {
+    it('keeps relative URLs in local development on localhost', async () => {
+        mockResponse(200, {})
+
+        await get('/api/test')
+
+        expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({ method: 'GET' }))
+    })
+
+    it('maps app.<domain> relative API calls to api.<domain> in deployed environments', async () => {
+        mockRuntimeLocation('https://app.policyforge.com/login')
+        mockResponse(200, {})
+
+        await get('/api/test')
+
+        expect(mockFetch).toHaveBeenCalledWith(
+            'https://api.policyforge.com/api/test',
+            expect.objectContaining({ method: 'GET' }),
+        )
+    })
+
+    it('leaves absolute URLs unchanged', async () => {
+        mockRuntimeLocation('https://app.policyforge.com/login')
+        mockResponse(200, {})
+
+        await get('https://example.com/api/test')
+
+        expect(mockFetch).toHaveBeenCalledWith(
+            'https://example.com/api/test',
+            expect.objectContaining({ method: 'GET' }),
+        )
     })
 })

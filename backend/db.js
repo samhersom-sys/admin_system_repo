@@ -15,9 +15,12 @@ const DB_URL =
     process.env.DATABASE_URL ||
     'postgres://policyforge:changeme@127.0.0.1:5432/policyforge_cleaned'
 
+const shouldUseDatabaseSsl = process.env.DATABASE_SSL === 'true'
+
 const pool = new Pool({
     connectionString: DB_URL,
     connectionTimeoutMillis: 5000,
+    ssl: shouldUseDatabaseSsl ? { rejectUnauthorized: false } : false,
 })
 
 pool.on('error', (err) => {

@@ -22,6 +22,13 @@ export interface ApiError extends Error {
   body: unknown
 }
 
+const LOCAL_API_HOSTS = new Set(['localhost', '127.0.0.1'])
+
+type RuntimeLocation = {
+  protocol: string
+  hostname: string
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -39,6 +46,45 @@ function buildHeaders(extra?: Record<string, string>): Record<string, string> {
     headers['x-org-code'] = session.user.orgCode
   }
   return headers
+}
+
+function getRuntimeLocation(): RuntimeLocation | null {
+  const override = (globalThis as { __POLICYFORGE_RUNTIME_LOCATION__?: RuntimeLocation })
+    .__POLICYFORGE_RUNTIME_LOCATION__
+
+  if (override) {
+    return override
+  }
+
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  return window.location
+}
+
+function resolveApiUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) {
+    return url
+  }
+
+  const runtimeLocation = getRuntimeLocation()
+
+  if (!runtimeLocation) {
+    return url
+  }
+
+  const { protocol, hostname } = runtimeLocation
+
+  if (LOCAL_API_HOSTS.has(hostname)) {
+    return url
+  }
+
+  if (/^app\./i.test(hostname)) {
+    return `${protocol}//${hostname.replace(/^app\./i, 'api.')}${url}`
+  }
+
+  return url
 }
 
 async function handleResponse<T>(res: Response, method: string, url: string): Promise<T> {
@@ -71,12 +117,13 @@ export async function get<T = unknown>(
   url: string,
   headers?: Record<string, string>
 ): Promise<T> {
-  logger.request('GET', url)
-  const res = await fetch(url, {
+  const resolvedUrl = resolveApiUrl(url)
+  logger.request('GET', resolvedUrl)
+  const res = await fetch(resolvedUrl, {
     method: 'GET',
     headers: buildHeaders(headers),
   })
-  return handleResponse<T>(res, 'GET', url)
+  return handleResponse<T>(res, 'GET', resolvedUrl)
 }
 
 export async function post<T = unknown>(
@@ -84,13 +131,14 @@ export async function post<T = unknown>(
   body?: unknown,
   headers?: Record<string, string>
 ): Promise<T> {
-  logger.request('POST', url, body)
-  const res = await fetch(url, {
+  const resolvedUrl = resolveApiUrl(url)
+  logger.request('POST', resolvedUrl, body)
+  const res = await fetch(resolvedUrl, {
     method: 'POST',
     headers: buildHeaders(headers),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
-  return handleResponse<T>(res, 'POST', url)
+  return handleResponse<T>(res, 'POST', resolvedUrl)
 }
 
 export async function put<T = unknown>(
@@ -98,25 +146,27 @@ export async function put<T = unknown>(
   body?: unknown,
   headers?: Record<string, string>
 ): Promise<T> {
-  logger.request('PUT', url, body)
-  const res = await fetch(url, {
+  const resolvedUrl = resolveApiUrl(url)
+  logger.request('PUT', resolvedUrl, body)
+  const res = await fetch(resolvedUrl, {
     method: 'PUT',
     headers: buildHeaders(headers),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
-  return handleResponse<T>(res, 'PUT', url)
+  return handleResponse<T>(res, 'PUT', resolvedUrl)
 }
 
 export async function del<T = unknown>(
   url: string,
   headers?: Record<string, string>
 ): Promise<T> {
-  logger.request('DELETE', url)
-  const res = await fetch(url, {
+  const resolvedUrl = resolveApiUrl(url)
+  logger.request('DELETE', resolvedUrl)
+  const res = await fetch(resolvedUrl, {
     method: 'DELETE',
     headers: buildHeaders(headers),
   })
-  return handleResponse<T>(res, 'DELETE', url)
+  return handleResponse<T>(res, 'DELETE', resolvedUrl)
 }
 
 export async function patch<T = unknown>(
@@ -124,11 +174,12 @@ export async function patch<T = unknown>(
   body?: unknown,
   headers?: Record<string, string>
 ): Promise<T> {
-  logger.request('PATCH', url, body)
-  const res = await fetch(url, {
+  const resolvedUrl = resolveApiUrl(url)
+  logger.request('PATCH', resolvedUrl, body)
+  const res = await fetch(resolvedUrl, {
     method: 'PATCH',
     headers: buildHeaders(headers),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
-  return handleResponse<T>(res, 'PATCH', url)
+  return handleResponse<T>(res, 'PATCH', resolvedUrl)
 }
