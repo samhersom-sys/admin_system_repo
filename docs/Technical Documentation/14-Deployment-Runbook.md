@@ -18,9 +18,9 @@
 
 ### Production only
 
-- `www.policyforge.com` — marketing website (`website/`) via Cloudflare Pages
-- `app.policyforge.com` — SPA (`frontend/`) via Railway
-- `api.policyforge.com` — NestJS backend (`backend/nest/`) via Railway
+- `www.thepolicyforge.com` — marketing website (`website/`) via Cloudflare Pages
+- `app.thepolicyforge.com` — SPA (`frontend/`) via Railway
+- `api.thepolicyforge.com` — NestJS backend (`backend/nest/`) via Railway
 - Railway Postgres — production database
 
 ### Deferred until later
@@ -33,7 +33,7 @@
 
 ## 3. Login Entry Decision
 
-- The website login link points to `https://app.policyforge.com/login`.
+- The website login link points to `https://app.thepolicyforge.com/login`.
 - The login page lives in the SPA, not the marketing website.
 - No environment dropdown is shown on the website for the first release.
 
@@ -60,7 +60,7 @@
 - Production website env example:
   - `website/.env.production.example`
 - Required variable:
-  - `NEXT_PUBLIC_APP_URL=https://app.policyforge.com`
+  - `NEXT_PUBLIC_APP_URL=https://app.thepolicyforge.com`
 
 ---
 
@@ -77,8 +77,8 @@
   - `JWT_SECRET`
   - `NODE_ENV=production`
   - `HOST=0.0.0.0`
-  - `CORS_ORIGINS=https://app.policyforge.com`
-  - `FRONTEND_URL=https://app.policyforge.com`
+  - `CORS_ORIGINS=https://app.thepolicyforge.com`
+  - `FRONTEND_URL=https://app.thepolicyforge.com`
 - Health check path: `/api/health`
 
 #### Backend setup sequence
@@ -96,7 +96,7 @@
 ### Frontend service
 
 - Root directory: `frontend`
-- Build command: `npm run build`
+- Build command: `npx vite build`
 - Start command: `npx vite preview --host 0.0.0.0 --port $PORT`
 - No first-release frontend env vars are required
 
@@ -104,7 +104,7 @@
 
 1. Add a second Railway service from the same GitHub repository.
 2. Point the service root to `frontend`.
-3. Set the build command to `npm run build`.
+3. Set the build command to `npx vite build`.
 4. Set the start command to `npx vite preview --host 0.0.0.0 --port $PORT`.
 5. Deploy once on the Railway-generated domain before attaching the custom domain.
 6. After the backend custom domain is live, confirm the SPA resolves relative `/api/*` calls to `https://api.<domain>` automatically.
@@ -128,8 +128,11 @@
 ### Website
 
 - Cloudflare Pages project root: `website`
+- Cloudflare Pages framework preset: `Next.js (Static HTML Export)`
+- Cloudflare Pages build command: `npm run build`
+- Cloudflare Pages build output directory: `out`
 - Production env variable:
-  - `NEXT_PUBLIC_APP_URL=https://app.policyforge.com`
+  - `NEXT_PUBLIC_APP_URL=https://app.thepolicyforge.com`
 
 ### DNS / proxying
 
@@ -167,10 +170,10 @@
 
 ## 8. Validation Before Public Cutover
 
-- Website loads on `www.policyforge.com`
-- Website login link opens `app.policyforge.com/login`
-- SPA loads on `app.policyforge.com`
-- SPA API calls resolve to `api.policyforge.com`
+- Website loads on `www.thepolicyforge.com`
+- Website login link opens `app.thepolicyforge.com/login`
+- SPA loads on `app.thepolicyforge.com`
+- SPA API calls resolve to `api.thepolicyforge.com`
 - Backend health endpoint responds successfully
 - Railway Postgres connection succeeds in production
 - Cloudflare proxying does not break app or API traffic

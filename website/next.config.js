@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    // www.policyforge.com serves marketing pages only.
-    // The app lives at app.policyforge.com (frontend/).
+    // www.thepolicyforge.com serves marketing pages only.
+    // The app lives at app.thepolicyforge.com (frontend/).
+    output: 'export',
 }
 
 module.exports = nextConfig

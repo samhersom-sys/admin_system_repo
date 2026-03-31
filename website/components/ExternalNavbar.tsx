@@ -4,7 +4,7 @@
  * ExternalNavbar — navigation bar for the public-facing marketing pages.
  *
  * Transparent over dark hero images, solid white on light pages.
- * The "Login" link is a cross-origin <a> pointing to app.policyforge.com/login
+ * The "Login" link is a cross-origin <a> pointing to app.thepolicyforge.com/login
  * (not a SPA navigation — the app is a separate origin).
  *
  * Architecture rules:
@@ -15,7 +15,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-// In production: https://app.policyforge.com
+// In production: https://app.thepolicyforge.com
 // In local dev: http://localhost:5173 (Vite SPA)
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:5173'
 

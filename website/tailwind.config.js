@@ -9,7 +9,7 @@ module.exports = {
         extend: {
             colors: {
                 // Website brand palette — copied from frontend/tailwind.config.js (Phase 3: 2026-03-17).
-                // Independently editable: www.policyforge.com may adopt its own marketing palette
+                // Independently editable: www.thepolicyforge.com may adopt its own marketing palette
                 // without touching the app's design tokens.
                 brand: {
                     50:  '#edfbf8',

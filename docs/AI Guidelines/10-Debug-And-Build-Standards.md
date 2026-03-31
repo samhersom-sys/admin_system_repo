@@ -267,7 +267,7 @@ dotenv.config({ path: '../../../.env.local' })  // relative to backend/nest/
 | `DATABASE_URL` | No | `postgres://policyforge:changeme@127.0.0.1:5432/policyforge_cleaned` | PostgreSQL connection string |
 | `JWT_SECRET` | Yes in prod | `dev-secret-change-me` | Signs and verifies JWT access tokens |
 | `JWT_REFRESH_SECRET` | Yes in prod | `dev-refresh-secret-change-me` | Signs and verifies JWT refresh tokens |
-| `CORS_ORIGINS` | No | permissive in dev | Comma-separated allowed origins for production CORS (`http://localhost:5173,https://app.policyforge.com`) |
+| `CORS_ORIGINS` | No | permissive in dev | Comma-separated allowed origins for production CORS (`http://localhost:5173,https://app.thepolicyforge.com`) |
 | `NODE_ENV` | No | `development` | Controls `TestEntity` inclusion in audit VALID_ENTITY_TYPES |
 | `PORT` | No | `5000` | Server listen port |
 

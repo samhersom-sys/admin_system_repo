@@ -5,9 +5,9 @@
 **Delete when:** All phases complete and verified  
 
 > This file tracks the migration from the current single-project monolith to the three-app target architecture:
-> - `backend/` — NestJS API (api.policyforge.com)
-> - `frontend/` — React + Vite SPA (app.policyforge.com)
-> - `website/` — Next.js/Astro marketing site (www.policyforge.com) ← Phase 3, deferred
+> - `backend/` — NestJS API (api.thepolicyforge.com)
+> - `frontend/` — React + Vite SPA (app.thepolicyforge.com)
+> - `website/` — Next.js marketing site (www.thepolicyforge.com)
 
 ---
 
@@ -75,14 +75,14 @@
 ## Phase 3 — Website: Extract to Separate App *(Complete)*
 
 > **Completed 2026-03-18.** Tech stack chosen: Next.js 14 App Router, TypeScript, Tailwind.
-> Login stays on `app.policyforge.com`; website login link = plain `<a href>` cross-origin.
+> Login stays on `app.thepolicyforge.com`; website login link = plain `<a href>` cross-origin.
 > Design tokens copied (independently editable); `NEXT_PUBLIC_APP_URL` env var for login URL.
 
 | # | Step | Status | Notes |
 |---|------|--------|-------|
 | 3.1 | Create `website/` — Next.js (SSR, SEO, CMS-ready) | ✅ Done | Next.js 14 App Router, TypeScript 5, Tailwind 3 |
 | 3.2 | Move `app/features/external/` pages into `website/` | ✅ Done | 4 pages ported; visual output identical |
-| 3.3 | Login button on `www.` → cross-origin redirect to `app.policyforge.com/login` | ✅ Done | Plain `<a href={NEXT_PUBLIC_APP_URL + '/login'}>` |
+| 3.3 | Login button on `www.` → cross-origin redirect to `app.thepolicyforge.com/login` | ✅ Done | Plain `<a href={NEXT_PUBLIC_APP_URL + '/login'}>` |
 | 3.4 | Delete `app/features/external/` from `frontend/` | ✅ Done | 5 files deleted; `/` → `/login` redirect added to `main.jsx` |
 | 3.5 | Design tokens: copy vs shared package — document the choice | ✅ Done | Copy chosen; independence comment in `brandColors.ts`; shared package if needed later |
 | 3.6 | Update AI Guidelines for three-app structure | ✅ Done | 00-Index, 12-Folder-Structure, 09-Full-Stack-Development, 13-Requirements-Standards (WEB code) |
@@ -98,8 +98,8 @@
 |---|------|--------|-------|
 | 4.1 | Create a dedicated GitHub repository containing `Cleaned/` only | 🔄 In Progress | Local Git repo initialized; remote `admin_system_repo.git` connected |
 | 4.2 | Exclude `policy-forge-chat (BackUp)/` from deployment and keep it read-only local reference only | ✅ Done | BackUp folder is outside the new repo boundary and will not be pushed |
-| 4.3 | First release uses production only: `www.policyforge.com`, `app.policyforge.com`, `api.policyforge.com` | ✅ Done | Test environment deferred until needed |
-| 4.4 | Website login points to `app.policyforge.com/login`; no public environment selector in first release | ✅ Done | Environment switching deferred until a real test environment exists |
+| 4.3 | First release uses production only: `www.thepolicyforge.com`, `app.thepolicyforge.com`, `api.thepolicyforge.com` | ✅ Done | Test environment deferred until needed |
+| 4.4 | Website login points to `app.thepolicyforge.com/login`; no public environment selector in first release | ✅ Done | Environment switching deferred until a real test environment exists |
 | 4.5 | Put Cloudflare in front of public hostnames (`www`, `app`, `api`) | ✅ Done | Proxying chosen; API caching must remain disabled |
 | 4.6 | Use Railway for frontend, backend, and production Postgres initially | ✅ Done | Simplest first production platform choice |
 | 4.7 | Add CI/CD pipeline: GitHub CI checks before Railway/Cloudflare deploys from `main` | ⬜ Not Started | To include tests, scans, and build verification |
@@ -128,7 +128,7 @@
 | 2026-03-17 | Keep backend on port 5000 throughout Phase 1 | Frontend Vite proxy needs no change until Phase 2 |
 | 2026-03-18 | Website tech stack: Next.js 14 App Router, TypeScript, Tailwind | SSR/SSG for SEO; familiar Tailwind ecosystem; no new tech beyond the suite already used |
 | 2026-03-18 | Design tokens: copy into `website/lib/design-tokens/` (not shared npm package) | 5 files — shared package overhead not justified; independence comment documents extraction path |
-| 2026-03-18 | Login link on website: plain `<a href>` cross-origin to `NEXT_PUBLIC_APP_URL/login` | Login stays on app.policyforge.com; website has no session knowledge; no SPA routing needed |
+| 2026-03-18 | Login link on website: plain `<a href>` cross-origin to `NEXT_PUBLIC_APP_URL/login` | Login stays on app.thepolicyforge.com; website has no session knowledge; no SPA routing needed |
 | 2026-03-30 | Dedicated GitHub repository created for `Cleaned/` only | Ensures only the cleaned app set is published; BackUp remains local read-only reference |
 | 2026-03-30 | First release will deploy production only; test environment deferred | Keeps environment complexity low until test is actually needed |
 | 2026-03-30 | Cloudflare proxying chosen for `www`, `app`, and `api` public hostnames | Adds edge protection and central DNS/TLS management |

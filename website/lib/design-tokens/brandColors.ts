@@ -2,7 +2,7 @@
  * Brand Colors — website design tokens.
  *
  * Copied from frontend/lib/design-tokens/brandColors.ts at Phase 3 (2026-03-17).
- * Independently editable: www.policyforge.com may evolve its own marketing palette
+ * Independently editable: www.thepolicyforge.com may evolve its own marketing palette
  * without touching the app's tokens. If a shared package is ever needed, extract
  * both copies into packages/design-tokens/ and replace these files with re-exports.
  *

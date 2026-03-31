@@ -19,7 +19,7 @@
 - Contact page at route `/contact`
 
 **Out of scope:**
-- Login, logout, or any authentication UI — auth remains in `frontend/` at `app.policyforge.com`
+- Login, logout, or any authentication UI — auth remains in `frontend/` at `app.thepolicyforge.com`
 - Any API data fetching or backend integration
 - A CMS or admin-editable content layer
 - Any domain-specific logic (submissions, parties, finance, etc.)

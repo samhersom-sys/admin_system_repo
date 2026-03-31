@@ -30,7 +30,7 @@ Cleaned/
     list-columns.js              ← Lists all column definitions for a table
     list-tables.js               ← Lists all tables in the schema
     verify-auth-hash.js          ← Verifies a password hash against a stored bcrypt value
-  frontend/                      ← React + Vite SPA (Phase 2 — app.policyforge.com)
+  frontend/                      ← React + Vite SPA (Phase 2 — app.thepolicyforge.com)
     docs/                        ← Frontend-level documentation (architecture, overall requirements)
     src/                         ← All frontend source (replaces app/, domains/, components/, lib/)
       [module]/                  ← One folder per domain/feature — see §12.7 for pattern
@@ -45,7 +45,7 @@ Cleaned/
     package.json                 ← Frontend-only deps (React, Vite, Tailwind, Chart.js, etc.)
     jest.config.js               ← Frontend Jest config (testEnvironment: jsdom)
     jest.setup.ts
-  website/                       ← Next.js 14 App Router (Phase 3 — www.policyforge.com)
+  website/                       ← Next.js 14 App Router (Phase 3 — www.thepolicyforge.com)
     docs/                        ← Website-level documentation
     src/                         ← All website source (target — migration pending)
     app/                         ← Next.js App Router pages (current location, pre-migration)

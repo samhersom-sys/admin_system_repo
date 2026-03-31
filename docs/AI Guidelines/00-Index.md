@@ -67,9 +67,9 @@ The project is migrating from a single monolith to three separate applications:
 
 | App | Tech | Domain | Status |
 |-----|------|--------|--------|
-| `backend/` | NestJS + TypeScript | API — api.policyforge.com | Phase 1 — complete |
-| `frontend/` | React + Vite + Tailwind | SPA — app.policyforge.com | Phase 2 — complete |
-| `website/` | Next.js 14 + Tailwind | Marketing — www.policyforge.com | Phase 3 — complete |
+| `backend/` | NestJS + TypeScript | API — api.thepolicyforge.com | Phase 1 — complete |
+| `frontend/` | React + Vite + Tailwind | SPA — app.thepolicyforge.com | Phase 2 — complete |
+| `website/` | Next.js 14 + Tailwind | Marketing — www.thepolicyforge.com | Phase 3 — complete |
 
 Migration is tracked in `Technical Documentation/13-Three-App-Migration-Plan.md`.  
 Do not delete that file until all phases are complete and verified.
