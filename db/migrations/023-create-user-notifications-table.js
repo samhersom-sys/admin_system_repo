@@ -9,7 +9,7 @@ async function run() {
             CREATE TABLE IF NOT EXISTS user_notifications (
                 id            SERIAL PRIMARY KEY,
                 user_name     VARCHAR(255),
-                template_code VARCHAR(50) REFERENCES notification_templates(code) ON DELETE CASCADE,
+                template_code VARCHAR(50) REFERENCES notification_templates(template_code) ON DELETE CASCADE,
                 context_data  JSONB,
                 is_read       BOOLEAN NOT NULL DEFAULT FALSE,
                 is_dismissed  BOOLEAN NOT NULL DEFAULT FALSE,
