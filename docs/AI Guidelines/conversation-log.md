@@ -4,6 +4,24 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-04-01] [HH:MM] — Testing Branch Renamed To UAT
+
+**Request:**
+User decided the hosted pre-production branch should be called `uat` rather than `testing`, because a separate QA lane may exist later.
+
+**Outcome:**
+Updated the CI workflow and deployment documentation to replace the hosted non-production branch name `testing` with `uat`. The promotion flow is now documented as local development -> `uat` -> `production`, and the workflow is configured to run on `uat` and `production`.
+
+**Files Changed:**
+- `.github/workflows/ci.yml` — changed non-production workflow triggers from `testing` to `uat`
+- `docs/Technical Documentation/14-Deployment-Runbook.md` — updated UAT branch references from `testing` to `uat`
+- `docs/Technical Documentation/13-Three-App-Migration-Plan.md` — updated CI/CD and decision-log language from `testing` to `uat`
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- Documentation and workflow updates only
+- Existing `testing` branch can remain temporarily until GitHub rules and Railway are switched to `uat`
+
 ### [2026-04-01] [HH:MM] — Hosted Non-Production Flow Reframed As Testing And UAT
 
 **Request:**

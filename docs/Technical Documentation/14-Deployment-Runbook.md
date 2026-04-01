@@ -192,8 +192,8 @@
 ### Branching
 
 - `production` is the production release branch
-- `testing` is the shared pre-production branch that deploys to the hosted UAT environment
-- Feature work happens on non-release branches, is validated locally during development, and lands in `testing` before promotion to `production`
+- `uat` is the shared pre-production branch that deploys to the hosted UAT environment
+- Feature work happens on non-release branches, is validated locally during development, and lands in `uat` before promotion to `production`
 - Use explicit environment names in documentation and hosting configuration: local `development`, hosted `UAT`, and `production`.
 
 ### Delivery model
@@ -201,7 +201,7 @@
 - GitHub Actions should be the CI gate only.
 - Railway and Cloudflare Pages remain the deployment executors.
 - The repository should not move deployment responsibility into GitHub Actions for the first production release.
-- The objective is: complete day-to-day development locally, merge validated work into `testing`, validate the shared UAT environment there, then promote to `production` for the live deploy.
+- The objective is: complete day-to-day development locally, merge validated work into `uat`, validate the shared UAT environment there, then promote to `production` for the live deploy.
 - Workflow file: `.github/workflows/ci.yml`
 
 ### Required CI before deploy
@@ -241,10 +241,10 @@ Run these checks from the repository root:
 
 ### Pull request and merge policy
 
-- CI should run on pull requests targeting `testing` and `production`.
-- CI should also run on direct pushes to `testing` and `production`.
+- CI should run on pull requests targeting `uat` and `production`.
+- CI should also run on direct pushes to `uat` and `production`.
 - Branch protection should require the CI workflow to pass before merge.
-- Railway and Cloudflare should deploy the shared UAT environment from `testing` and the live environment from `production`.
+- Railway and Cloudflare should deploy the shared UAT environment from `uat` and the live environment from `production`.
 - Do not permit deployment-only changes to bypass CI; the app, API, and website must all remain validated together.
 
 ### Branch protection rules
@@ -262,9 +262,9 @@ Apply these rules in GitHub branch protection after `production` is set as the d
 - Restrict direct pushes.
 - Disallow force pushes.
 - Disallow branch deletion.
-- Treat `production` as the live-release branch; changes should normally arrive from `testing`, not directly from feature branches.
+- Treat `production` as the live-release branch; changes should normally arrive from `uat`, not directly from feature branches.
 
-#### `testing`
+#### `uat`
 
 - Require a pull request before merging.
 - Require status checks to pass before merging.
