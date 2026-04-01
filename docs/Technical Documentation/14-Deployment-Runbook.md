@@ -191,15 +191,17 @@
 
 ### Branching
 
-- `main` is the production release branch
-- Feature work happens on non-`main` branches
+- `production` is the production release branch
+- `development` is the shared pre-production integration branch
+- Feature work happens on non-release branches and lands in `development` first
+- Use full environment names in documentation and hosting configuration: `development`, `staging`, and `production`.
 
 ### Delivery model
 
 - GitHub Actions should be the CI gate only.
 - Railway and Cloudflare Pages remain the deployment executors.
 - The repository should not move deployment responsibility into GitHub Actions for the first production release.
-- The objective is: merge to `main` only after validation passes, then let Railway and Cloudflare deploy from `main`.
+- The objective is: merge feature work into `development` after validation passes, validate the shared non-production environment there, then promote to `production` for the live deploy.
 - Workflow file: `.github/workflows/ci.yml`
 
 ### Required CI before deploy
@@ -239,9 +241,10 @@ Run these checks from the repository root:
 
 ### Pull request and merge policy
 
-- CI should run on pull requests targeting `main`.
-- CI should also run on direct pushes to `main`.
+- CI should run on pull requests targeting `development` and `production`.
+- CI should also run on direct pushes to `development` and `production`.
 - Branch protection should require the CI workflow to pass before merge.
+- Railway and Cloudflare should deploy the shared non-production environment from `development` and the live environment from `production`.
 - Do not permit deployment-only changes to bypass CI; the app, API, and website must all remain validated together.
 
 ### Explicit non-goals for first-release CI/CD
@@ -258,7 +261,7 @@ Run these checks from the repository root:
 
 ### Deployment trigger
 
-- Railway and Cloudflare deploy from `main` only after CI passes
+- Railway and Cloudflare deploy from `production` only after CI passes
 
 ### Production database rule
 

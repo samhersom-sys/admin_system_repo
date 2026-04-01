@@ -4,6 +4,41 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-04-01] [HH:MM] — Branch Model Switched To Development And Production
+
+**Request:**
+User decided to make the future-safe branch naming change now rather than leaving the repository on `main` for production.
+
+**Outcome:**
+Updated the CI workflow and deployment documentation to use `development` as the shared integration branch and `production` as the live release branch. The workflow now runs on pull requests and pushes for both branches so validation covers pre-production integration and live release promotion. The runbook and migration plan now describe promotion from `development` to `production` instead of direct release flow from `main`.
+
+**Files Changed:**
+- `.github/workflows/ci.yml` — changed workflow triggers from `main` to `development` and `production`
+- `docs/Technical Documentation/14-Deployment-Runbook.md` — updated branching, merge policy, and deployment flow language
+- `docs/Technical Documentation/13-Three-App-Migration-Plan.md` — updated CI/CD branch references and added branch-model decision
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- Workflow and Markdown files updated without file-level errors
+- Hosting providers still need their branch settings changed outside the repository
+
+### [2026-04-01] [HH:MM] — Environment Naming Convention Clarified
+
+**Request:**
+User asked to standardize future branch and environment naming on `development` and `production` rather than shorthand labels such as `develop` or `prod`.
+
+**Outcome:**
+Updated the deployment runbook and migration plan to record the naming convention for the next environment split. The current first-release setup remains `main` deploying to production, but any shared pre-production branch should be named `development`, and documentation/configuration should use full environment names such as `development`, `staging`, and `production`.
+
+**Files Changed:**
+- `docs/Technical Documentation/14-Deployment-Runbook.md` — clarified branch and environment naming convention
+- `docs/Technical Documentation/13-Three-App-Migration-Plan.md` — added decision log entry for full environment names
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- Documentation-only change
+- No runtime behavior changed
+
 ### [2026-04-01] [HH:MM] — GitHub Actions CI Workflow Added
 
 **Request:**
