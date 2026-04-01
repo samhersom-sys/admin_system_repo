@@ -3,11 +3,11 @@ name: CI
 on:
   pull_request:
     branches:
-      - development
+      - testing
       - production
   push:
     branches:
-      - development
+      - testing
       - production
 
 permissions:

@@ -4,6 +4,24 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-04-01] [HH:MM] — Hosted Non-Production Flow Reframed As Testing And UAT
+
+**Request:**
+User clarified that day-to-day development should stay local and that the hosted non-production lane is really UAT, not a separate cloud development environment. User then requested a testing branch.
+
+**Outcome:**
+Updated the CI workflow and deployment documentation to use `testing` as the shared pre-production branch that deploys to the hosted UAT environment, while keeping local development as the primary day-to-day engineering workflow. The runbook and migration plan now describe the promotion path as local development -> `testing`/UAT -> `production`.
+
+**Files Changed:**
+- `.github/workflows/ci.yml` — changed non-production workflow triggers from `development` to `testing`
+- `docs/Technical Documentation/14-Deployment-Runbook.md` — updated branching, UAT flow, and branch protection language
+- `docs/Technical Documentation/13-Three-App-Migration-Plan.md` — updated CI/CD and decision-log language for `testing` and UAT
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- Documentation and workflow updates only
+- Existing `development` branch intentionally left in place for transition and cleanup later
+
 ### [2026-04-01] [HH:MM] — Branch Protection Rules Documented
 
 **Request:**
