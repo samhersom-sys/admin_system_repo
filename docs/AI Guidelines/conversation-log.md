@@ -4,6 +4,26 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-04-01] [HH:MM] — Website Login Selector Added For Production And UAT
+
+**Request:**
+User requested that the website login entry point offer a choice between the production app and the UAT app, with each option redirecting to the correct hosted app login page.
+
+**Outcome:**
+Updated the website navbar to replace the single LOGIN link with an environment chooser. Desktop navigation now opens a login menu with `Production` and `UAT` options, while the mobile menu shows both options directly. The website requirements, tests, and environment example were updated so the site reads `NEXT_PUBLIC_APP_URL` for production and `NEXT_PUBLIC_UAT_APP_URL` for UAT.
+
+**Files Changed:**
+- `website/components/ExternalNavbar.tsx` — replaced the single login link with Production/UAT chooser links
+- `website/website.requirements.md` — updated navbar and env-var requirements for the new login chooser
+- `website/website.test.tsx` — updated navbar test coverage for the chooser behavior
+- `website/__tests__/codebase-scan.test.js` — expanded env-var guard for production and UAT app URLs
+- `website/.env.production.example` — added `NEXT_PUBLIC_UAT_APP_URL`
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- File-level validation passed for edited files that were checked
+- Website test suite was not run in this session
+
 ### [2026-04-01] [HH:MM] — Testing Branch Renamed To UAT
 
 **Request:**
