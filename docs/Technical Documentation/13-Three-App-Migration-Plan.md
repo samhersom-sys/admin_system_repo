@@ -102,7 +102,7 @@
 | 4.4 | Website login points to `app.thepolicyforge.com/login`; no public environment selector in first release | ✅ Done | Environment switching deferred until a real test environment exists |
 | 4.5 | Put Cloudflare in front of public hostnames (`www`, `app`, `api`) | ✅ Done | Proxying chosen; API caching must remain disabled |
 | 4.6 | Use Railway for frontend, backend, and production Postgres initially | ✅ Done | Simplest first production platform choice |
-| 4.7 | Add CI/CD pipeline: GitHub CI checks before Railway/Cloudflare deploys from `main` | ⬜ Not Started | To include tests, scans, and build verification |
+| 4.7 | Add CI/CD pipeline: GitHub CI checks before Railway/Cloudflare deploys from `main` | ✅ Done | `.github/workflows/ci.yml` added with frontend, website, and backend validation jobs |
 | 4.8 | Verify Railway frontend and backend custom domains in production | ✅ Done | `app.thepolicyforge.com` and `api.thepolicyforge.com` both responding after build and port fixes |
 | 4.9 | Verify Cloudflare Pages website deployment on production domain | ✅ Done | `www.thepolicyforge.com` live after static export and Pages path/output fixes |
 | 4.10 | Document manual Railway Postgres bootstrap for production | ✅ Done | Runbook updated to record explicit migrations and seed constraints |
@@ -138,3 +138,5 @@
 | 2026-03-30 | Railway chosen for frontend, backend, and initial production Postgres | Fastest path to first release with lowest operational overhead |
 | 2026-03-31 | Website deployment target is Cloudflare Pages using static export, not Workers | Matches the Next.js marketing site shape and avoids Wrangler-based deployment flow |
 | 2026-04-01 | Production database bootstrap remains explicit and manual | `migrationsRun` stays false by design; schema creation and optional seed execution must not be hidden inside app startup |
+| 2026-04-01 | First-release CI/CD keeps GitHub Actions as a validation gate only | Railway and Cloudflare continue to deploy from `main`; CI blocks merges but does not own hosting or production database changes |
+| 2026-04-01 | CI is allowed to bootstrap only an ephemeral test Postgres service | The current backend integration suite needs migrations and seed data, but production database mutation remains manual and out of band |

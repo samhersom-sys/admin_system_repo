@@ -194,6 +194,14 @@
 - `main` is the production release branch
 - Feature work happens on non-`main` branches
 
+### Delivery model
+
+- GitHub Actions should be the CI gate only.
+- Railway and Cloudflare Pages remain the deployment executors.
+- The repository should not move deployment responsibility into GitHub Actions for the first production release.
+- The objective is: merge to `main` only after validation passes, then let Railway and Cloudflare deploy from `main`.
+- Workflow file: `.github/workflows/ci.yml`
+
 ### Required CI before deploy
 
 - Frontend tests
@@ -203,9 +211,60 @@
 - Website build
 - Backend build
 
+### Recommended CI command set
+
+Run these checks from the repository root:
+
+1. Frontend tests
+  - `npm run test`
+2. Frontend scan tests
+  - `npm run test:scan`
+3. Backend tests
+  - `npm run test:backend`
+4. Frontend build
+  - `npm run build --prefix frontend`
+5. Website build
+  - `npm run build --prefix website`
+6. Backend build
+  - `npm run build:backend`
+
+### Command notes
+
+- `npm run test` at the repository root delegates to `frontend/`.
+- `npm run test:scan` at the repository root delegates to the frontend codebase scan.
+- `npm run build --prefix frontend` runs the frontend `prebuild` hook first, so the scan test executes again as part of that build.
+- `npm run build:backend` is the root-level backend build wrapper and should be preferred over hardcoding `backend/nest` paths inside CI documentation.
+- `website/` currently needs a production build check, even though deployment is handled by Cloudflare Pages.
+- The current backend integration suite is still rooted in the repository-level Express backend (`backend/server.js`) and requires an ephemeral Postgres instance plus schema/bootstrap data before tests run.
+
+### Pull request and merge policy
+
+- CI should run on pull requests targeting `main`.
+- CI should also run on direct pushes to `main`.
+- Branch protection should require the CI workflow to pass before merge.
+- Do not permit deployment-only changes to bypass CI; the app, API, and website must all remain validated together.
+
+### Explicit non-goals for first-release CI/CD
+
+- Do not hide production schema bootstrap inside application startup.
+- Do not let CI mutate the production database.
+- Do not move Railway or Cloudflare deployment logic into custom scripts unless a later release needs that extra control.
+
+### Allowed CI database bootstrap
+
+- CI may run migrations and seed data against an **ephemeral test database** created inside the workflow.
+- This is allowed only to support integration tests and must never target Railway production infrastructure.
+- The current backend integration suite requires lookup and auth seed data, so `.github/workflows/ci.yml` bootstraps the temporary CI Postgres service before running `npm run test:backend`.
+
 ### Deployment trigger
 
 - Railway and Cloudflare deploy from `main` only after CI passes
+
+### Production database rule
+
+- Production database bootstrap remains an explicit operator step.
+- CI may validate builds and tests, but it must not implicitly create production tables or seed production users.
+- Any future migration automation must be designed separately with rollback and failure-handling rules; it is not part of the first-release CI baseline.
 
 ---
 

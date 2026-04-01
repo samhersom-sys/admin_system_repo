@@ -4,6 +4,49 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-04-01] [HH:MM] — GitHub Actions CI Workflow Added
+
+**Request:**
+User chose the next step of implementing the documented CI workflow rather than making another documentation-only commit.
+
+**Outcome:**
+Added `.github/workflows/ci.yml` to provide first-release GitHub Actions validation for the active `Cleaned` repository. The workflow runs on pull requests to `main` and pushes to `main`, and it splits validation into frontend, website, and backend jobs. Frontend installs dependencies, runs Jest, runs the scan suite, and builds. Website installs dependencies and runs a production build. Backend provisions an ephemeral Postgres service, runs repository migrations, seeds the temporary test database, starts the repository-level Express backend for the current integration suite, runs `npm run test:backend`, and then builds the Nest backend with `npm run build:backend`. The deployment runbook and migration plan were updated to reflect the implemented workflow and to clarify that CI database bootstrap is allowed only for an ephemeral test database, never production.
+
+**Files Changed:**
+- `.github/workflows/ci.yml` — created GitHub Actions CI workflow for frontend, website, and backend validation
+- `docs/Technical Documentation/14-Deployment-Runbook.md` — updated CI section to reference the workflow file and document ephemeral CI DB bootstrap
+- `docs/Technical Documentation/13-Three-App-Migration-Plan.md` — marked Phase 4 CI/CD item done and added CI bootstrap decision
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- Workflow commands were aligned to the current root, `frontend/`, `backend/nest/`, and `website/` package scripts
+- Markdown files have no file-level errors
+- Workflow execution was not run inside GitHub Actions from this session
+
+**Open Questions / Deferred:**
+- Branch protection settings still need to be configured in GitHub to require the CI workflow before merge
+- The backend integration suite still targets the repository-level Express backend rather than the Nest backend
+
+### [2026-04-01] [HH:MM] — CI/CD Walkthrough Documented For First Production Release
+
+**Request:**
+User asked the AI to document the agreed CI/CD walkthrough after the deployment documentation commit.
+
+**Outcome:**
+Expanded the deployment runbook to record the first-release CI/CD model: GitHub Actions as the validation gate, Railway and Cloudflare as the actual deployers, required checks for frontend, backend, and website, the exact repository-root commands to run, branch-protection expectations, and the explicit rule that CI must not mutate the production database or run production seed flows. The migration plan was updated to show CI/CD documentation is now in progress even though the workflow files are not yet implemented.
+
+**Files Changed:**
+- `docs/Technical Documentation/14-Deployment-Runbook.md` — added CI/CD delivery model, exact commands, merge policy, and production database constraints
+- `docs/Technical Documentation/13-Three-App-Migration-Plan.md` — changed Phase 4 CI/CD item to in progress and added the validation-gate decision
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- Documentation updated against the current package scripts in the repository root, `frontend/`, `backend/nest/`, and `website/`
+- No code paths changed
+
+**Open Questions / Deferred:**
+- The GitHub Actions workflow files and branch protection settings are still not implemented
+
 ### [2026-04-01] [HH:MM] — Deployment Documentation Updated For Live Railway And Cloudflare Setup
 
 **Request:**
