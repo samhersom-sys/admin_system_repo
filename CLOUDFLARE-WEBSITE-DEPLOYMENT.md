@@ -2,6 +2,8 @@
 
 This file documents the correct Cloudflare deployment settings for the `website/` app in this repository.
 
+This configuration was verified against the live `www.thepolicyforge.com` deployment.
+
 ## Use Pages, Not Workers
 
 The public website is a static Next.js export.
@@ -9,6 +11,8 @@ The public website is a static Next.js export.
 Use a Cloudflare Pages project, not a Workers Builds project.
 
 If Cloudflare requires a deploy command such as `npx wrangler deploy`, you are in the wrong product flow.
+
+The correct production hostname for this app is `www.thepolicyforge.com`.
 
 ## Correct Project Settings
 
@@ -18,6 +22,8 @@ Use these values when creating or editing the Cloudflare Pages project:
 - Build command: `npm run build`
 - Build output directory: `out`
 - Path / root directory: `/website`
+
+Do not set a deploy command.
 
 If the `Next.js (Static HTML Export)` preset is not available, use:
 
@@ -96,6 +102,36 @@ The effective resolved output location should be:
 - build output directory: `out`
 - final built files found at: `website/out`
 
+### 4. Cloudflare builds the wrong commit
+
+Example symptom:
+
+- the build log succeeds, but the deployed site does not reflect the latest repository changes
+
+Meaning:
+
+- Cloudflare is building an older Git commit than the one you expect.
+
+Fix:
+
+- Open the build log and check the checkout line for the commit SHA.
+- Confirm that SHA matches the latest pushed commit containing the website deployment changes.
+- If the SHA is stale, push the missing commit or trigger a new deployment from the correct branch head.
+
+Do not keep debugging application code until the build log shows the expected commit.
+
+### 5. Pages build succeeds but custom domain is still wrong
+
+Meaning:
+
+- The Pages deployment is healthy, but the domain is not yet attached to the Pages project or DNS is pointing elsewhere.
+
+Fix:
+
+- Add `www.thepolicyforge.com` as a Pages custom domain.
+- Confirm the Pages preview URL works first.
+- Then confirm `www` resolves to the Pages project inside Cloudflare before testing the content.
+
 ## How To Read The Latest Log
 
 The latest log shows the build itself succeeded:
@@ -122,7 +158,9 @@ Use exactly this configuration:
 - Build command: `npm run build`
 - Build output directory: `out`
 - Path / root directory: `/website`
+- Deploy command: none
 - Environment variable: `NEXT_PUBLIC_APP_URL=https://app.thepolicyforge.com`
+- Custom domain: `www.thepolicyforge.com`
 
 ## Post-Deploy Steps
 
@@ -131,3 +169,4 @@ After the Pages deployment succeeds:
 1. Add the custom domain `www.thepolicyforge.com`
 2. Confirm the website loads on the Pages preview URL
 3. Confirm the `LOGIN` link opens `https://app.thepolicyforge.com/login`
+4. Confirm the build log commit SHA matches the latest pushed website deployment commit

@@ -4,6 +4,27 @@ Newest entries at the top. Do not delete or reformat â€” append only.
 
 ---
 
+### [2026-04-01] [HH:MM] â€” Deployment Documentation Updated For Live Railway And Cloudflare Setup
+
+**Request:**
+User asked the AI to follow AI Guidelines and update the Cloudflare and Railway documentation after the production deployment and login recovery work.
+
+**Outcome:**
+Updated the deployment documentation to reflect the verified live setup for Railway and Cloudflare Pages. The runbook now records the actual Railway service layout, custom-domain behavior, manual production database bootstrap requirement, public-vs-internal Railway Postgres connection rule, and live validation checklist including admin login. The Cloudflare website note now records the exact Pages configuration, the no-deploy-command rule, commit-SHA verification for stale deployments, and the final custom-domain flow for `www.thepolicyforge.com`. The three-app migration plan was also updated to mark the public deployment milestone and the manual Postgres bootstrap decision.
+
+**Files Changed:**
+- `docs/Technical Documentation/14-Deployment-Runbook.md` â€” updated Railway service setup, production bootstrap notes, Cloudflare Pages notes, and validation checklist
+- `CLOUDFLARE-WEBSITE-DEPLOYMENT.md` â€” updated Pages settings, stale-commit troubleshooting, and final custom-domain configuration
+- `docs/Technical Documentation/13-Three-App-Migration-Plan.md` â€” updated Phase 4 deployment status and decisions log
+- `docs/AI Guidelines/conversation-log.md` â€” this entry added
+
+**Validation:**
+- Documentation changes only; no code paths changed
+- Content aligned with the live verified deployment state: `www.thepolicyforge.com`, `app.thepolicyforge.com`, and `api.thepolicyforge.com`
+
+**Open Questions / Deferred:**
+- CI/CD pipeline work remains deferred and is still tracked as not started in Phase 4
+
 ### [2026-03-25] [HH:MM] â€” NestJS Quotes Module â€” Full Â§03 Remediation
 
 **Request:**
@@ -499,20 +520,20 @@ Created `AI Guidelines/11-Conversation-Log-Standards.md` defining the log file l
 ---
 
 ---
-### [2026-03-26] [14:52] — Fix Section Fields, Payload Merge Bug, Add Button Placement, Numeric Display
+### [2026-03-26] [14:52] ï¿½ Fix Section Fields, Payload Merge Bug, Add Button Placement, Numeric Display
 
 **Request:**
 User reported (1) quote section entity fields not visible in UI and (2) Add Coverage/Deduction/Risk Code buttons deviating from reference design in backup project. User confirmed implementation plan and required AI guideline compliance before proceeding.
 
 **Outcome:**
-Fixed payload overwrite bug in updateSection — ody.written_order/ody.signed_order now applied after Object.assign(payloadPatch, body.payload) so they take precedence. Moved Add Coverage, Add Deduction, and Add Risk Code buttons from above-table divs into their respective table header <th> cells (FiPlus icon, matching backup design). Fixed TypeORM NUMERIC?string coercion by wrapping display values with Number(). Widened ResizableGrid Column.label from string to React.ReactNode. Added frontend tests T-quotes-section-R11 through R14 (button placement and absence in non-Draft). Added backend describe('updateSection') with T-QUO-BE-NE-R14a through R14e (scalar update, payload precedence, key preservation, NotFoundException, ForbiddenException). All 39 backend tests and all 68 frontend tests pass.
+Fixed payload overwrite bug in updateSection ï¿½ ody.written_order/ody.signed_order now applied after Object.assign(payloadPatch, body.payload) so they take precedence. Moved Add Coverage, Add Deduction, and Add Risk Code buttons from above-table divs into their respective table header <th> cells (FiPlus icon, matching backup design). Fixed TypeORM NUMERIC?string coercion by wrapping display values with Number(). Widened ResizableGrid Column.label from string to React.ReactNode. Added frontend tests T-quotes-section-R11 through R14 (button placement and absence in non-Draft). Added backend describe('updateSection') with T-QUO-BE-NE-R14a through R14e (scalar update, payload precedence, key preservation, NotFoundException, ForbiddenException). All 39 backend tests and all 68 frontend tests pass.
 
 **Files Changed:**
-- ackend/nest/src/quotes/quotes.service.ts — reordered payload merge in updateSection so written_order/signed_order take precedence over body.payload
-- rontend/src/shared/components/ResizableGrid/ResizableGrid.tsx — Column.label: string ? React.ReactNode
-- rontend/src/quotes/QuoteSectionViewPage/QuoteSectionViewPage.tsx — Add buttons moved into table <th> headers; section:add-coverage event listener removed; Number() coercion on numeric display fields; DeductionsTable grossPremium prop coercion
-- rontend/src/quotes/quotes.test.tsx — added T-quotes-section-R11, R12, R13, R14
-- ackend/nest/src/quotes/quotes.spec.ts — added describe('updateSection') with T-QUO-BE-NE-R14a through R14e
+- ackend/nest/src/quotes/quotes.service.ts ï¿½ reordered payload merge in updateSection so written_order/signed_order take precedence over body.payload
+- rontend/src/shared/components/ResizableGrid/ResizableGrid.tsx ï¿½ Column.label: string ? React.ReactNode
+- rontend/src/quotes/QuoteSectionViewPage/QuoteSectionViewPage.tsx ï¿½ Add buttons moved into table <th> headers; section:add-coverage event listener removed; Number() coercion on numeric display fields; DeductionsTable grossPremium prop coercion
+- rontend/src/quotes/quotes.test.tsx ï¿½ added T-quotes-section-R11, R12, R13, R14
+- ackend/nest/src/quotes/quotes.spec.ts ï¿½ added describe('updateSection') with T-QUO-BE-NE-R14a through R14e
 
 **Open Questions / Deferred:**
 - E2E (Playwright) test coverage for section field display and Add button placement not yet written
