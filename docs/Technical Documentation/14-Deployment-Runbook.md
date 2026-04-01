@@ -247,6 +247,40 @@ Run these checks from the repository root:
 - Railway and Cloudflare should deploy the shared non-production environment from `development` and the live environment from `production`.
 - Do not permit deployment-only changes to bypass CI; the app, API, and website must all remain validated together.
 
+### Branch protection rules
+
+Apply these rules in GitHub branch protection after `production` is set as the default branch.
+
+#### `production`
+
+- Require a pull request before merging.
+- Require at least 1 approval.
+- Dismiss stale approvals when new commits are pushed.
+- Require conversation resolution before merge when GitHub offers that option.
+- Require status checks to pass before merging.
+- Require branches to be up to date before merging.
+- Restrict direct pushes.
+- Disallow force pushes.
+- Disallow branch deletion.
+- Treat `production` as the live-release branch; changes should normally arrive from `development`, not directly from feature branches.
+
+#### `development`
+
+- Require a pull request before merging.
+- Require status checks to pass before merging.
+- Require branches to be up to date before merging.
+- Disallow force pushes.
+- Disallow branch deletion.
+- Approval requirement is optional for a single maintainer, but recommended once regular multi-developer collaboration starts.
+
+#### Required status checks
+
+- `Frontend`
+- `Website`
+- `Backend`
+
+If GitHub shows the workflow name instead of individual job names, require the checks surfaced by `.github/workflows/ci.yml` for both protected branches.
+
 ### Explicit non-goals for first-release CI/CD
 
 - Do not hide production schema bootstrap inside application startup.

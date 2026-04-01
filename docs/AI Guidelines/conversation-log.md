@@ -4,6 +4,23 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-04-01] [HH:MM] — Branch Protection Rules Documented
+
+**Request:**
+User asked to update the documentation after agreeing on the GitHub branch protection model for `development` and `production`.
+
+**Outcome:**
+Expanded the deployment runbook to record the concrete GitHub branch protection rules for both protected branches. The runbook now states that `production` must require PRs, CI, at least one approval, stale approval dismissal, and blocked direct pushes, while `development` must require PRs, CI, and standard branch-safety settings without forcing the same approval strictness for solo iteration. The migration plan was updated to mark this documentation step complete and to record the decision that `production` protection is intentionally stricter than `development` protection.
+
+**Files Changed:**
+- `docs/Technical Documentation/14-Deployment-Runbook.md` — added the branch protection rules and required CI status checks
+- `docs/Technical Documentation/13-Three-App-Migration-Plan.md` — added a completed documentation step and decision-log entry for branch protection
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- Documentation-only change
+- No runtime or workflow behavior changed in the repository
+
 ### [2026-04-01] [HH:MM] — Branch Model Switched To Development And Production
 
 **Request:**
