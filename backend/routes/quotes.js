@@ -511,7 +511,7 @@ router.post('/:id/audit', async (req, res) => {
     const orgCode = req.user.orgCode
     const { action, details } = req.body
     if (!action || typeof action !== 'string') {
-        return res.status(400).json({ error: 'action is required' })
+        return res.status(400).json({ message: 'action is required' })
     }
     try {
         const rows = await runQuery(
