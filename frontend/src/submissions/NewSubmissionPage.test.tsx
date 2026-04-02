@@ -30,6 +30,11 @@ jest.mock('@/submissions/submissions.service', () => ({
     createSubmission: (...args: unknown[]) => mockCreateSubmission(...args),
 }))
 
+const mockAddNotification = jest.fn()
+jest.mock('@/shell/NotificationDock', () => ({
+    useNotifications: () => ({ addNotification: mockAddNotification }),
+}))
+
 // Stub sub-components so page tests focus on orchestration
 jest.mock('@/submissions/SubmissionIdentity/SubmissionIdentity', () =>
     function SubmissionIdentity({ reference }: { reference: string }) {

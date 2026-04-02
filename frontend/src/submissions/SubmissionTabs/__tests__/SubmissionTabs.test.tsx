@@ -4,6 +4,16 @@
  * Requirements: requirements.md
  */
 
+// API CONTRACT ALIGNMENT:
+//   GET    /api/submissions/:id/quotes               -> QuoteRow[]
+//   GET    /api/submissions/:id/related-submissions  -> RelatedSubmissionRow[]
+//   GET    /api/submissions/:id/audit                -> AuditEvent[]
+//   GET    /api/submissions/:id/ba-contracts         -> BAContractRow[]
+//   POST   /api/submissions/:id/related-submissions  -> RelatedSubmissionRow
+//   PUT    /api/submissions/:id/related-submissions/:relatedId -> RelatedSubmissionRow
+//   DELETE /api/submissions/:id/related-submissions/:relatedId -> void
+//   No .data wrapper - all responses return value directly at root level.
+
 import React from 'react'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

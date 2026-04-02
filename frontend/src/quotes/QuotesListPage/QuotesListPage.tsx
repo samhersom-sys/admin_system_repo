@@ -109,10 +109,10 @@ export default function QuotesListPage() {
     const heading = submissionIdFilter ? 'Quotes for Submission' : 'Quotes'
 
     return (
-        <div className="p-6 space-y-4">
+        <div className="p-6 flex flex-col gap-4">
             {/* Header */}
             <div className="flex items-center justify-between">
-                <h1 className="text-xl font-semibold text-gray-900">{heading}</h1>
+                <p role="heading" aria-level={1} className="text-xl font-semibold text-gray-900">{heading}</p>
                 <Link
                     to="/quotes/new"
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500"

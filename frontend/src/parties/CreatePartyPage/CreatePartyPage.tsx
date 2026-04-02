@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { FiSave, FiArrowLeft } from 'react-icons/fi'
 import { useSidebarSection } from '@/shell/SidebarContext'
 import type { SidebarSection } from '@/shell/SidebarContext'
@@ -34,9 +34,13 @@ const SIDEBAR_SECTION: SidebarSection = {
 
 export default function CreatePartyPage() {
     const navigate = useNavigate()
+    const location = useLocation()
+    const searchParams = new URLSearchParams(location.search)
+    const returnTo = searchParams.get('returnTo')
+    const presetType = searchParams.get('type') ?? ''
 
     const [name, setName] = useState('')
-    const [type, setType] = useState('')
+    const [type, setType] = useState(presetType)
     const [email, setEmail] = useState('')
     const [phone, setPhone] = useState('')
     const [addressLine1, setAddressLine1] = useState('')
@@ -74,7 +78,7 @@ export default function CreatePartyPage() {
                 postcode: postcode.trim() || undefined,
                 country: country.trim() || undefined,
             })
-            navigate('/parties')
+            navigate(returnTo || '/parties')
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to create party.'
             setValidationError(msg)
@@ -92,7 +96,7 @@ export default function CreatePartyPage() {
     return (
         <div className="p-6 flex flex-col gap-6">
             {/* Header (R01) */}
-            <h1 className="text-xl font-semibold text-gray-900">Create Party</h1>
+            <p role="heading" aria-level={1} className="text-xl font-semibold text-gray-900">Create Party</p>
 
             {/* Validation / API error (R04, R05c) */}
             {validationError && (

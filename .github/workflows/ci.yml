@@ -4,10 +4,12 @@ on:
   pull_request:
     branches:
       - development
+      - uat
       - production
   push:
     branches:
       - development
+      - uat
       - production
 
 permissions:

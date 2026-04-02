@@ -16,7 +16,7 @@ async function run() {
         await client.query(`
             CREATE TABLE IF NOT EXISTS quote_section_risk_codes (
                 id SERIAL PRIMARY KEY,
-                quote_section_id INTEGER NOT NULL REFERENCES quote_section(id) ON DELETE CASCADE,
+                quote_section_id INTEGER NOT NULL REFERENCES quote_sections(id) ON DELETE CASCADE,
                 code TEXT NOT NULL,
                 description TEXT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

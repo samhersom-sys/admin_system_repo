@@ -546,7 +546,7 @@ export default function QuoteSectionViewPage() {
 
     if (notFound || !section) {
         return (
-            <div className="p-6 space-y-4">
+            <div className="p-6 flex flex-col gap-4">
                 <p className="text-gray-600">Section not found.</p>
                 <Link to={`/quotes/${id}`} className="text-brand-600 hover:underline text-sm">
                     Back to Quote
@@ -556,11 +556,11 @@ export default function QuoteSectionViewPage() {
     }
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="p-6 flex flex-col gap-6">
             {/* ------------------------------------------------------------------ */}
             {/* Section details header (F-052) */}
             {/* ------------------------------------------------------------------ */}
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
                 <h2 className="text-lg font-semibold text-gray-900">Section Details</h2>
 
                 {actionError && (
@@ -570,7 +570,7 @@ export default function QuoteSectionViewPage() {
                 {/* Two-column field group */}
                 <div className="grid grid-cols-2 gap-4">
                     {/* Left column — dates & reference */}
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                         {/* Reference — always read-only (F-052) */}
                         <div>
                             <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
@@ -638,7 +638,7 @@ export default function QuoteSectionViewPage() {
                     </div>
 
                     {/* Right column — limits, premium, order */}
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                         {/* Limit */}
                         <div>
                             <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
@@ -789,7 +789,7 @@ export default function QuoteSectionViewPage() {
                 {/* Excess & Sum Insured — full-width group */}
                 <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
                     {/* Excess */}
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                         <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Excess</h3>
                         <div>
                             <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
@@ -847,7 +847,7 @@ export default function QuoteSectionViewPage() {
                     </div>
 
                     {/* Sum Insured */}
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                         <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Sum Insured</h3>
                         <div>
                             <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">

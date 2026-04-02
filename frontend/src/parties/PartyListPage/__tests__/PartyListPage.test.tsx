@@ -1,5 +1,5 @@
 /**
- * PartyListPage — tests
+ * PartyListPage ï¿½ tests
  *
  * Requirements: requirements.md
  */
@@ -21,6 +21,11 @@ jest.mock('@/parties/parties.service', () => ({
     listParties: (...args: unknown[]) => mockListParties(...args),
 }))
 
+const mockAddNotification = jest.fn()
+jest.mock('@/shell/NotificationDock', () => ({
+    useNotifications: () => ({ addNotification: mockAddNotification }),
+}))
+
 function renderPage() {
     return render(
         <MemoryRouter>
@@ -37,9 +42,9 @@ beforeEach(() => {
 })
 
 // ---------------------------------------------------------------------------
-// R01 — Party list display
+// R01 ï¿½ Party list display
 // ---------------------------------------------------------------------------
-describe('R01 — Party list display', () => {
+describe('R01 ï¿½ Party list display', () => {
     it('T-PAR-LIST-R01a: shows loading state while fetch is in flight', () => {
         renderPage()
         expect(screen.getByLabelText('Loading parties')).toBeInTheDocument()
@@ -80,9 +85,9 @@ describe('R01 — Party list display', () => {
 })
 
 // ---------------------------------------------------------------------------
-// R02 — Role filter
+// R02 ï¿½ Role filter
 // ---------------------------------------------------------------------------
-describe('R02 — Role filter', () => {
+describe('R02 ï¿½ Role filter', () => {
     it('T-PAR-LIST-R02b: selecting a role calls listParties with that type', async () => {
         mockListParties.mockResolvedValue([])
         renderPage()
@@ -106,9 +111,9 @@ describe('R02 — Role filter', () => {
 })
 
 // ---------------------------------------------------------------------------
-// R03 — Name search
+// R03 ï¿½ Name search
 // ---------------------------------------------------------------------------
-describe('R03 — Name search', () => {
+describe('R03 ï¿½ Name search', () => {
     it('T-PAR-LIST-R03b: typing in search calls listParties with search param', async () => {
         mockListParties.mockResolvedValue([])
         renderPage()
@@ -120,9 +125,9 @@ describe('R03 — Name search', () => {
 })
 
 // ---------------------------------------------------------------------------
-// R04 — Create party navigation
+// R04 ï¿½ Create party navigation
 // ---------------------------------------------------------------------------
-describe('R04 — Create party navigation', () => {
+describe('R04 ï¿½ Create party navigation', () => {
     it('T-PAR-LIST-R04a: clicking New Party button navigates to /parties/new', () => {
         renderPage()
         fireEvent.click(screen.getByLabelText('New Party'))

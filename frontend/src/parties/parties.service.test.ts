@@ -1,11 +1,30 @@
 /**
- * Parties domain � unit tests
+ * Parties domain � unit tests
  *
  * Requirements: parties.requirements.md
  */
 
 import { get, post } from '@/shared/lib/api-client/api-client'
 import { listParties, createParty } from './parties.service'
+
+// ---------------------------------------------------------------------------
+// Mocks
+//
+// API CONTRACT ALIGNMENT (verified — backend endpoint live):
+//   GET    /api/parties                           → Party[]
+//   POST   /api/parties                           → Party
+//   GET    /api/parties/:id                        → Party
+//   PUT    /api/parties/:id                        → Party
+//   GET    /api/parties/:id/entities               → EntityRow[]
+//   POST   /api/parties/:id/entities               → EntityRow
+//   PUT    /api/parties/:id/entities/:entityId     → EntityRow
+//   DELETE /api/parties/:id/entities/:entityId     → 204
+//   GET    /api/parties/:id/audit                  → AuditEvent[]
+//   POST   /api/parties/:id/audit                  → AuditEvent
+//   GET    /api/parties/:id/submissions            → RelatedRecord[]
+//   GET    /api/parties/:id/quotes                 → RelatedRecord[]
+//   No .data wrapper — all responses return value directly at root level
+// ---------------------------------------------------------------------------
 
 jest.mock('@/shared/lib/api-client/api-client', () => ({
     get: jest.fn(),
@@ -20,7 +39,7 @@ beforeEach(() => {
 })
 
 // ---------------------------------------------------------------------------
-// R02 � listParties
+// R02 � listParties
 // ---------------------------------------------------------------------------
 describe('listParties', () => {
     it('T-parties-DOMAIN-R02a: returns a Party[] on success', async () => {
@@ -50,7 +69,7 @@ describe('listParties', () => {
 })
 
 // ---------------------------------------------------------------------------
-// R03 � createParty
+// R03 � createParty
 // ---------------------------------------------------------------------------
 describe('createParty', () => {
     it('T-parties-DOMAIN-R03a: posts correct payload and returns created party', async () => {

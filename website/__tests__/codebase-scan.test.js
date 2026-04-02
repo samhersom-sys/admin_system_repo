@@ -146,19 +146,20 @@ describe('WEB Architectural Constraints — codebase scan', () => {
     })
 
     // ── REQ-WEB-C-014 ─────────────────────────────────────────────────────────
-    // The production app URL (app.thepolicyforge.com) must not be hardcoded in source.
-    // It must always be read from NEXT_PUBLIC_APP_URL.
+    // The production and UAT app URLs must not be hardcoded in source.
+    // They must always be read from NEXT_PUBLIC_APP_URL / NEXT_PUBLIC_UAT_APP_URL.
     // The localhost:5173 dev fallback on the same line as the env var read is permitted.
-    it('T-WEB-arch-C014: production app URL not hardcoded in website/ source files', () => {
+    it('T-WEB-arch-C014: app URLs not hardcoded in website/ source files', () => {
         const violations = []
         for (const file of allSourceFiles) {
             const lines = readLines(file)
             lines.forEach((line, i) => {
                 if (isCommentLine(line)) return
-                // If the line also reads NEXT_PUBLIC_APP_URL, it is the approved pattern
+                // If the line reads one of the approved env vars, it is permitted.
                 if (/process\.env\.NEXT_PUBLIC_APP_URL/.test(line)) return
-                // Hardcoded production domain — not permitted outside the env var read
-                if (/app\.thepolicyforge\.com/.test(line)) {
+                if (/process\.env\.NEXT_PUBLIC_UAT_APP_URL/.test(line)) return
+                // Hardcoded app domains are not permitted outside the env var reads.
+                if (/app\.thepolicyforge\.com|app\.uat\.thepolicyforge\.com/.test(line)) {
                     violations.push(
                         `${path.relative(WEBSITE_ROOT, file)}:${i + 1} — ${line.trim()}`
                     )

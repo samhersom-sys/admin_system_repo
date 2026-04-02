@@ -4,6 +4,7 @@ import path from 'path'
 
 const previewAllowedHosts = [
     'app.thepolicyforge.com',
+    'app.uat.thepolicyforge.com',
 ]
 
 export default defineConfig({
