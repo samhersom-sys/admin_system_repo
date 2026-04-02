@@ -539,8 +539,6 @@ router.post('/:id/audit', async (req, res) => {
     }
 })
 
-})
-
 // ---------------------------------------------------------------------------
 // R11 — POST /api/quotes/:id/copy
 // Creates a Draft copy of the quote with a new reference. All editable fields
