@@ -9,6 +9,13 @@
  * Note: F-023 and F-024 are it.todo() pending OQ-044 (broker-origin locked field list).
  */
 
+// API CONTRACT ALIGNMENT:
+//   GET  /api/submissions/:id -> Submission
+//   PUT  /api/submissions/:id -> Submission
+//   POST /api/submissions/:id/edit-lock -> EditLock
+//   DELETE /api/submissions/:id/edit-lock -> void
+//   No .data wrapper - all responses return value directly at root level.
+
 import React from 'react'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'

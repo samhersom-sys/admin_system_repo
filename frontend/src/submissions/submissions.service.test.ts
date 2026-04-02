@@ -4,6 +4,13 @@
  * Test ID format: T-submissions-DOMAIN-R[NN]
  */
 
+// API CONTRACT ALIGNMENT:
+//   POST /api/submissions -> Submission
+//   GET  /api/submissions/:id -> Submission
+//   GET  /api/submissions -> Submission[]
+//   PUT  /api/submissions/:id -> Submission
+//   No .data wrapper - all responses return value directly at root level.
+
 // ---------------------------------------------------------------------------
 // Mock api-client BEFORE importing the module under test
 // (jest.mock is hoisted but explicit placement avoids TypeScript confusion)

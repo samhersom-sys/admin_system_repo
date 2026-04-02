@@ -59,7 +59,7 @@ export default function PartyListPage() {
         <div className="p-6 flex flex-col gap-4">
             {/* Header */}
             <div className="flex items-center justify-between">
-                <h1 className="text-xl font-semibold text-gray-900">Parties</h1>
+                <p role="heading" aria-level={1} className="text-xl font-semibold text-gray-900">Parties</p>
                 <button
                     type="button"
                     aria-label="New Party"

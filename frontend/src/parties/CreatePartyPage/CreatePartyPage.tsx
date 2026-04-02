@@ -92,7 +92,7 @@ export default function CreatePartyPage() {
     return (
         <div className="p-6 flex flex-col gap-6">
             {/* Header (R01) */}
-            <h1 className="text-xl font-semibold text-gray-900">Create Party</h1>
+            <p role="heading" aria-level={1} className="text-xl font-semibold text-gray-900">Create Party</p>
 
             {/* Validation / API error (R04, R05c) */}
             {validationError && (
