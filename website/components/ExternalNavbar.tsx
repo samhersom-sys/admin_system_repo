@@ -103,14 +103,13 @@ export default function ExternalNavbar() {
                         </div>
                     </div>
 
-                    {/* Mobile hamburger button */}
                     <button
                         type="button"
                         className="md:hidden flex flex-col justify-center items-center w-8 h-8 gap-1.5"
                         aria-label={menuOpen ? 'Close menu' : 'Open menu'}
                         aria-expanded={menuOpen}
                         onClick={() => {
-                            setMenuOpen((o) => !o)
+                            setMenuOpen((open) => !open)
                             setLoginMenuOpen(false)
                         }}
                     >
@@ -121,7 +120,6 @@ export default function ExternalNavbar() {
                 </div>
             </div>
 
-            {/* Mobile dropdown menu */}
             {menuOpen && (
                 <div className="md:hidden bg-white border-t border-gray-200 px-6 pb-4">
                     <Link href="/" className={mobileLinkClass('/')} onClick={() => setMenuOpen(false)}>HOME</Link>
@@ -146,4 +144,3 @@ export default function ExternalNavbar() {
         </nav>
     )
 }
-

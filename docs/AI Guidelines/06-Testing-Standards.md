@@ -373,6 +373,7 @@ This is the only automated check that catches the class of bug where a server.js
 7. **Never write a backend test that accepts an error status as a valid pass.** `expect([200, 500]).toContain(res.status)` is forbidden. Use `expect(res.status).toBe(200)`. If a bug prevents 200, the test must fail and the bug must be fixed before the test is committed.
 8. **After any backend route change, run Layer 2 tests** (`npm run test:backend`) before running Layer 1 tests. Frontend tests passing without backend verification is false confidence.
 9. **When retesting a feature end-to-end**, "end-to-end" means all three layers: `npm run test:all`. It does not mean re-running frontend mocks only.
+10. **When unblocking CI, document the right thing at the right level.** Always append the session to `docs/AI Guidelines/conversation-log.md`. Update deployment/runbook/CI notes in the same change only when the CI unblock changes operator steps, CI policy, release flow, environment rules, required checks, or reveals an enforced rule that is not yet documented clearly enough. Purely corrective fixes that only restore compliance with already-documented rules do not require runbook changes by default.
 
 ---
 

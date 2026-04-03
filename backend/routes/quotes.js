@@ -511,7 +511,7 @@ router.post('/:id/audit', async (req, res) => {
     const orgCode = req.user.orgCode
     const { action, details } = req.body
     if (!action || typeof action !== 'string') {
-        return res.status(400).json({ error: 'action is required' })
+        return res.status(400).json({ message: 'action is required' })
     }
     try {
         const rows = await runQuery(
@@ -537,8 +537,6 @@ router.post('/:id/audit', async (req, res) => {
         await logError(req, 'POST /api/quotes/:id/audit', 'ERR_QUOTE_AUDIT_POST_500', err.message, { id })
         return res.status(500).json({ error: err.message })
     }
-})
-
 })
 
 // ---------------------------------------------------------------------------

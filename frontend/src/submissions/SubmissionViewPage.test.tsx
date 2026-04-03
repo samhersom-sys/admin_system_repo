@@ -10,10 +10,10 @@
  */
 
 // API CONTRACT ALIGNMENT:
-//   GET  /api/submissions/:id -> Submission
-//   PUT  /api/submissions/:id -> Submission
-//   POST /api/submissions/:id/edit-lock -> EditLock
-//   DELETE /api/submissions/:id/edit-lock -> void
+//   GET  /api/submissions/:id                 -> Submission
+//   PUT  /api/submissions/:id                 -> Submission
+//   POST /api/submissions/:id/edit-lock       -> EditLock
+//   DELETE /api/submissions/:id/edit-lock     -> void
 //   No .data wrapper - all responses return value directly at root level.
 
 import React from 'react'

@@ -6,7 +6,7 @@
  */
 
 // API CONTRACT ALIGNMENT:
-//   POST /api/audit/event -> AuditEvent
+//   POST /api/audit/event               -> AuditEvent
 //   GET  /api/audit/history/:entityType/:entityId -> AuditEvent[]
 //   No .data wrapper - all responses return value directly at root level.
 

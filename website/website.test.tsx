@@ -179,8 +179,6 @@ describe('Homepage — /', () => {
 
     it('T-WEB-homepage-R011: hero section renders a background visual element (placeholder or real image)', () => {
         const { container } = render(<HomePage />)
-        // Hero uses a placeholder <div> until real assets are available.
-        // The first <section> must contain at least one absolutely-positioned background element.
         const heroSection = container.querySelector('section')
         expect(heroSection).not.toBeNull()
         const bgElement = heroSection!.querySelector('[class*="absolute"]')

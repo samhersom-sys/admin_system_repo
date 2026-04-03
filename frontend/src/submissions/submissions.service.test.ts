@@ -5,10 +5,10 @@
  */
 
 // API CONTRACT ALIGNMENT:
-//   POST /api/submissions -> Submission
-//   GET  /api/submissions/:id -> Submission
-//   GET  /api/submissions -> Submission[]
-//   PUT  /api/submissions/:id -> Submission
+//   POST /api/submissions      -> Submission
+//   GET  /api/submissions/:id  -> Submission
+//   GET  /api/submissions      -> Submission[]
+//   PUT  /api/submissions/:id  -> Submission
 //   No .data wrapper - all responses return value directly at root level.
 
 // ---------------------------------------------------------------------------
