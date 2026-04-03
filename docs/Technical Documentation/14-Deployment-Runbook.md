@@ -191,17 +191,21 @@
 
 ### Branching
 
+- `development` is the active coding and integration branch
 - `production` is the production release branch
-- `development` is the shared pre-production integration branch
-- Feature work happens on non-release branches and lands in `development` first
-- Use full environment names in documentation and hosting configuration: `development`, `staging`, and `production`.
+- `uat` is the shared pre-production branch that deploys to the hosted UAT environment
+- Feature work should be developed on `development` and promoted forward to `uat` and then `production`
+- Normal coding work should not happen directly on `uat` or `production`
+- `development` is a branch, not a hosted environment; the runtime environment for day-to-day engineering remains local development on the developer machine
+- Use explicit environment names in documentation and hosting configuration: local development runtime, hosted `UAT`, and `production`.
 
 ### Delivery model
 
 - GitHub Actions should be the CI gate only.
 - Railway and Cloudflare Pages remain the deployment executors.
 - The repository should not move deployment responsibility into GitHub Actions for the first production release.
-- The objective is: merge feature work into `development` after validation passes, validate the shared non-production environment there, then promote to `production` for the live deploy.
+- The objective is: complete day-to-day coding on `development`, promote validated branch state into `uat`, validate the shared UAT environment there, then promote `uat` into `production` for the live deploy.
+- `development` should receive CI validation but must not deploy a hosted environment.
 - Workflow file: `.github/workflows/ci.yml`
 
 ### Required CI before deploy
@@ -241,15 +245,24 @@ Run these checks from the repository root:
 
 ### Pull request and merge policy
 
-- CI should run on pull requests targeting `development` and `production`.
-- CI should also run on direct pushes to `development` and `production`.
+- CI should run on pull requests targeting `development`, `uat`, and `production`.
+- CI should also run on direct pushes to `development`, `uat`, and `production`.
+- `development` is the branch where coding changes are integrated before promotion.
 - Branch protection should require the CI workflow to pass before merge.
-- Railway and Cloudflare should deploy the shared non-production environment from `development` and the live environment from `production`.
+- Railway and Cloudflare should deploy the shared UAT environment from `uat` and the live environment from `production`.
+- No hosted deployment should trigger from `development`.
 - Do not permit deployment-only changes to bypass CI; the app, API, and website must all remain validated together.
 
 ### Branch protection rules
 
 Apply these rules in GitHub branch protection after `production` is set as the default branch.
+
+#### `development`
+
+- Treat `development` as the active coding branch.
+- Require CI to pass before promotion into `uat`.
+- Direct maintainer pushes may be allowed for solo work, but they should still be validated by CI.
+- Do not use `development` as a hosted deployment branch.
 
 #### `production`
 
@@ -262,9 +275,9 @@ Apply these rules in GitHub branch protection after `production` is set as the d
 - Restrict direct pushes.
 - Disallow force pushes.
 - Disallow branch deletion.
-- Treat `production` as the live-release branch; changes should normally arrive from `development`, not directly from feature branches.
+- Treat `production` as the live-release branch; changes should normally arrive from `uat`, not directly from feature branches.
 
-#### `development`
+#### `uat`
 
 - Require a pull request before merging.
 - Require status checks to pass before merging.
@@ -272,6 +285,7 @@ Apply these rules in GitHub branch protection after `production` is set as the d
 - Disallow force pushes.
 - Disallow branch deletion.
 - Approval requirement is optional for a single maintainer, but recommended once regular multi-developer collaboration starts.
+- Treat `uat` as promotion-only from `development`, not as the primary day-to-day coding branch.
 
 #### Required status checks
 
@@ -279,8 +293,7 @@ Apply these rules in GitHub branch protection after `production` is set as the d
 - `Website`
 - `Backend`
 
-If GitHub shows the workflow name instead of individual job names, require the checks surfaced by `.github/workflows/ci.yml` for both protected branches.
-
+If GitHub shows the workflow name instead of individual job names, require the checks surfaced by `.github/workflows/ci.yml` for all protected branches.
 ### Explicit non-goals for first-release CI/CD
 
 - Do not hide production schema bootstrap inside application startup.
@@ -292,6 +305,13 @@ If GitHub shows the workflow name instead of individual job names, require the c
 - CI may run migrations and seed data against an **ephemeral test database** created inside the workflow.
 - This is allowed only to support integration tests and must never target Railway production infrastructure.
 - The current backend integration suite requires lookup and auth seed data, so `.github/workflows/ci.yml` bootstraps the temporary CI Postgres service before running `npm run test:backend`.
+
+### Documentation expectation for CI-unblock fixes
+
+- Every CI-unblock change must be recorded in `docs/AI Guidelines/conversation-log.md`.
+- A CI-unblock change does **not** automatically require runbook or CI-note updates when it is purely corrective and only brings code, tests, or migrations back into alignment with rules that are already documented.
+- A CI-unblock change **does** require runbook and CI-note updates in the same change when it alters any operator step, branch policy, required status check, CI job shape, deployment flow, environment rule, or other documented release behavior.
+- A CI-unblock change also requires documentation updates when it exposes a rule that CI is already enforcing but the documentation does not currently state clearly enough. In that case, the missing rule must be documented before the fix is treated as fully complete.
 
 ### Deployment trigger
 

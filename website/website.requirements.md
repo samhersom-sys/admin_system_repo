@@ -48,7 +48,11 @@
 
 **REQ-WEB-F-003:** The `ExternalNavbar` component shall display a brand logo that links back to `/` using Next.js `<Link>`.
 
-**REQ-WEB-F-004:** The `ExternalNavbar` component shall display a LOGIN navigation item rendered as a plain HTML `<a>` element (not Next.js `<Link>`) whose `href` resolves to `${NEXT_PUBLIC_APP_URL}/login`.
+**REQ-WEB-F-004:** The `ExternalNavbar` component shall display a LOGIN control in the desktop navigation that opens a chooser containing two plain HTML `<a>` elements labelled `Production` and `UAT`.
+
+**REQ-WEB-F-004a:** The `Production` login link shall resolve to `${NEXT_PUBLIC_APP_URL}/login`.
+
+**REQ-WEB-F-004b:** The `UAT` login link shall resolve to `${NEXT_PUBLIC_UAT_APP_URL}/login`.
 
 **REQ-WEB-F-005:** The `ExternalNavbar` component shall apply transparent absolute positioning over the page content (class `absolute top-0 left-0 right-0`) when the current pathname is `/`, `/about`, or `/services`.
 
@@ -136,7 +140,7 @@
 
 **REQ-WEB-C-013:** All colour values in `website/` source files shall be expressed as Tailwind utility classes or as references to named tokens in `website/lib/design-tokens/brandColors`; no raw hex values shall appear in JSX `style` props or CSS files (except inside the SVG data URI fallback which encodes hex as `%23` to avoid scanner conflicts).
 
-**REQ-WEB-C-014:** The `website/` app shall read the cross-origin authenticated-app URL exclusively from the `NEXT_PUBLIC_APP_URL` environment variable. This value shall not be hardcoded in any source file.
+**REQ-WEB-C-014:** The `website/` app shall read the cross-origin authenticated-app URLs exclusively from the `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_UAT_APP_URL` environment variables. These values shall not be hardcoded in any source file.
 
 **REQ-WEB-C-015:** The `website/` app shall not import from any path beginning with `frontend/`, `backend/`, or `domains/`.
 
@@ -150,6 +154,8 @@
 | REQ-WEB-F-002 | `T-WEB-navbar-R002` | Tests written |
 | REQ-WEB-F-003 | `T-WEB-navbar-R003` | Tests written |
 | REQ-WEB-F-004 | `T-WEB-navbar-R004` | Tests written |
+| REQ-WEB-F-004a | `T-WEB-navbar-R004` | Tests written |
+| REQ-WEB-F-004b | `T-WEB-navbar-R004` | Tests written |
 | REQ-WEB-F-005 | `T-WEB-navbar-R005` (×3) | Tests written |
 | REQ-WEB-F-006 | `T-WEB-navbar-R006` | Tests written |
 | REQ-WEB-F-007 | `T-WEB-navbar-R007` (×2) | Tests written |

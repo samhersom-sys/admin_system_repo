@@ -106,7 +106,6 @@
 | 4.8 | Verify Railway frontend and backend custom domains in production | ✅ Done | `app.thepolicyforge.com` and `api.thepolicyforge.com` both responding after build and port fixes |
 | 4.9 | Verify Cloudflare Pages website deployment on production domain | ✅ Done | `www.thepolicyforge.com` live after static export and Pages path/output fixes |
 | 4.10 | Document manual Railway Postgres bootstrap for production | ✅ Done | Runbook updated to record explicit migrations and seed constraints |
-| 4.11 | Document GitHub branch protection rules for `development` and `production` | ✅ Done | Runbook now records required PR, CI, approval, and direct-push rules for both branches |
 
 ---
 
@@ -141,6 +140,8 @@
 | 2026-04-01 | Production database bootstrap remains explicit and manual | `migrationsRun` stays false by design; schema creation and optional seed execution must not be hidden inside app startup |
 | 2026-04-01 | First-release CI/CD keeps GitHub Actions as a validation gate only | Railway and Cloudflare deploy from Git branches; CI blocks merges but does not own hosting or production database changes |
 | 2026-04-01 | CI is allowed to bootstrap only an ephemeral test Postgres service | The current backend integration suite needs migrations and seed data, but production database mutation remains manual and out of band |
-| 2026-04-01 | Future environment naming should use `development` and `production` in full | Avoids shorthand branch/environment labels drifting into docs, hosting config, or team process |
-| 2026-04-01 | Branch model moves to `development` for shared integration and `production` for live release | Separates day-to-day work from the live deployment branch while keeping environment names explicit |
-| 2026-04-01 | `production` protection is stricter than `development` protection | The live branch must require approval and block direct pushes, while `development` stays protected without over-constraining iteration |
+| 2026-04-01 | Local development remains local; the hosted non-production environment is UAT | Avoids paying for a hosted development stack that duplicates local work while still preserving a shared test environment |
+| 2026-04-01 | Branch model uses `development` for coding, `uat` for UAT promotion, and `production` for live release | Separates the active coding branch from the hosted pre-production branch while keeping promotion flow explicit |
+| 2026-04-01 | `production` protection is stricter than `uat` protection | The live branch must require approval and block direct pushes, while `uat` stays protected without over-constraining iteration |
+| 2026-04-02 | Corrective CI-unblock fixes are logged separately from process changes | Fixes that only restore compliance with existing rules must still be recorded in the conversation log, but runbook/CI-note updates are required only when CI behavior, release procedure, operator steps, or undocumented enforced rules change |
+| 2026-04-02 | `development` remains a branch only, not a hosted environment | Developers code and integrate on `development`, then promote to `uat`; hosted environments remain UAT and production only |

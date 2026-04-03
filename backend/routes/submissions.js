@@ -14,6 +14,8 @@ const router = express.Router()
 const { runQuery, runCommand } = require('../db')
 const { authenticateToken } = require('../middleware/auth')
 
+const EDIT_LOCK_TTL_SECONDS = 90
+
 // Every route in this file requires authentication
 router.use(authenticateToken)
 
@@ -38,6 +40,86 @@ async function logError(req, source, errorCode, description, context = {}) {
     } catch (logErr) {
         console.error('[logError] Failed to write error_log:', logErr.message)
     }
+}
+
+function currentUserName(user) {
+    return user.username || user.email || 'Unknown user'
+}
+
+function mapEditLock(row, currentUserId) {
+    return {
+        submissionId: row.submission_id,
+        lockedByUserId: row.locked_by_user_id,
+        lockedByUserName: row.locked_by_user_name,
+        lockedByUserEmail: row.locked_by_user_email,
+        acquiredAt: row.acquired_at,
+        expiresAt: row.expires_at,
+        isHeldByCurrentUser: row.locked_by_user_id === currentUserId,
+    }
+}
+
+function buildEditLockConflict(lock) {
+    return {
+        message: `This page has been locked for editing by ${lock.lockedByUserName}.`,
+        code: 'SUBMISSION_EDIT_LOCKED',
+        submissionId: lock.submissionId,
+        lockedByUserId: lock.lockedByUserId,
+        lockedByUserName: lock.lockedByUserName,
+        lockedByUserEmail: lock.lockedByUserEmail,
+        expiresAt: lock.expiresAt,
+        isHeldByCurrentUser: false,
+    }
+}
+
+async function getAccessibleSubmission(orgCode, id) {
+    const rows = await runQuery('SELECT * FROM submission WHERE id = $1', [id])
+
+    if (!rows || rows.length === 0) {
+        return { status: 404, body: { error: 'Submission not found' } }
+    }
+    if (rows[0].createdByOrgCode !== orgCode) {
+        return { status: 403, body: { error: 'Access denied' } }
+    }
+
+    return { submission: rows[0] }
+}
+
+async function getActiveEditLock(submissionId, currentUserId) {
+    const rows = await runQuery(
+        `SELECT submission_id, locked_by_user_id, locked_by_user_name, locked_by_user_email,
+                acquired_at::text, expires_at::text
+           FROM submission_edit_lock
+          WHERE submission_id = $1
+            AND expires_at > NOW()`,
+        [submissionId]
+    )
+
+    if (!rows.length) {
+        return null
+    }
+
+    return mapEditLock(rows[0], currentUserId)
+}
+
+async function ensureCurrentUserHoldsEditLock(submissionId, user) {
+    const activeLock = await getActiveEditLock(submissionId, user.id)
+
+    if (!activeLock) {
+        return {
+            status: 409,
+            body: {
+                message: 'This page is no longer locked for your session. Refresh and try again.',
+                code: 'SUBMISSION_EDIT_LOCK_REQUIRED',
+                submissionId,
+            },
+        }
+    }
+
+    if (!activeLock.isHeldByCurrentUser) {
+        return { status: 409, body: buildEditLockConflict(activeLock) }
+    }
+
+    return null
 }
 
 // ---------------------------------------------------------------------------
@@ -248,42 +330,29 @@ router.put('/:id', async (req, res) => {
     const orgCode = req.user.orgCode
     const id = Number(req.params.id)
 
-    // R04: fetch and validate ownership first
-    let existing
     try {
-        const rows = await runQuery(`SELECT * FROM submission WHERE id = $1`, [id])
-        if (!rows || rows.length === 0) {
+        const access = await getAccessibleSubmission(orgCode, id)
+        if (access.status) {
             await logError(req, 'PUT /api/submissions/:id', 'ERR_SUB_NOT_FOUND', 'Submission not found', { id })
-            return res.status(404).json({ error: 'Submission not found' })
+            return res.status(access.status).json(access.body)
         }
-        existing = rows[0]
-    } catch (err) {
-        await logError(req, 'PUT /api/submissions/:id', 'ERR_SUB_FETCH_500', err.message, { id })
-        return res.status(500).json({ error: err.message })
-    }
 
-    if (existing.createdByOrgCode !== orgCode) {
-        await logError(req, 'PUT /api/submissions/:id', 'ERR_SUB_FORBIDDEN', 'Access denied', { id })
-        return res.status(403).json({ error: 'Access denied' })
-    }
+        const lockFailure = await ensureCurrentUserHoldsEditLock(id, req.user)
+        if (lockFailure) {
+            return res.status(lockFailure.status).json(lockFailure.body)
+        }
 
-    // TODO: enforce cascade lock when quote/policy tables exist:
-    //   if (existing.hasQuote || existing.hasPolicy) return res.status(409).json({ error: 'Locked' })
+        const {
+            insured,
+            insuredId,
+            inceptionDate,
+            expiryDate,
+            renewalDate,
+            placingBroker,
+            placingBrokerId,
+            placingBrokerName,
+        } = req.body
 
-    // R04: only allow editable fields
-    // contractType is IMMUTABLE — it is intentionally excluded (REQ-SUB-VIEW-S-002)
-    const {
-        insured,
-        insuredId,
-        inceptionDate,
-        expiryDate,
-        renewalDate,
-        placingBroker,
-        placingBrokerId,
-        placingBrokerName,
-    } = req.body
-
-    try {
         const rows = await runCommand(
             `UPDATE submission SET
         insured            = COALESCE($1, insured),
@@ -308,11 +377,110 @@ router.put('/:id', async (req, res) => {
                 id,
             ]
         )
-        res.json(rows[0])
+        return res.json(rows[0])
     } catch (err) {
         console.error('[PUT /api/submissions/:id] Error:', err.message)
         await logError(req, 'PUT /api/submissions/:id', 'ERR_SUB_UPDATE_500', err.message, { id })
         res.status(500).json({ error: err.message })
+    }
+})
+
+// ---------------------------------------------------------------------------
+// R10 — POST /api/submissions/:id/edit-lock
+// Acquire or refresh the edit lock for the current user.
+// ---------------------------------------------------------------------------
+
+router.post('/:id/edit-lock', async (req, res) => {
+    const orgCode = req.user.orgCode
+    const id = Number(req.params.id)
+
+    try {
+        const access = await getAccessibleSubmission(orgCode, id)
+        if (access.status) {
+            return res.status(access.status).json(access.body)
+        }
+
+        const rows = await runCommand(
+            `INSERT INTO submission_edit_lock (
+                submission_id,
+                org_code,
+                locked_by_user_id,
+                locked_by_user_name,
+                locked_by_user_email,
+                acquired_at,
+                expires_at,
+                updated_at
+             )
+             VALUES (
+                $1,
+                $2,
+                $3,
+                $4,
+                $5,
+                NOW(),
+                NOW() + ($6 || ' seconds')::interval,
+                NOW()
+             )
+             ON CONFLICT (submission_id) DO UPDATE
+                SET org_code = EXCLUDED.org_code,
+                    locked_by_user_id = EXCLUDED.locked_by_user_id,
+                    locked_by_user_name = EXCLUDED.locked_by_user_name,
+                    locked_by_user_email = EXCLUDED.locked_by_user_email,
+                    expires_at = NOW() + ($6 || ' seconds')::interval,
+                    updated_at = NOW()
+              WHERE submission_edit_lock.locked_by_user_id = EXCLUDED.locked_by_user_id
+                 OR submission_edit_lock.expires_at <= NOW()
+             RETURNING submission_id, locked_by_user_id, locked_by_user_name, locked_by_user_email,
+                       acquired_at::text, expires_at::text`,
+            [id, orgCode, req.user.id, currentUserName(req.user), req.user.email ?? null, EDIT_LOCK_TTL_SECONDS]
+        )
+
+        if (rows.length > 0) {
+            return res.json(mapEditLock(rows[0], req.user.id))
+        }
+
+        const activeLock = await getActiveEditLock(id, req.user.id)
+        if (activeLock) {
+            return res.status(409).json(buildEditLockConflict(activeLock))
+        }
+
+        return res.status(409).json({
+            message: 'This page could not be locked for editing. Refresh and try again.',
+            code: 'SUBMISSION_EDIT_LOCK_UNAVAILABLE',
+            submissionId: id,
+        })
+    } catch (err) {
+        console.error('[POST /api/submissions/:id/edit-lock] Error:', err.message)
+        return res.status(500).json({ error: err.message })
+    }
+})
+
+// ---------------------------------------------------------------------------
+// R10 — DELETE /api/submissions/:id/edit-lock
+// Release the current user's edit lock if they hold it.
+// ---------------------------------------------------------------------------
+
+router.delete('/:id/edit-lock', async (req, res) => {
+    const orgCode = req.user.orgCode
+    const id = Number(req.params.id)
+
+    try {
+        const access = await getAccessibleSubmission(orgCode, id)
+        if (access.status) {
+            return res.status(access.status).json(access.body)
+        }
+
+        await runCommand(
+            `DELETE FROM submission_edit_lock
+              WHERE submission_id = $1
+                AND locked_by_user_id = $2`,
+            [id, req.user.id]
+        )
+
+        return res.status(204).send()
+    } catch (err) {
+        console.error('[DELETE /api/submissions/:id/edit-lock] Error:', err.message)
+        return res.status(500).json({ error: err.message })
     }
 })
 
@@ -326,14 +494,15 @@ router.post('/:id/submit', async (req, res) => {
     const id = Number(req.params.id)
 
     try {
-        const rows = await runQuery(`SELECT * FROM submission WHERE id = $1`, [id])
-        if (!rows || rows.length === 0) {
+        const access = await getAccessibleSubmission(orgCode, id)
+        if (access.status) {
             await logError(req, 'POST /api/submissions/:id/submit', 'ERR_SUB_NOT_FOUND', 'Submission not found', { id })
-            return res.status(404).json({ error: 'Submission not found' })
+            return res.status(access.status).json(access.body)
         }
-        if (rows[0].createdByOrgCode !== orgCode) {
-            await logError(req, 'POST /api/submissions/:id/submit', 'ERR_SUB_FORBIDDEN', 'Access denied', { id })
-            return res.status(403).json({ error: 'Access denied' })
+
+        const lockFailure = await ensureCurrentUserHoldsEditLock(id, req.user)
+        if (lockFailure) {
+            return res.status(lockFailure.status).json(lockFailure.body)
         }
 
         const updated = await runCommand(
@@ -366,14 +535,15 @@ router.post('/:id/decline', async (req, res) => {
     }
 
     try {
-        const rows = await runQuery(`SELECT * FROM submission WHERE id = $1`, [id])
-        if (!rows || rows.length === 0) {
+        const access = await getAccessibleSubmission(orgCode, id)
+        if (access.status) {
             await logError(req, 'POST /api/submissions/:id/decline', 'ERR_SUB_NOT_FOUND', 'Submission not found', { id })
-            return res.status(404).json({ error: 'Submission not found' })
+            return res.status(access.status).json(access.body)
         }
-        if (rows[0].createdByOrgCode !== orgCode) {
-            await logError(req, 'POST /api/submissions/:id/decline', 'ERR_SUB_FORBIDDEN', 'Access denied', { id })
-            return res.status(403).json({ error: 'Access denied' })
+
+        const lockFailure = await ensureCurrentUserHoldsEditLock(id, req.user)
+        if (lockFailure) {
+            return res.status(lockFailure.status).json(lockFailure.body)
         }
 
         const updated = await runCommand(

@@ -75,35 +75,34 @@ recentRecordsRouter.get('/', async (req, res) => {
     try {
         const { orgCode } = req.user
 
-        // Submissions — LEFT JOIN parties to resolve insured name from party record
+        // Submissions
         const submissionRows = await runQuery(
             `SELECT
                  s.id,
                  s.reference,
                  s."submissionType"     AS "submissionType",
-                 COALESCE(p.name, s.insured) AS "insuredName",
+                 s.insured               AS "insuredName",
                  s."placingBroker"      AS "broker",
                  s.status,
                  s."createdDate"        AS "lastOpenedDate"
              FROM submission s
-             LEFT JOIN parties p ON p.id = s.insured_id
              WHERE s."createdByOrgCode" = $1
              ORDER BY s."createdDate" DESC
              LIMIT 25`,
             [orgCode]
         )
 
-        // Quotes — LEFT JOIN parties to resolve insured name
+        // Quotes
         const quoteRows = await runQuery(
             `SELECT
                  q.id,
                  q.reference,
-                 COALESCE(p.name, q.insured) AS "insuredName",
+                 q.insured               AS "insuredName",
                  q.status,
                  q.created_date          AS "lastOpenedDate"
              FROM quotes q
-             LEFT JOIN parties p ON p.id = q.insured_id
              WHERE q.created_by_org_code = $1
+               AND q.deleted_at IS NULL
              ORDER BY q.created_date DESC
              LIMIT 25`,
             [orgCode]

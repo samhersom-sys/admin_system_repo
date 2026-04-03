@@ -4,6 +4,62 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-04-01] [HH:MM] — Website Login Selector Added For Production And UAT
+
+**Request:**
+User requested that the website login entry point offer a choice between the production app and the UAT app, with each option redirecting to the correct hosted app login page.
+
+**Outcome:**
+Updated the website navbar to replace the single LOGIN link with an environment chooser. Desktop navigation now opens a login menu with `Production` and `UAT` options, while the mobile menu shows both options directly. The website requirements, tests, and environment example were updated so the site reads `NEXT_PUBLIC_APP_URL` for production and `NEXT_PUBLIC_UAT_APP_URL` for UAT.
+
+**Files Changed:**
+- `website/components/ExternalNavbar.tsx` — replaced the single login link with Production/UAT chooser links
+- `website/website.requirements.md` — updated navbar and env-var requirements for the new login chooser
+- `website/website.test.tsx` — updated navbar test coverage for the chooser behavior
+- `website/__tests__/codebase-scan.test.js` — expanded env-var guard for production and UAT app URLs
+- `website/.env.production.example` — added `NEXT_PUBLIC_UAT_APP_URL`
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- File-level validation passed for edited files that were checked
+- Website test suite was not run in this session
+
+### [2026-04-01] [HH:MM] — Testing Branch Renamed To UAT
+
+**Request:**
+User decided the hosted pre-production branch should be called `uat` rather than `testing`, because a separate QA lane may exist later.
+
+**Outcome:**
+Updated the CI workflow and deployment documentation to replace the hosted non-production branch name `testing` with `uat`. The promotion flow is now documented as local development -> `uat` -> `production`, and the workflow is configured to run on `uat` and `production`.
+
+**Files Changed:**
+- `.github/workflows/ci.yml` — changed non-production workflow triggers from `testing` to `uat`
+- `docs/Technical Documentation/14-Deployment-Runbook.md` — updated UAT branch references from `testing` to `uat`
+- `docs/Technical Documentation/13-Three-App-Migration-Plan.md` — updated CI/CD and decision-log language from `testing` to `uat`
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- Documentation and workflow updates only
+- Existing `testing` branch can remain temporarily until GitHub rules and Railway are switched to `uat`
+
+### [2026-04-01] [HH:MM] — Hosted Non-Production Flow Reframed As Testing And UAT
+
+**Request:**
+User clarified that day-to-day development should stay local and that the hosted non-production lane is really UAT, not a separate cloud development environment. User then requested a testing branch.
+
+**Outcome:**
+Updated the CI workflow and deployment documentation to use `testing` as the shared pre-production branch that deploys to the hosted UAT environment, while keeping local development as the primary day-to-day engineering workflow. The runbook and migration plan now describe the promotion path as local development -> `testing`/UAT -> `production`.
+
+**Files Changed:**
+- `.github/workflows/ci.yml` — changed non-production workflow triggers from `development` to `testing`
+- `docs/Technical Documentation/14-Deployment-Runbook.md` — updated branching, UAT flow, and branch protection language
+- `docs/Technical Documentation/13-Three-App-Migration-Plan.md` — updated CI/CD and decision-log language for `testing` and UAT
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- Documentation and workflow updates only
+- Existing `development` branch intentionally left in place for transition and cleanup later
+
 ### [2026-04-01] [HH:MM] — Branch Protection Rules Documented
 
 **Request:**

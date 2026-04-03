@@ -5,6 +5,11 @@
  * Test ID format: T-SHARED-AUDIT-R[NN]
  */
 
+// API CONTRACT ALIGNMENT:
+//   POST /api/audit/event               -> AuditEvent
+//   GET  /api/audit/history/:entityType/:entityId -> AuditEvent[]
+//   No .data wrapper - all responses return value directly at root level.
+
 import React from 'react'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { renderHook } from '@testing-library/react'

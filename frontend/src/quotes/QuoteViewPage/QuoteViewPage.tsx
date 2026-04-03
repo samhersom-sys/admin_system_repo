@@ -672,7 +672,7 @@ export default function QuoteViewPage() {
                 <div className="flex flex-col gap-4">
                     {/* F-037 — Quote & Referencing */}
                     <FieldGroup title="Quote & Referencing">
-                        <div className="space-y-3">
+                        <div className="flex flex-col gap-3">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-xs text-gray-500 mb-0.5">Reference</p>
@@ -792,7 +792,7 @@ export default function QuoteViewPage() {
                 <div className="flex flex-col gap-4">
                     {/* F-039 — Dates */}
                     <FieldGroup title="Dates">
-                        <div className="space-y-3">
+                        <div className="flex flex-col gap-3">
                             <div className="grid grid-cols-2 gap-3">
                                 {field('Inception Date',
                                     editable
@@ -875,7 +875,7 @@ export default function QuoteViewPage() {
 
                     {/* F-040 — Contract / Placement */}
                     <FieldGroup title="Contract / Placement">
-                        <div className="space-y-3">
+                        <div className="flex flex-col gap-3">
                             {/* F-029 */}
                             {field('Contract Type',
                                 editable
@@ -905,7 +905,7 @@ export default function QuoteViewPage() {
 
                     {/* F-041 — Renewal */}
                     <FieldGroup title="Renewal">
-                        <div className="space-y-3">
+                        <div className="flex flex-col gap-3">
                             {field('Renewable',
                                 editable
                                     ? <select aria-label="Renewable" value={formValues.renewable_indicator} onChange={(e) => setFormValues((v) => ({ ...v, renewable_indicator: e.target.value, renewal_date: e.target.value === 'No' ? '' : v.renewal_date, renewal_status: e.target.value === 'No' ? '' : v.renewal_status }))} className={inputCls}>
@@ -944,7 +944,7 @@ export default function QuoteViewPage() {
             ---------------------------------------------------------------- */}
             {activeTab === 'sections' && (
                 <Card>
-                    <div className="p-4 space-y-3">
+                    <div className="p-4 flex flex-col gap-3">
 
                         {sectionsLoading ? (
                             <p className="text-sm text-gray-400 py-4 text-center">Loading sections…</p>
@@ -1094,9 +1094,9 @@ export default function QuoteViewPage() {
             ---------------------------------------------------------------- */}
             {activeTab === 'brokers' && (
                 <Card>
-                    <div className="p-4 space-y-6">
+                    <div className="p-4 flex flex-col gap-6">
                         {/* Placing Broker sub-section */}
-                        <div className="space-y-3">
+                        <div className="flex flex-col gap-3">
                             <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Placing Broker</h4>
                             {editable ? (
                                 brokerFields.placingBrokerParty ? (
@@ -1138,7 +1138,7 @@ export default function QuoteViewPage() {
                         </div>
 
                         {/* Surplus Lines Broker sub-section */}
-                        <div className="space-y-3">
+                        <div className="flex flex-col gap-3">
                             <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Surplus Lines Broker</h4>
                             {editable ? (
                                 brokerFields.surplusLinesBrokerParty ? (
@@ -1172,7 +1172,7 @@ export default function QuoteViewPage() {
             ---------------------------------------------------------------- */}
             {activeTab === 'additional-insureds' && (
                 <Card>
-                    <div className="p-4 space-y-3">
+                    <div className="p-4 flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-gray-700">Additional Insureds</h3>
                             {editable && (
@@ -1261,7 +1261,7 @@ export default function QuoteViewPage() {
             ---------------------------------------------------------------- */}
             {activeTab === 'financial-summary' && (
                 <Card>
-                    <div className="p-4 space-y-4">
+                    <div className="p-4 flex flex-col gap-4">
                         <h3 className="text-sm font-semibold text-gray-700">Financial Summary</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
@@ -1323,7 +1323,7 @@ export default function QuoteViewPage() {
             {/* Add Section modal */}
             {showAddSectionModal && (
                 <div className="fixed inset-y-0 left-14 right-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg space-y-4">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg flex flex-col gap-4">
                         <h2 className="text-base font-semibold text-gray-900">Add Section</h2>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -1369,7 +1369,7 @@ export default function QuoteViewPage() {
             {/* Decline modal */}
             {showDeclineModal && (
                 <div className="fixed inset-y-0 left-14 right-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md space-y-4">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md flex flex-col gap-4">
                         <h2 className="text-base font-semibold text-gray-900">Decline Quote</h2>
                         <div>
                             <label htmlFor="decline-reason-code" className="block text-sm font-medium text-gray-700 mb-1">

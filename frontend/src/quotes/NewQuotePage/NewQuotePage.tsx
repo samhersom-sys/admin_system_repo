@@ -171,7 +171,7 @@ export default function NewQuotePage() {
     }, [isDirty])
 
     return (
-        <div className="p-6 space-y-4">
+        <div className="p-6 flex flex-col gap-4">
             {/* Unsaved changes banner */}
             {isDirty && (
                 <div className="rounded-md bg-yellow-50 border border-yellow-200 px-4 py-2 text-sm text-yellow-800">
@@ -180,11 +180,11 @@ export default function NewQuotePage() {
             )}
 
             {/* Heading */}
-            <h1 className="text-xl font-semibold text-gray-900">New Quote</h1>
+            <p role="heading" aria-level={1} className="text-xl font-semibold text-gray-900">New Quote</p>
 
             {/* Linked Submission — required; use SubmissionSearch when no param provided */}
             <Card>
-                <div className="p-4 space-y-3">
+                <div className="p-4 flex flex-col gap-3">
                     <h2 className="text-sm font-semibold text-gray-700">Linked Submission <span className="text-red-500">*</span></h2>
                     {linkedSubmission ? (
                         <div className="flex items-center gap-3">
@@ -226,7 +226,7 @@ export default function NewQuotePage() {
 
             {/* Insured */}
             <Card>
-                <div className="p-4 space-y-3">
+                <div className="p-4 flex flex-col gap-3">
                     <h2 className="text-sm font-semibold text-gray-700">Insured</h2>
                     <InsuredSearch
                         onSelect={(party: Party) => {
