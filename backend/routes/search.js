@@ -427,10 +427,10 @@ async function filterMode(q, orgCode, requestedTypes) {
     result.submissions = await runForType('Submission', async () => {
         const { where, params } = buildClause(
             [orgCode],
-            { reference: true, status: true, insured: true, broker: true, yearOfAccount: true, inceptionDate: true, expiryDate: true, createdDate: true, createdBy: true }
+            { reference: true, status: true, insured: true, broker: true, inceptionDate: true, expiryDate: true, createdDate: true, createdBy: true }
         )
         const rows = await runQuery(
-            `SELECT id, reference, insured, status, "yearOfAccount", "inceptionDate", "expiryDate", "createdDate", "createdBy"
+            `SELECT id, reference, insured, status, NULL::text AS "yearOfAccount", "inceptionDate", "expiryDate", "createdDate", "createdBy"
              FROM submission WHERE "createdByOrgCode" = $1${where} ORDER BY "createdDate" DESC LIMIT 200`,
             params
         )

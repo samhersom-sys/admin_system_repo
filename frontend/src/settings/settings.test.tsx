@@ -137,7 +137,7 @@ describe('T-SETTINGS-ADMIN-R04: dep warning when enabling Bordereau Import witho
     mockRole = 'internal_admin'
     render(<MemoryRouter><PlatformAdminPanel /></MemoryRouter>)
     const checkbox = screen.getByRole('checkbox', {
-      name: /ClaimsPro TPA — Bordereau Import/i,
+      name: /ClaimsPro TPA.*Bordereau Import/i,
     })
     expect(checkbox).not.toBeChecked()
     fireEvent.click(checkbox)
@@ -153,10 +153,10 @@ describe('T-SETTINGS-ADMIN-R05: disabling Binding Authorities auto-disables Bord
     mockRole = 'internal_admin'
     render(<MemoryRouter><PlatformAdminPanel /></MemoryRouter>)
     const baCheckbox = screen.getByRole('checkbox', {
-      name: /Allied Insurance Group — Binding Authorities/i,
+      name: /Allied Insurance Group.*Binding Authorities/i,
     })
     const brCheckbox = screen.getByRole('checkbox', {
-      name: /Allied Insurance Group — Bordereau Import/i,
+      name: /Allied Insurance Group.*Bordereau Import/i,
     })
     expect(brCheckbox).toBeChecked()
     fireEvent.click(baCheckbox)

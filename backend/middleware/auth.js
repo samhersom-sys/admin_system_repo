@@ -10,6 +10,7 @@
 'use strict'
 
 const jwt = require('jsonwebtoken')
+const { runQuery } = require('../db')
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 
@@ -17,21 +18,37 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
  * Express middleware — rejects requests without a valid Bearer token.
  * On success sets req.user = decoded token payload.
  */
-function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization']
-    const token = authHeader && authHeader.split(' ')[1] // "Bearer <token>"
+async function authenticateToken(req, res, next) {
+    const authHeader = req.headers.authorization
+    const token = authHeader && authHeader.split(' ')[1]
 
     if (!token) {
         return res.status(401).json({ error: 'Access token required' })
     }
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) {
-            return res.status(403).json({ error: 'Invalid or expired token' })
+    try {
+        const user = jwt.verify(token, JWT_SECRET)
+
+        if (!user?.id) {
+            return res.status(403).json({ error: 'Invalid token payload' })
         }
+
+        if (user.tokenVersion !== undefined) {
+            const rows = await runQuery(
+                'SELECT token_version FROM users WHERE id = $1',
+                [user.id]
+            )
+
+            if (!rows.length || rows[0].token_version !== user.tokenVersion) {
+                return res.status(403).json({ error: 'Token has been invalidated' })
+            }
+        }
+
         req.user = user
-        next()
-    })
+        return next()
+    } catch (_err) {
+        return res.status(403).json({ error: 'Invalid or expired token' })
+    }
 }
 
 module.exports = { authenticateToken }
