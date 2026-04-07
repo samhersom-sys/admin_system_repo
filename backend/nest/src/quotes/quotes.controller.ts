@@ -149,4 +149,27 @@ export class QuotesController {
     ) {
         await this.quotesService.deleteRiskCode(quoteId, sectionId, req.user.orgCode, code)
     }
+
+    // REQ-QUO-BE-F-037 — POST /api/quotes/:id/issue-policy
+    @Post(':id/issue-policy')
+    @HttpCode(HttpStatus.CREATED)
+    issuePolicy(
+        @Param('id', ParseIntPipe) id: number,
+        @Req() req: any,
+    ) {
+        return this.quotesService.issuePolicy(
+            id,
+            req.user.orgCode,
+            req.user.name ?? req.user.username ?? null,
+        )
+    }
+
+    // REQ-QUO-BE-F-038 — GET /api/quotes/:id/locations
+    @Get(':id/locations')
+    getLocations(
+        @Param('id', ParseIntPipe) id: number,
+        @Req() req: any,
+    ) {
+        return this.quotesService.getLocations(id, req.user.orgCode)
+    }
 }

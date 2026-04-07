@@ -26,8 +26,7 @@ jest.mock('@/shared/lib/auth-session/auth-session', () => ({
 }))
 
 import Sidebar from './Sidebar'
-import { SidebarContextProvider, useSidebarSection } from './SidebarContext'
-import type { SidebarSection } from './SidebarContext'
+import { SidebarContextProvider, useSidebarSection, SidebarSection } from './SidebarContext'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -241,15 +240,16 @@ describe('Sidebar — Create menu', () => {
     expect(screen.queryByTitle('Create')).not.toBeInTheDocument()
   })
 
-  it('T-SIDEBAR-CREATE-R03: clicking Create opens the submenu with live create options only', () => {
+  it('T-SIDEBAR-CREATE-R03: clicking Create opens the submenu with all create options', () => {
     renderSidebar('/app-home')
     fireEvent.click(screen.getByTitle('Create'))
     expect(screen.getByTitle('Submission')).toBeInTheDocument()
+    expect(screen.getByTitle('Pre-Submission')).toBeInTheDocument()
     expect(screen.getByTitle('Quote')).toBeInTheDocument()
+    expect(screen.getByTitle('Binding Authority')).toBeInTheDocument()
+    expect(screen.getByTitle('Policy')).toBeInTheDocument()
+    expect(screen.getByTitle('Claim')).toBeInTheDocument()
     expect(screen.getByTitle('Party')).toBeInTheDocument()
-    expect(screen.queryByTitle('Binding Authority Contract')).not.toBeInTheDocument()
-    expect(screen.queryByTitle('Policy')).not.toBeInTheDocument()
-    expect(screen.queryByTitle('Claim')).not.toBeInTheDocument()
   })
 })
 

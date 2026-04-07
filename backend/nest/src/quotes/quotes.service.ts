@@ -562,5 +562,72 @@ export class QuotesService {
         const audit = await this.auditService.getHistory('Quote', id)
         return { success: true, audit, otherUsersOpen: writeResult.otherUsersOpen ?? [] }
     }
+
+    // ---------------------------------------------------------------------------
+    // REQ-QUO-BE-F-037 — POST /api/quotes/:id/issue-policy
+    // Creates a Policy record from the Bound quote. Quote must be Bound.
+    // ---------------------------------------------------------------------------
+    async issuePolicy(
+        quoteId: number,
+        orgCode: string,
+        createdBy: string | null,
+    ): Promise<Record<string, unknown>> {
+        const quote = await this.quoteRepo.findOne({ where: { id: quoteId } })
+        if (!quote) throw new NotFoundException('Quote not found.')
+        if (quote.createdByOrgCode !== orgCode) throw new ForbiddenException('Forbidden.')
+        if (quote.status !== 'Bound') {
+            throw new BadRequestException('Only Bound quotes can be issued as a policy.')
+        }
+
+        const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+        const prefix = `POL-${orgCode.toUpperCase()}-${datePart}-`
+        const row = await this.dataSource.query(
+            `SELECT reference FROM policies WHERE reference LIKE $1 ORDER BY reference DESC LIMIT 1`,
+            [`${prefix}%`],
+        )
+        let seq = 1
+        if (row.length && row[0].reference) {
+            const lastSeq = parseInt(row[0].reference.slice(-3), 10)
+            if (!isNaN(lastSeq)) seq = lastSeq + 1
+        }
+        const reference = `${prefix}${String(seq).padStart(3, '0')}`
+
+        const inserted = await this.dataSource.query(
+            `INSERT INTO policies (reference, quote_id, submission_id, insured, insured_id,
+                inception_date, expiry_date, status, business_type, contract_type,
+                created_by, created_by_org_code, payload)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'Active', $8, $9, $10, $11, $12)
+             RETURNING *`,
+            [
+                reference,
+                quoteId,
+                quote.submissionId,
+                quote.insured,
+                quote.insuredId,
+                quote.inceptionDate,
+                quote.expiryDate,
+                quote.businessType,
+                quote.contractType,
+                createdBy,
+                orgCode,
+                JSON.stringify(quote.payload ?? {}),
+            ],
+        )
+        return inserted[0]
+    }
+
+    // ---------------------------------------------------------------------------
+    // REQ-QUO-BE-F-038 — GET /api/quotes/:id/locations
+    // Returns location rows associated with the quote (joined from sections).
+    // ---------------------------------------------------------------------------
+    async getLocations(quoteId: number, orgCode: string): Promise<unknown[]> {
+        const quote = await this.quoteRepo.findOne({ where: { id: quoteId } })
+        if (!quote) throw new NotFoundException('Quote not found.')
+        if (quote.createdByOrgCode !== orgCode) throw new ForbiddenException('Forbidden.')
+        return this.dataSource.query(
+            `SELECT * FROM quote_location_rows WHERE quote_id = $1 ORDER BY id`,
+            [quoteId],
+        )
+    }
 }
 

@@ -50,7 +50,7 @@ interface NotificationContextValue {
      *  auto-open so initial data load never triggers the panel. */
     addedSignal: number
     addNotification: (
-        message: string,
+        messageOrOptions: string | { message: string; type?: AppNotification['type'] },
         type?: AppNotification['type'],
         options?: NotificationOptions
     ) => Promise<AppNotification | undefined>
@@ -94,10 +94,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     // R02 — addNotification (with local-only fallback)
     const addNotification = useCallback(
         async (
-            message: string,
-            type: AppNotification['type'] = 'info',
+            messageOrOptions: string | { message: string; type?: AppNotification['type'] },
+            typeArg: AppNotification['type'] = 'info',
             options: NotificationOptions = {}
         ): Promise<AppNotification | undefined> => {
+            const message = typeof messageOrOptions === 'string' ? messageOrOptions : messageOrOptions.message
+            const type: AppNotification['type'] = typeof messageOrOptions === 'string' ? typeArg : (messageOrOptions.type ?? 'info')
             const session = getSession()
             const user = session?.user as { name?: string; orgCode?: string } | undefined
             try {

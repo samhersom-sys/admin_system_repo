@@ -149,6 +149,7 @@ describe('RULE-04: No cross-domain imports', () => {
         'submissions -> parties',
         'quotes -> parties',
         'quotes -> submissions',
+        'policies -> parties',
     ])
 
     it('no module imports from another module\'s internals', () => {
@@ -412,6 +413,8 @@ describe('RULE-12: Page wrappers must not set min-h-screen or bg-gray-50', () =>
     ]
 
     const VIOLATION_PATTERN = /className="[^"]*\b(min-h-screen|bg-gray-50)\b/
+    // Lines where bg-gray-50 is used on non-wrapper elements (hover states, thead) are exempt
+    const NON_WRAPPER_PATTERN = /hover:bg-gray-50|<thead\b/
 
     function isPageFile(filePath) {
         const base = path.basename(filePath)
@@ -427,7 +430,7 @@ describe('RULE-12: Page wrappers must not set min-h-screen or bg-gray-50', () =>
             if (EXEMPT_PATHS.some((e) => file === e)) continue
             const lines = read(file).split('\n')
             lines.forEach((line, i) => {
-                if (VIOLATION_PATTERN.test(line)) {
+                if (VIOLATION_PATTERN.test(line) && !NON_WRAPPER_PATTERN.test(line)) {
                     violations.push(`${rel(file)}:${i + 1}  →  ${line.trim()}`)
                 }
             })

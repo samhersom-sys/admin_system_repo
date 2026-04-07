@@ -23,6 +23,45 @@
 
 ---
 
+## 1a. Impact Analysis
+
+### UI Components
+| Component | Path | Action |
+|---|---|---|
+| SubmissionViewPage | `domains/submissions/components/SubmissionViewPage.tsx` | Create / modify |
+| SubmissionTabs | `domains/submissions/components/SubmissionTabs/SubmissionTabs.tsx` | Exists — rendered by SubmissionViewPage |
+| DeclineModal | `domains/submissions/components/DeclineModal.tsx` | Create |
+
+### API Endpoints
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/submissions/:id` | Load single submission |
+| PUT | `/api/submissions/:id` | Save editable fields |
+| POST | `/api/submissions/:id/submit` | Transition Draft → In Review |
+| POST | `/api/submissions/:id/decline` | Decline submission with reason |
+| POST | `/api/submissions/:id/lock` | Acquire concurrent edit lock |
+| PUT | `/api/submissions/:id/lock` | Renew concurrent edit lock |
+| DELETE | `/api/submissions/:id/lock` | Release concurrent edit lock |
+| POST | `/api/audit/event` | Post audit events (Opened, Closed, Updated) |
+| GET | `/api/audit/Submission/:id` | Fetch audit trail (consumed by SubmissionTabs Audit pane) |
+
+### Database Tables
+| Table | Impact |
+|---|---|
+| `submissions` | Read / update |
+| `submission_locks` | Create / read / update / delete (concurrent edit lock) |
+| `audit_events` | Insert (Submission Opened, Submission Closed, Submission Updated) |
+
+### Dependencies
+- `@/domains/submissions` module — `getSubmission`, `updateSubmission`
+- `@/shared/lib/api-client/api-client` — `get`, `post`, `put`, `del`
+- `@/shared/lib/auth-session/auth-session` — `getSession` (org type for origin-based locking)
+- `@/shell/SidebarContext` — `useSidebarSection`
+- `@/shared/hooks/useAudit` — audit lifecycle events
+- `react-router-dom` — `useParams`, `useNavigate`, `Link`
+
+---
+
 ## 2. Requirements
 
 ### 2.1 Data Loading
@@ -131,6 +170,10 @@
 
 ### 2.12a Concurrent Edit Lock
 
+**REQ-SUB-VIEW-F-043:** The Submission View Page shall use the `useAudit` hook with `{ entityType: 'Submission', entityId: submission.id, trackVisits: true }` so that a `"Submission Opened"` event is posted via `POST /api/audit/event` on page mount (once the submission id is known) and a `"Submission Closed"` event is posted on page unmount. Both calls shall be best-effort: failures shall not affect page functionality or display an error to the user.
+
+**REQ-SUB-VIEW-F-044:** The Submission View Page shall post a `POST /api/audit/event` request with `entityType: 'Submission'`, `entityId: submission.id`, and `action: 'Submission Declined'` after a successful decline call (REQ-SUB-VIEW-F-035). The audit post shall be best-effort.
+
 **REQ-SUB-VIEW-F-038:** After the initial `getSubmission(submissionId)` call resolves successfully, the Submission View Page shall attempt to acquire the submission edit lock through the submissions domain module before treating the page as confirmed editable for the current session.
 
 **REQ-SUB-VIEW-F-039:** When the submission edit lock is acquired successfully, the Submission View Page shall renew that lock periodically while the page remains mounted and shall issue a best-effort lock release when the page unmounts.
@@ -215,6 +258,8 @@
 | REQ-SUB-VIEW-S-006 | `domains/submissions/components/SubmissionViewPage.test.tsx` | validated |
 | REQ-SUB-VIEW-C-001 | `domains/submissions/components/SubmissionViewPage.test.tsx` | pending |
 | REQ-SUB-VIEW-C-002 | `domains/submissions/components/SubmissionViewPage.test.tsx` | pending |
+| REQ-SUB-VIEW-F-043 | `domains/submissions/components/SubmissionViewPage.test.tsx` | pending |
+| REQ-SUB-VIEW-F-044 | `domains/submissions/components/SubmissionViewPage.test.tsx` | pending |
 
 ---
 
@@ -236,6 +281,7 @@
 | 2026-06-18 | Added REQ-SUB-VIEW-F-031 through REQ-SUB-VIEW-F-037 and REQ-SUB-VIEW-S-004 for Decline action (§2.5a). Updated scope statement. Updated traceability table. |
 | 2026-03-20 | REQ-SUB-VIEW-F-010 superseded: placingBroker removed from main form panel (now managed in Placing Broking tab per Block B). REQ-SUB-VIEW-F-017 updated accordingly. REQ-SUB-VIEW-F-026 updated to pass broker + insured props to SubmissionTabs. |
 | 2026-03-23 | Added REQ-SUB-VIEW-F-038–F-042 and REQ-SUB-VIEW-S-005 for concurrent submission edit-lock handling and fixed page-status indicator. |
+| 2026-04-05 | Impact Analysis section (1a) added. REQ-SUB-VIEW-F-043 added — Submission Opened/Closed audit events via useAudit hook. REQ-SUB-VIEW-F-044 added — Submission Declined audit event. Traceability updated. |
 
 ---
 

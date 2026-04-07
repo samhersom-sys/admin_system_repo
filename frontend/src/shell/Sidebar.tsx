@@ -32,19 +32,72 @@ import {
   FiXCircle,
   FiCopy,
   FiEdit2,
+  FiAlertCircle,
+  FiArrowLeft,
+  FiPlus,
+  FiClipboard,
+  FiAlertTriangle,
+  FiPackage,
+  FiSliders,
+  FiRepeat,
 } from 'react-icons/fi'
 import { clearSession, getSession } from '@/shared/lib/auth-session/auth-session'
 import { useSidebarContextValue } from './SidebarContext'
 import './Sidebar.css'
 
+// ─── Sub-item type for nav menus ────────────────────────────────────────────
+interface NavSubItem {
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  to: string
+}
+
+interface NavItem {
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  to: string
+  subItems?: NavSubItem[]
+}
+
 // ─── Main nav items (always visible) ───────────────────────────────────────
-const NAV_ITEMS = [
+const NAV_ITEMS: NavItem[] = [
   { label: 'Home', icon: FiHome, to: '/app-home' },
   { label: 'Search', icon: FiSearch, to: '/search' },
-  { label: 'Reporting', icon: FiBarChart2, to: '/reports' },
-  { label: 'Finance', icon: FiCreditCard, to: '/finance' },
-  { label: 'Workflow', icon: FiInbox, to: '/workflow' },
-  { label: 'Settings', icon: FiSettings, to: '/settings' },
+  {
+    label: 'Reporting', icon: FiBarChart2, to: '/reports',
+    subItems: [
+      { label: 'Create Report', icon: FiFileText, to: '/reports/create?type=report' },
+      { label: 'Create Dashboard', icon: FiBarChart2, to: '/dashboards/create' },
+    ],
+  },
+  {
+    label: 'Finance', icon: FiCreditCard, to: '/finance',
+    subItems: [
+      { label: 'Cash Batching', icon: FiCreditCard, to: '/finance/cash-batching' },
+      { label: 'Trial Balance', icon: FiBarChart2, to: '/finance/trial-balance' },
+      { label: 'Invoices', icon: FiFileText, to: '/finance/invoices' },
+      { label: 'Payments', icon: FiCreditCard, to: '/finance/payments' },
+    ],
+  },
+  {
+    label: 'Workflow', icon: FiRepeat, to: '/workflow',
+    subItems: [
+      { label: 'My Work Items', icon: FiClipboard, to: '/my-work-items' },
+      { label: 'Submission Workflow', icon: FiInbox, to: '/workflow/submissions' },
+      { label: 'Clearance', icon: FiAlertCircle, to: '/workflow/clearance' },
+      { label: 'Data Quality', icon: FiAlertTriangle, to: '/workflow/data-quality' },
+    ],
+  },
+  {
+    label: 'Settings', icon: FiSettings, to: '/settings',
+    subItems: [
+      { label: 'Account Admin', icon: FiUser, to: '/settings/account' },
+      { label: 'Products', icon: FiPackage, to: '/settings/products' },
+      { label: 'Organisations', icon: FiBriefcase, to: '/settings/organisations' },
+      { label: 'Rating Rules', icon: FiSliders, to: '/settings/rating-rules' },
+      { label: 'Data Quality', icon: FiAlertTriangle, to: '/settings/data-quality' },
+    ],
+  },
 ]
 
 // ─── Domain contextual nav items ────────────────────────────────────────────
@@ -70,6 +123,10 @@ const DOMAIN_NAV = [
     subItems: [],
   },
   {
+    label: 'Claims', icon: FiAlertCircle, to: '/claims', matchPrefix: '/claims',
+    subItems: [],
+  },
+  {
     label: 'Binding Authorities', icon: FiBriefcase, to: '/binding-authorities', matchPrefix: '/binding-authorities',
     subItems: [],
   },
@@ -78,7 +135,11 @@ const DOMAIN_NAV = [
 // ─── Create quick-menu items ────────────────────────────────────────────────
 const CREATE_ITEMS = [
   { label: 'Submission', icon: FiFileText, to: '/submissions/new?type=submission' },
+  { label: 'Pre-Submission', icon: FiFileText, to: '/submissions/new?type=pre-submission' },
   { label: 'Quote', icon: FiFile, to: '/quotes/new' },
+  { label: 'Binding Authority', icon: FiBriefcase, to: '/binding-authorities/new' },
+  { label: 'Policy', icon: FiShield, to: '/policies/create' },
+  { label: 'Claim', icon: FiAlertCircle, to: '/claims/create' },
   { label: 'Party', icon: FiUsers, to: '/parties/new' },
 ]
 
@@ -113,9 +174,13 @@ export default function Sidebar() {
   const [hoveredDomain, setHoveredDomain] = useState<string | null>(null)
   const domainTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Nav-item submenu hover state
+  const [hoveredNav, setHoveredNav] = useState<string | null>(null)
+  const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Pre-render page-registered section sub-items for the active domain header.
   // This is a JSX expression (not a hook) — valid to compute before return().
-  const sectionSubEl = (section && activeDomainItem) ? (
+  const sectionSubEl = (section && activeDomainItem && Array.isArray(section.items)) ? (
     <ul className="sidebar-domain-sub" role="list">
       {section.items.map((item) => {
         const ItemIcon = item.icon
@@ -238,6 +303,15 @@ export default function Sidebar() {
     domainTimer.current = setTimeout(() => setHoveredDomain(null), 200)
   }
 
+  function handleNavEnter(navTo: string) {
+    if (navTimer.current) clearTimeout(navTimer.current)
+    setHoveredNav(navTo)
+  }
+
+  function handleNavLeave() {
+    navTimer.current = setTimeout(() => setHoveredNav(null), 200)
+  }
+
   function handleLogout() {
     clearSession()
     navigate('/login')
@@ -252,9 +326,13 @@ export default function Sidebar() {
     >
       {/* ── Primary nav items ───────────────────────────────── */}
       <ul className="sidebar-nav" role="list">
-        {NAV_ITEMS.map(({ label, icon: Icon, to }) => (
+        {NAV_ITEMS.map(({ label, icon: Icon, to, subItems }) => (
           <React.Fragment key={to}>
-            <li>
+            <li
+              className={subItems?.length ? 'sidebar-nav-group' : undefined}
+              onMouseEnter={subItems?.length ? () => handleNavEnter(to) : undefined}
+              onMouseLeave={subItems?.length ? handleNavLeave : undefined}
+            >
               <NavLink
                 to={to}
                 className={({ isActive }) =>
@@ -265,7 +343,44 @@ export default function Sidebar() {
                 <Icon className="sidebar-item-icon" aria-hidden="true" />
                 <span className="sidebar-item-label">{label}</span>
               </NavLink>
+
+              {/* ── Nav sub-items — shown on hover ── */}
+              {subItems?.length && hoveredNav === to ? (
+                <ul className="sidebar-domain-sub" role="list">
+                  {subItems.map((sub) => {
+                    const SubIcon = sub.icon
+                    return (
+                      <li key={sub.to}>
+                        <NavLink
+                          to={sub.to}
+                          className="sidebar-item sidebar-domain-sub-item"
+                          title={sub.label}
+                          onClick={() => setHoveredNav(null)}
+                        >
+                          <SubIcon className="sidebar-item-icon" aria-hidden="true" />
+                          <span className="sidebar-item-label">{sub.label}</span>
+                        </NavLink>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : null}
             </li>
+
+            {/* ── Global Back button — directly after Home, hidden on /app-home ── */}
+            {to === '/app-home' && location.pathname !== '/app-home' && (
+              <li>
+                <button
+                  type="button"
+                  className="sidebar-item sidebar-back-btn"
+                  title="Back"
+                  onClick={() => navigate(-1)}
+                >
+                  <FiArrowLeft className="sidebar-item-icon" aria-hidden="true" />
+                  <span className="sidebar-item-label">Back</span>
+                </button>
+              </li>
+            )}
 
             {/* ── Create quick-menu — visible on /app-home and /search (T-SIDEBAR-CREATE-R01) ── */}
             {to === '/search' && (location.pathname === '/app-home' || location.pathname === '/search') && (
@@ -381,7 +496,7 @@ export default function Sidebar() {
             Section items are now rendered inline under the domain header (REQ-SIDEBAR-F-007).
             This fallback block is preserved for edge cases where a section is registered
             but no domain route is matched (e.g. a future non-domain page with a section). */}
-        {section && !activeDomainItem && (
+        {section && Array.isArray(section.items) && !activeDomainItem && (
           <li>
             <div className="sidebar-context-section">
               <ul className="sidebar-context-list" role="list">

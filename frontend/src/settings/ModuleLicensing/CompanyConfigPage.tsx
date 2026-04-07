@@ -1,12 +1,12 @@
-﻿/**
- * CompanyConfigPage — Module Licensing: per-company module toggle configuration.
+/**
+ * CompanyConfigPage � Module Licensing: per-company module toggle configuration.
  *
  * Route: /settings/module-licensing/:orgCode
  * Visible to: internal_admin only
  *
- * STRAWMAN — uses hardcoded mock data keyed by orgCode.
+ * STRAWMAN � uses hardcoded mock data keyed by orgCode.
  * Replace INITIAL_STATE with GET /api/admin/orgs/:orgCode/modules once the
- * org_modules DB migration is in place (12-Module-Access-Control.md §10 step 1).
+ * org_modules DB migration is in place (12-Module-Access-Control.md �10 step 1).
  *
  * Requirements: settings.requirements.md REQ-SETTINGS-ADMIN-F-003 through F-006
  */
@@ -25,7 +25,7 @@ import type { ModuleKey } from '@/settings/moduleCatalogue'
 // REQUIRES is the UX alias for the shared MODULE_REQUIRES map
 const REQUIRES = MODULE_REQUIRES
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
+// -- Mock data -----------------------------------------------------------------
 
 type OrgModules = Record<ModuleKey, boolean>
 
@@ -52,7 +52,7 @@ const INITIAL_STATE: Record<string, OrgModules> = {
   TPA1: makeModules(['module:claims']),
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// -- Component -----------------------------------------------------------------
 
 export default function CompanyConfigPage() {
   const { orgCode = '' } = useParams<{ orgCode: string }>()
@@ -74,7 +74,7 @@ export default function CompanyConfigPage() {
       const dep = REQUIRES[key]
       if (dep && !modules[dep]) {
         setAlert(
-          `Cannot enable "${MODULE_LABELS[key]}" — "${MODULE_LABELS[dep]}" must be enabled first.`
+          `Cannot enable "${MODULE_LABELS[key]}" � "${MODULE_LABELS[dep]}" must be enabled first.`
         )
         return
       }
@@ -99,7 +99,7 @@ export default function CompanyConfigPage() {
   }
 
   function handleSave() {
-    // STUB — replace with PUT /api/admin/orgs/:orgCode/modules
+    // STUB � replace with PUT /api/admin/orgs/:orgCode/modules
     console.info(`[STUB] Saving modules for ${orgCode}:`, modules)
     setDirty(false)
     setAlert('Module configuration saved (mock).')

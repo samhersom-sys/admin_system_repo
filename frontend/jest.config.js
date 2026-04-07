@@ -8,8 +8,10 @@ module.exports = {
     roots: [
         '<rootDir>/src/auth',
         '<rootDir>/src/binding-authorities',
+        '<rootDir>/src/claims',
         '<rootDir>/src/finance',
         '<rootDir>/src/home',
+        '<rootDir>/src/locations',
         '<rootDir>/src/not-found',
         '<rootDir>/src/parties',
         '<rootDir>/src/policies',

@@ -18,6 +18,38 @@
 **Out of scope:**
 - Saved searches
 - Export
+
+---
+
+## 1a. Impact Analysis
+
+### UI Components (to create / modify)
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| SearchPage | `app/features/search/SearchPage.tsx` | Route `/search` — orchestrates SearchForm and SearchResults |
+| SearchForm | `app/features/search/SearchForm.tsx` | Filter bar — type, text, date range, status, insured, broker, YoA filters |
+| SearchResults | `app/features/search/SearchResults.tsx` | Sortable results table with pagination and row navigation |
+
+### API Endpoints (consumed)
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/search` | Cross-domain search with optional filter query params |
+
+### Database Tables (read by API)
+
+| Table | Key Columns | Role |
+|-------|-------------|------|
+| `submissions` | id, reference, status, insured_name, broker_name | Searchable entity |
+| `quotes` | id, reference, status, insured_name, broker_name | Searchable entity |
+| `policies` | id, reference, status, insured_name, broker_name | Searchable entity |
+| `audit_events` | user_id, entity_type, entity_id, created_at | Last-opened date tracking |
+
+### Dependencies
+
+- `lib/api-client` — HTTP wrapper for search endpoint
+- `react-router-dom` — `useNavigate` for result row navigation, `useSearchParams` for filter state
 - Full-text / fuzzy search
 
 ---
@@ -153,3 +185,4 @@ B. **Cache last results in session storage.** Complicates state management and r
 | 2026-03-13 | Full requirements written |
 | 2026-03-14 | F-003 updated for multi-type URL param; F-007/F-008 updated for multi-select checkbox type filter; F-011 column heading updated; F-016–F-022 added (insured/broker semantics, YoA, last opened range, created range, created by, audit fields) |
 | 2026-03-23 | Corrected Quote result navigation to the live route `/quotes/:id` and removed dead Search result links for domains without implemented detail pages |
+| 2026-04-05 | Added Impact Analysis (§1a): 3 UI components, 1 API endpoint, 4 DB tables, 2 dependencies |

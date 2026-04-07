@@ -44,7 +44,7 @@ function recordUrl(record: SearchRecord): string | null {
     case 'Quote': return `/quotes/${id}`
     case 'Policy': return null
     case 'BindingAuthority': return null
-    case 'Party': return null
+    case 'Party': return `/parties/${id}`
     case 'Claim': return null
   }
 }

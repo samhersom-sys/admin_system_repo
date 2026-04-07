@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Post, Put, Get, Body, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
 import { AuthService } from './auth.service'
 import { JwtAuthGuard } from './jwt-auth.guard'
 import { RolesGuard } from './roles.guard'
@@ -16,7 +16,7 @@ import { Roles } from './roles.decorator'
  */
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -56,5 +56,22 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() body: { token: string; newPassword: string }) {
     return this.authService.resetPassword(body.token, body.newPassword)
+  }
+
+  @Put('profile')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateProfile(@Body() body: { name: string }, @Req() req: any) {
+    return this.authService.updateProfile(req.user.id, body.name)
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Body() body: { currentPassword: string; newPassword: string },
+    @Req() req: any,
+  ) {
+    return this.authService.changePassword(req.user.id, body.currentPassword, body.newPassword)
   }
 }

@@ -23,6 +23,44 @@
 
 ---
 
+## 1a. Impact Analysis
+
+### UI Components (to create / modify)
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| LoginPage | `domains/auth/LoginPage.tsx` | Route `/login` — renders LoginForm inside PublicLayout |
+| LoginForm | `domains/auth/LoginForm/LoginForm.tsx` | Credential form — email, password, submit, error display |
+| LogoutButton | `app/AppLayout/LogoutButton.tsx` | Calls `POST /api/auth/logout` and clears client session |
+| RequireAuth | `app/AppLayout/RequireAuth.tsx` | Route guard — redirects unauthenticated users to `/login` |
+| PasswordResetPage | `domains/auth/PasswordResetPage.tsx` | Route `/reset-password?token=` — new password + confirm form |
+
+### API Endpoints (consumed)
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/auth/login` | Authenticate user, return JWT + user object |
+| POST | `/api/auth/logout` | Server-side token invalidation (increment token_version) |
+| POST | `/api/auth/generate-reset-token` | Admin-initiated password reset token generation |
+| POST | `/api/auth/reset-password` | Consume reset token, update password, audit |
+
+### Database Tables (read / written by API)
+
+| Table | Key Columns | Role |
+|-------|-------------|------|
+| `users` | id, email, password_hash, token_version, failed_login_attempts, locked_until | Authentication source, brute-force lockout tracking |
+| `password_reset_tokens` | id, user_id, token, expires_at, used_at | Time-limited reset link storage |
+| `password_audit_log` | id, user_id, action, created_at | Password change audit trail |
+
+### Dependencies
+
+- `lib/api-client` — HTTP wrapper for all endpoints
+- `lib/auth-session` — `storeSession()`, `clearSession()`, `getSession()` client-side session management
+- `react-router-dom` — `useNavigate` for login/reset redirects
+- `components/LoadingSpinner` — loading state during API calls
+
+---
+
 ## 2. Requirements
 
 ### 2.1 Login Page — Route and Rendering
@@ -237,6 +275,7 @@
 | 2026-03-11 | Initial requirements written (login page, logout, session handling) |
 | 2026-03-11 | Added: server-side invalidation, token versioning, no self-registration, password reset flow, audit trail |
 | 2026-03-11 | Full rewrite into formal REQ-AUTH-{TYPE}-{NNN} format per Guideline 13 |
+| 2026-04-05 | Added Impact Analysis (§1a): 5 UI components, 4 API endpoints, 3 DB tables, 4 dependencies |
 
 ---
 

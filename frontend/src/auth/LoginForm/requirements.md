@@ -20,6 +20,29 @@ and no direct `fetch()` or `localStorage` calls.
 
 ---
 
+## Impact Analysis
+
+### UI Components
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| LoginForm | `domains/auth/LoginForm/LoginForm.tsx` | Credential submission form — email, password, submit, loading, error |
+
+### API Endpoints (consumed)
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/auth/login` | Authenticate with `{ email, password }`, returns `{ token, user }` |
+
+### Dependencies
+
+- `lib/api-client` — `post()` wrapper (R01: must never call `fetch()` directly)
+- `lib/auth-session` — `storeSession({ token, user })` (R02: must never write `localStorage` directly)
+- `react-router-dom` — `useNavigate` for `/app-home` redirect (R03)
+- `brandClasses` — CSS theming (R07: no hardcoded colours)
+
+---
+
 ## Requirements
 
 ### R01 — API call
