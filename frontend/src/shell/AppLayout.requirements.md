@@ -15,6 +15,40 @@
 
 ---
 
+## 1a. Impact Analysis
+
+### UI Components (to create / modify)
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| AppLayout | `app/AppLayout/AppLayout.jsx` | Shell wrapper — provider nesting, Sidebar, Outlet, NotificationDock |
+
+### Provider Nesting (composition dependencies)
+
+| Provider | Purpose |
+|----------|---------|
+| NotificationProvider | Notification context for all child routes |
+| SidebarContextProvider | Sidebar open/close state for all child routes |
+
+### Composed Children
+
+| Component | Path | Role |
+|-----------|------|------|
+| Sidebar | `app/AppLayout/Sidebar.tsx` | Navigation sidebar |
+| NotificationDock | `app/AppLayout/NotificationDock.tsx` | Slide-out notification panel |
+| ErrorBoundary | `components/ErrorBoundary/` | Applied at router level in `main.jsx`, NOT in AppLayout |
+| Outlet | `react-router-dom` | Renders matched child route |
+
+### API Endpoints
+
+None — AppLayout is structural composition only.
+
+### Database Tables
+
+None — no data fetching.
+
+---
+
 ## 2. Requirements
 
 **REQ-LAYOUT-F-001:** The `AppLayout` component shall render `NotificationProvider` as the outer context wrapper and `SidebarContextProvider` as the inner context wrapper so that any component inside the sidebar context also has access to notification context.
@@ -50,6 +84,7 @@ None.
 |------|--------|
 | 2026-03-11 | Initial requirements written |
 | 2026-03-11 | Rewritten into formal REQ-LAYOUT-{TYPE}-{NNN} format per Guideline 13 |
+| 2026-04-05 | Added Impact Analysis (§1a): structural composition — 1 component, 2 providers, 4 composed children |
 
 ---
 

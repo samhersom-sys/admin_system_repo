@@ -5,7 +5,7 @@
  * Run: npx jest --config jest.config.js --testPathPattern=formatters.test
  */
 
-import { number, currency, date, monthYear, relativeTime } from './formatters'
+import { number, currency, date, monthYear, relativeTime, formatMoney, parseNumber, formatMovement, displayEditMoney } from './formatters'
 
 // ---------------------------------------------------------------------------
 // R01 — number()
@@ -109,5 +109,114 @@ describe('T-lib-formatters-R05: relativeTime() returns human-readable relative t
     it('returns the original string without throwing on invalid input', () => {
         expect(() => relativeTime('bad')).not.toThrow()
         expect(relativeTime('bad')).toBe('bad')
+    })
+})
+
+// ---------------------------------------------------------------------------
+// R06 — formatMoney()
+// ---------------------------------------------------------------------------
+
+describe('T-lib-formatters-R06: formatMoney() formats monetary value with currency code', () => {
+    it('formats a GBP value with £ symbol and 2 decimals', () => {
+        const result = formatMoney(100000, 'GBP')
+        expect(result).toContain('100,000')
+        expect(result).toContain('£')
+    })
+
+    it('returns empty string for null input', () => {
+        expect(formatMoney(null)).toBe('')
+    })
+
+    it('returns empty string for undefined input', () => {
+        expect(formatMoney(undefined)).toBe('')
+    })
+
+    it('returns empty string for NaN-like string', () => {
+        expect(formatMoney('abc')).toBe('')
+    })
+
+    it('formats a numeric string as a monetary value', () => {
+        const result = formatMoney('50000', 'USD', 'en-US')
+        expect(result).toContain('50,000')
+    })
+})
+
+// ---------------------------------------------------------------------------
+// R07 — parseNumber()
+// ---------------------------------------------------------------------------
+
+describe('T-lib-formatters-R07: parseNumber() parses human-entered numeric strings', () => {
+    it('parses an integer', () => {
+        expect(parseNumber(1234)).toBe(1234)
+    })
+
+    it('parses a comma-separated number string', () => {
+        expect(parseNumber('1,000,500')).toBe(1000500)
+    })
+
+    it('returns NaN for null', () => {
+        expect(parseNumber(null)).toBeNaN()
+    })
+
+    it('returns NaN for empty string', () => {
+        expect(parseNumber('')).toBeNaN()
+    })
+
+    it('returns NaN for non-numeric string', () => {
+        expect(parseNumber('abc')).toBeNaN()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// R08 — formatMovement()
+// ---------------------------------------------------------------------------
+
+describe('T-lib-formatters-R08: formatMovement() formats movement delta with sign', () => {
+    it('formats a positive delta with (+ prefix', () => {
+        expect(formatMovement(1200)).toBe('(+1,200)')
+    })
+
+    it('formats a negative delta with (- prefix', () => {
+        expect(formatMovement(-500)).toBe('(-500)')
+    })
+
+    it('returns empty string for zero', () => {
+        expect(formatMovement(0)).toBe('')
+    })
+
+    it('returns empty string for null', () => {
+        expect(formatMovement(null)).toBe('')
+    })
+
+    it('returns empty string for undefined', () => {
+        expect(formatMovement(undefined)).toBe('')
+    })
+})
+
+// ---------------------------------------------------------------------------
+// R09 — displayEditMoney()
+// ---------------------------------------------------------------------------
+
+describe('T-lib-formatters-R09: displayEditMoney() formats value for controlled inputs', () => {
+    it('formats a number to 2 decimal places', () => {
+        expect(displayEditMoney(1000)).toBe('1,000.00')
+    })
+
+    it('returns 0.00 for null', () => {
+        expect(displayEditMoney(null)).toBe('0.00')
+    })
+
+    it('returns 0.00 for undefined', () => {
+        expect(displayEditMoney(undefined)).toBe('0.00')
+    })
+
+    it('returns empty string for empty string (preserves controlled blank)', () => {
+        expect(displayEditMoney('')).toBe('')
+    })
+
+    it('formats a decimal value correctly', () => {
+        const result = displayEditMoney(1234.5)
+        expect(result).toContain('1,234')
+        expect(result).toContain('50')
     })
 })

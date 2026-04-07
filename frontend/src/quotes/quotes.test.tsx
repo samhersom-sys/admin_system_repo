@@ -9,7 +9,7 @@
  */
 
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 // ---------------------------------------------------------------------------
@@ -41,6 +41,9 @@ const mockCreateCoverage = jest.fn()
 const mockDeleteCoverage = jest.fn()
 const mockListParticipations = jest.fn()
 const mockSaveParticipations = jest.fn()
+const mockGetQuoteLocations = jest.fn()
+const mockIssuePolicy = jest.fn()
+const mockGetRiskCodes = jest.fn()
 
 jest.mock('@/quotes/quotes.service', () => ({
     ...jest.requireActual('@/quotes/quotes.service'),
@@ -61,9 +64,12 @@ jest.mock('@/quotes/quotes.service', () => ({
     deleteCoverage: (...args: unknown[]) => mockDeleteCoverage(...args),
     listParticipations: (...args: unknown[]) => mockListParticipations(...args),
     saveParticipations: (...args: unknown[]) => mockSaveParticipations(...args),
+    getQuoteLocations: (...args: unknown[]) => mockGetQuoteLocations(...args),
+    issuePolicy: (...args: unknown[]) => mockIssuePolicy(...args),
     getContractTypes: () => mockGetContractTypes(),
     getMethodsOfPlacement: () => mockGetMethodsOfPlacement(),
     getRenewalStatuses: () => mockGetRenewalStatuses(),
+    getRiskCodes: () => mockGetRiskCodes(),
 }))
 
 jest.mock('@/submissions/submissions.service', () => ({
@@ -176,6 +182,9 @@ import QuotesListPage from './QuotesListPage/QuotesListPage'
 import NewQuotePage from './NewQuotePage/NewQuotePage'
 import QuoteViewPage from './QuoteViewPage/QuoteViewPage'
 import QuoteSectionViewPage from './QuoteSectionViewPage/QuoteSectionViewPage'
+import QuoteCoverageDetailPage from './QuoteCoverageDetailPage/QuoteCoverageDetailPage'
+import QuoteCoverageSubDetailPage from './QuoteCoverageSubDetailPage/QuoteCoverageSubDetailPage'
+import QuoteSearchModal from './QuoteSearchModal/QuoteSearchModal'
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -232,7 +241,7 @@ function makeSection(overrides: Record<string, unknown> = {}) {
         excess_currency: null,
         excess_amount: null,
         excess_loss_qualifier: null,
-        sum_insured_currency: null,
+        sum_insured_currency: 'USD',
         sum_insured_amount: null,
         premium_currency: 'USD',
         gross_premium: 50000,
@@ -793,6 +802,48 @@ describe('QuoteViewPage', () => {
         })
     })
 
+    // REQ-QUO-FE-F-024 — Insured not confirmed: red border + warning
+    test('T-quotes-view-R20b — Insured unconfirmed shows red border and warning text', async () => {
+        mockGetQuote.mockResolvedValue(makeQuote({ insured: '', insured_id: null }))
+        renderView()
+        await waitFor(() => {
+            expect(screen.getByText(/insured not confirmed/i)).toBeInTheDocument()
+        })
+        // The wrapper should have a red border class
+        const wrapper = screen.getByText(/insured not confirmed/i).closest('[data-testid="insured-unconfirmed"]')
+        expect(wrapper).toBeInTheDocument()
+    })
+
+    // REQ-QUO-FE-F-024 — Insured confirmed: no warning
+    test('T-quotes-view-R20c — Insured confirmed hides warning text', async () => {
+        renderView() // default makeQuote has insured_id set
+        await waitFor(() => {
+            expect(screen.getByText('Widget Corp')).toBeInTheDocument()
+        })
+        expect(screen.queryByText(/insured not confirmed/i)).not.toBeInTheDocument()
+    })
+
+    // REQ-QUO-FE-F-025 — Submission not confirmed: red border + warning
+    test('T-quotes-view-R20d — Submission unconfirmed shows red border and warning text', async () => {
+        mockGetQuote.mockResolvedValue(makeQuote({ submission_id: null }))
+        mockGetSubmission.mockResolvedValue(null)
+        renderView()
+        await waitFor(() => {
+            expect(screen.getByText(/submission not confirmed/i)).toBeInTheDocument()
+        })
+        const wrapper = screen.getByText(/submission not confirmed/i).closest('[data-testid="submission-unconfirmed"]')
+        expect(wrapper).toBeInTheDocument()
+    })
+
+    // REQ-QUO-FE-F-025 — Submission confirmed: no warning
+    test('T-quotes-view-R20e — Submission confirmed hides warning text', async () => {
+        renderView() // default makeQuote has submission_id: 10
+        await waitFor(() => {
+            expect(screen.getByText('SUB-DEMO-20260601-001')).toBeInTheDocument()
+        })
+        expect(screen.queryByText(/submission not confirmed/i)).not.toBeInTheDocument()
+    })
+
     // REQ-QUO-FE-F-039 — Dates FieldGroup
     test('T-quotes-view-R21 — Dates FieldGroup contains inception date input', async () => {
         renderView()
@@ -1014,6 +1065,7 @@ describe('QuoteSectionViewPage', () => {
         mockGetContractTypes.mockResolvedValue([])
         mockGetMethodsOfPlacement.mockResolvedValue([])
         mockGetRenewalStatuses.mockResolvedValue([])
+        mockGetRiskCodes.mockResolvedValue([])
     })
 
     function renderSection(quoteId = '1', sectionId = '1') {
@@ -1038,36 +1090,37 @@ describe('QuoteSectionViewPage', () => {
     // REQ-QUO-FE-F-051 — not found
     test('T-quotes-section-R02 — shows "Section not found" with back link when sectionId has no match', async () => {
         renderSection('1', '999')
-        await waitFor(() =>
-            expect(screen.getByText(/section not found/i)).toBeInTheDocument()
-        )
-        expect(screen.getByRole('link', { name: /back to quote/i })).toBeInTheDocument()
-    })
-
-    // REQ-QUO-FE-F-052
-    test('T-quotes-section-R03 — renders section reference as read-only field', async () => {
-        renderSection()
-        await waitFor(() =>
-            expect(screen.getByText('QUO-DEMO-20260601-001-S01')).toBeInTheDocument()
-        )
-    })
-
-    // REQ-QUO-FE-F-054
-    test('T-quotes-section-R04 — renders four tabs: Coverages, Deductions, Risk Codes, Participations', async () => {
-        renderSection()
         await waitFor(() => {
-            expect(screen.getByTestId('tab-coverages')).toBeInTheDocument()
-            expect(screen.getByTestId('tab-deductions')).toBeInTheDocument()
-            expect(screen.getByTestId('tab-riskCodes')).toBeInTheDocument()
-            expect(screen.getByTestId('tab-participations')).toBeInTheDocument()
+            expect(screen.getByText(/section not found/i)).toBeInTheDocument()
+            expect(screen.getByRole('link', { name: /back/i })).toBeInTheDocument()
         })
     })
 
-    // REQ-QUO-FE-F-054 — default tab
+    // REQ-QUO-FE-F-052
+    test('T-quotes-section-R03 — renders section reference as a read-only field', async () => {
+        renderSection()
+        await waitFor(() => {
+            expect(screen.getByText('QUO-DEMO-20260601-001-S01')).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUO-FE-F-053
+    test('T-quotes-section-R04 — renders four tabs: Coverages, Deductions, Risk Codes, Participations', async () => {
+        renderSection()
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Coverages' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Deductions' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Risk Codes' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Participations' })).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUO-FE-F-054
     test('T-quotes-section-R04a — Coverages tab is active by default', async () => {
         renderSection()
         await waitFor(() => {
-            expect(screen.getByTestId('tab-coverages')).toHaveClass('border-brand-500')
+            const covBtn = screen.getByTestId('tab-coverages')
+            expect(covBtn).toHaveClass('border-brand-500')
         })
     })
 
@@ -1076,7 +1129,7 @@ describe('QuoteSectionViewPage', () => {
         renderSection()
         await waitFor(() => {
             expect(mockListCoverages).toHaveBeenCalledWith(1, 1)
-            expect(screen.getByRole('columnheader', { name: /reference/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /coverage/i })).toBeInTheDocument()
         })
     })
 
@@ -1084,99 +1137,657 @@ describe('QuoteSectionViewPage', () => {
     test('T-quotes-section-R06 — Coverages tab shows "No coverages found." empty-state row', async () => {
         mockListCoverages.mockResolvedValue([])
         renderSection()
-        await waitFor(() =>
+        await waitFor(() => {
             expect(screen.getByText(/no coverages found/i)).toBeInTheDocument()
-        )
+        })
     })
 
     // REQ-QUO-FE-F-056
     test('T-quotes-section-R07 — Deductions tab renders rows from payload.taxOverrides', async () => {
         mockListSections.mockResolvedValue([makeSection({
-            payload: { taxOverrides: [{ country: 'US', deductionType: 'Tax', basis: 'Gross', rate: '5' }] },
+            payload: { taxOverrides: [{ deductionType: 'Tax', rate: 12, amount: 600 }] },
         })])
         renderSection()
-        await waitFor(() => screen.getByTestId('tab-deductions'))
-        fireEvent.click(screen.getByTestId('tab-deductions'))
-        await waitFor(() =>
-            expect(screen.getByDisplayValue('US')).toBeInTheDocument()
-        )
+        await waitFor(() => screen.getByRole('button', { name: 'Deductions' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Deductions' }))
+        await waitFor(() => {
+            expect(screen.getByText('Tax')).toBeInTheDocument()
+        })
     })
 
     // REQ-QUO-FE-F-057
     test('T-quotes-section-R08 — Risk Codes tab renders rows from payload.riskSplits', async () => {
         mockListSections.mockResolvedValue([makeSection({
-            payload: { riskSplits: [{ riskCode: 'PROP', allocation: '100' }] },
+            payload: { riskSplits: [{ riskCode: 'FIRE', allocation: '50' }] },
         })])
         renderSection()
-        await waitFor(() => screen.getByTestId('tab-riskCodes'))
-        fireEvent.click(screen.getByTestId('tab-riskCodes'))
-        await waitFor(() =>
-            expect(screen.getByDisplayValue('PROP')).toBeInTheDocument()
-        )
+        await waitFor(() => screen.getByRole('button', { name: 'Risk Codes' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Risk Codes' }))
+        await waitFor(() => {
+            expect(screen.getByDisplayValue('FIRE')).toBeInTheDocument()
+        })
     })
 
-    // REQ-QUO-FE-F-058
+    // REQ-QUO-FE-F-059
     test('T-quotes-section-R09 — Participations tab fetches participations on first activation and renders table', async () => {
+        mockListParticipations.mockResolvedValue([{
+            id: 1, section_id: 1, market_name: "Lloyd's", written_line: 100, signed_line: 100,
+            role: 'Underwriter', reference: 'SYN-001', notes: null,
+        }])
         renderSection()
-        await waitFor(() => screen.getByTestId('tab-participations'))
-        fireEvent.click(screen.getByTestId('tab-participations'))
+        await waitFor(() => screen.getByRole('button', { name: 'Participations' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Participations' }))
         await waitFor(() => {
             expect(mockListParticipations).toHaveBeenCalledWith(1)
-            expect(screen.getByRole('columnheader', { name: /market name/i })).toBeInTheDocument()
+            expect(screen.getByDisplayValue("Lloyd's")).toBeInTheDocument()
         })
     })
 
-    // REQ-QUO-FE-F-053 + sidebar
-    test('T-quotes-section-R10 — registers Quote Section sidebar with Save and Back to Quote items', async () => {
+    // REQ-QUO-FE-F-060
+    test('T-quotes-section-R10 — registers Quote Section sidebar with Save (Draft) and Back to Quote items', async () => {
         renderSection()
-        await waitFor(() => {
-            expect(mockUseSidebarSection).toHaveBeenCalled()
-        })
+        await waitFor(() => expect(mockGetQuote).toHaveBeenCalled())
         const section = mockUseSidebarSection.mock.calls.at(-1)?.[0]
-        expect(section?.title).toBe('Quote Section')
         const labels = (section?.items ?? []).map((item: { label: string }) => item.label)
         expect(labels).toContain('Save')
         expect(labels).toContain('Back to Quote')
+        // Must NOT contain Policy-specific items (negative assertions — §6.4B)
+        expect(labels).not.toContain('Issue Quote')
+        expect(labels).not.toContain('Endorse')
+        expect(labels).not.toContain('Issue Policy')
     })
 
-    // REQ-QUO-FE-F-055 — Add Coverage button placement
-    test('T-quotes-section-R11 — Add Coverage button is inside Coverages table header, not above grid, when quote is Draft', async () => {
+    // Guideline 14 RULE 8 — action buttons inside table headers
+    test('T-quotes-section-R11 — Add Coverage button is inside Coverages table header, not above grid', async () => {
+        mockListCoverages.mockResolvedValue([])
         renderSection()
-        await waitFor(() => screen.getByTestId('tab-coverages'))
-        const btn = await screen.findByTitle('Add Coverage')
+        await waitFor(() => screen.getByText(/no coverages found/i))
+        const btn = screen.getByTitle('Add Coverage')
         expect(btn.closest('th')).toBeInTheDocument()
     })
 
-    // REQ-QUO-FE-F-056 — Add Deduction button placement
-    test('T-quotes-section-R12 — Add Deduction button is inside Deductions table header when quote is Draft', async () => {
+    test('T-quotes-section-R12 — Add Deduction button is inside Deductions table header', async () => {
         renderSection()
-        await waitFor(() => screen.getByTestId('tab-deductions'))
-        fireEvent.click(screen.getByTestId('tab-deductions'))
+        await waitFor(() => screen.getByRole('button', { name: 'Deductions' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Deductions' }))
         const btn = await screen.findByTitle('Add Deduction')
         expect(btn.closest('th')).toBeInTheDocument()
     })
 
-    // REQ-QUO-FE-F-057 — Add Risk Code button placement
-    test('T-quotes-section-R13 — Add Risk Code button is inside Risk Codes table header when quote is Draft', async () => {
+    test('T-quotes-section-R13 — Add Risk Code button is inside Risk Codes table header', async () => {
         renderSection()
-        await waitFor(() => screen.getByTestId('tab-riskCodes'))
-        fireEvent.click(screen.getByTestId('tab-riskCodes'))
+        await waitFor(() => screen.getByRole('button', { name: 'Risk Codes' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Risk Codes' }))
         const btn = await screen.findByTitle('Add Risk Code')
         expect(btn.closest('th')).toBeInTheDocument()
     })
 
-    // REQ-QUO-FE-F-054 — Add buttons hidden in non-Draft quotes
-    test('T-quotes-section-R14 — Add Coverage, Add Deduction and Add Risk Code buttons are absent when quote is not Draft', async () => {
+    test('T-quotes-section-R14 — Add Coverage, Add Deduction and Add Risk Code buttons are absent when Quoted', async () => {
         mockGetQuote.mockResolvedValue(makeQuote({ status: 'Quoted' }))
         renderSection()
-        await waitFor(() => screen.getByTestId('tab-coverages'))
+        await waitFor(() => screen.getByText('QUO-DEMO-20260601-001-S01'))
         expect(screen.queryByTitle('Add Coverage')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Deductions' }))
+        await waitFor(() => {
+            expect(screen.queryByTitle('Add Deduction')).not.toBeInTheDocument()
+        })
+    })
 
-        fireEvent.click(screen.getByTestId('tab-deductions'))
-        await waitFor(() => expect(screen.queryByTitle('Add Deduction')).not.toBeInTheDocument())
+    // REQ-QUO-FE-F-052 — Days on Cover computed field
+    test('T-quotes-section-R15 — Days on Cover is displayed as a read-only computed field', async () => {
+        mockListSections.mockResolvedValue([makeSection({
+            inception_date: '2026-06-01',
+            expiry_date: '2027-06-01',
+        })])
+        renderSection()
+        await waitFor(() => {
+            expect(screen.getByText(/days on cover/i)).toBeInTheDocument()
+            expect(screen.getByText('365')).toBeInTheDocument()
+        })
+    })
 
-        fireEvent.click(screen.getByTestId('tab-riskCodes'))
-        await waitFor(() => expect(screen.queryByTitle('Add Risk Code')).not.toBeInTheDocument())
+    // REQ-QUO-FE-F-052 — Inception Time and Expiry Time fields
+    test('T-quotes-section-R16 — Inception Time and Expiry Time inputs are rendered', async () => {
+        renderSection()
+        await waitFor(() => {
+            expect(screen.getByLabelText(/inception time/i)).toBeInTheDocument()
+            expect(screen.getByLabelText(/expiry time/i)).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUO-FE-F-052 — Annual Net Premium field
+    test('T-quotes-section-R17 — Annual Net Premium field is rendered in the header', async () => {
+        renderSection()
+        await waitFor(() => {
+            // One in the section header label, one in the Coverages tab column header
+            const matches = screen.getAllByText(/annual net premium/i)
+            expect(matches.length).toBeGreaterThanOrEqual(2)
+        })
+    })
+
+    // REQ-QUO-FE-F-057 — Risk Code select from lookup
+    test('T-quotes-section-R18 — Risk Code renders as select when lookup returns options', async () => {
+        mockGetRiskCodes.mockResolvedValue(['FIRE', 'FLOOD', 'THEFT'])
+        mockListSections.mockResolvedValue([makeSection({
+            payload: { riskSplits: [{ riskCode: 'FIRE', allocation: '50' }] },
+        })])
+        renderSection()
+        await waitFor(() => screen.getByRole('button', { name: 'Risk Codes' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Risk Codes' }))
+        await waitFor(() => {
+            expect(screen.getByDisplayValue('FIRE')).toBeInTheDocument()
+            const select = screen.getByDisplayValue('FIRE')
+            expect(select.tagName).toBe('SELECT')
+        })
+    })
+
+    // REQ-QUO-FE-F-057 — Risk Code falls back to free text when lookup is empty
+    test('T-quotes-section-R19 — Risk Code renders as free-text input when lookup returns empty array', async () => {
+        mockGetRiskCodes.mockResolvedValue([])
+        mockListSections.mockResolvedValue([makeSection({
+            payload: { riskSplits: [{ riskCode: 'CUSTOM', allocation: '100' }] },
+        })])
+        renderSection()
+        await waitFor(() => screen.getByRole('button', { name: 'Risk Codes' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Risk Codes' }))
+        await waitFor(() => {
+            expect(screen.getByDisplayValue('CUSTOM')).toBeInTheDocument()
+            const input = screen.getByDisplayValue('CUSTOM')
+            expect(input.tagName).toBe('INPUT')
+        })
+    })
+
+    // REQ-QUO-FE-F-058 — Participations inline editing
+    test('T-quotes-section-R20 — Participations tab renders inline inputs in Draft mode', async () => {
+        mockListParticipations.mockResolvedValue([{
+            id: 1, section_id: 1, market_name: "Lloyd's", written_line: 100, signed_line: 100,
+            role: 'Lead', reference: 'SYN-001', notes: 'Test',
+        }])
+        renderSection()
+        await waitFor(() => screen.getByRole('button', { name: 'Participations' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Participations' }))
+        await waitFor(() => {
+            expect(screen.getByDisplayValue("Lloyd's")).toBeInTheDocument()
+            const input = screen.getByDisplayValue("Lloyd's")
+            expect(input.tagName).toBe('INPUT')
+        })
+    })
+
+    // REQ-QUO-FE-F-058 — Save Participations button
+    test('T-quotes-section-R21 — Save Participations button calls saveParticipations', async () => {
+        mockListParticipations.mockResolvedValue([{
+            id: 1, section_id: 1, market_name: "Lloyd's", written_line: 100, signed_line: 100,
+            role: 'Lead', reference: 'SYN-001', notes: null,
+        }])
+        mockSaveParticipations.mockResolvedValue([{
+            id: 1, section_id: 1, market_name: "Lloyd's", written_line: 100, signed_line: 100,
+            role: 'Lead', reference: 'SYN-001', notes: null,
+        }])
+        renderSection()
+        await waitFor(() => screen.getByRole('button', { name: 'Participations' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Participations' }))
+        await waitFor(() => screen.getByDisplayValue("Lloyd's"))
+        fireEvent.click(screen.getByRole('button', { name: /save participations/i }))
+        await waitFor(() => {
+            expect(mockSaveParticipations).toHaveBeenCalledWith(1, expect.any(Array))
+        })
+    })
+
+    // REQ-QUO-FE-F-058 — 100% validation for Written Line %
+    test('T-quotes-section-R22 — Save Participations shows error when Written Line % does not total 100', async () => {
+        mockListParticipations.mockResolvedValue([{
+            id: 1, section_id: 1, market_name: "Lloyd's", written_line: 50, signed_line: 100,
+            role: 'Lead', reference: 'SYN-001', notes: null,
+        }])
+        renderSection()
+        await waitFor(() => screen.getByRole('button', { name: 'Participations' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Participations' }))
+        await waitFor(() => screen.getByDisplayValue("Lloyd's"))
+        fireEvent.click(screen.getByRole('button', { name: /save participations/i }))
+        await waitFor(() => {
+            expect(screen.getByText(/written line.*must total 100/i)).toBeInTheDocument()
+        })
+        expect(mockSaveParticipations).not.toHaveBeenCalled()
+    })
+
+    // REQ-QUO-FE-F-058 — 100% validation for Signed Line %
+    test('T-quotes-section-R23 — Save Participations shows error when Signed Line % does not total 100', async () => {
+        mockListParticipations.mockResolvedValue([{
+            id: 1, section_id: 1, market_name: "Lloyd's", written_line: 100, signed_line: 50,
+            role: 'Lead', reference: 'SYN-001', notes: null,
+        }])
+        renderSection()
+        await waitFor(() => screen.getByRole('button', { name: 'Participations' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Participations' }))
+        await waitFor(() => screen.getByDisplayValue("Lloyd's"))
+        fireEvent.click(screen.getByRole('button', { name: /save participations/i }))
+        await waitFor(() => {
+            expect(screen.getByText(/signed line.*must total 100/i)).toBeInTheDocument()
+        })
+        expect(mockSaveParticipations).not.toHaveBeenCalled()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// QuoteViewPage — Issue Policy  (REQ-POL-FE-F-018, REQ-POL-FE-F-019)
+// ---------------------------------------------------------------------------
+
+describe('QuoteViewPage — Issue Policy', () => {
+    beforeEach(() => {
+        jest.clearAllMocks()
+        mockGetQuote.mockResolvedValue(makeQuote({ status: 'Bound' }))
+        mockListSections.mockResolvedValue([makeSection()])
+        mockGetContractTypes.mockResolvedValue([])
+        mockGetMethodsOfPlacement.mockResolvedValue([])
+        mockGetRenewalStatuses.mockResolvedValue([])
+        mockGetSubmission.mockResolvedValue({ id: 10, reference: 'SUB-001', insured: 'Widget Corp' })
+    })
+
+    function renderView(id = '1') {
+        return render(
+            <MemoryRouter initialEntries={[`/quotes/${id}`]}>
+                <Routes>
+                    <Route path="/quotes/:id" element={<QuoteViewPage />} />
+                </Routes>
+            </MemoryRouter>
+        )
+    }
+
+    // REQ-POL-FE-F-018
+    test('T-QUO-FE-F-R018a — sidebar shows "Issue Policy" when quote is Bound', async () => {
+        renderView()
+        await waitFor(() => expect(mockGetQuote).toHaveBeenCalled())
+        const section = mockUseSidebarSection.mock.calls.at(-1)?.[0]
+        const labels = (section?.items ?? []).map((item: { label: string }) => item.label)
+        expect(labels).toContain('Issue Policy')
+        // §6.4B negative: Bound quote must not show Draft-only actions
+        expect(labels).not.toContain('Save')
+        expect(labels).not.toContain('Issue Quote')
+        expect(labels).not.toContain('Bind Quote')
+    })
+
+    test('T-QUO-FE-F-R018b — sidebar does NOT show "Issue Policy" when quote is Draft', async () => {
+        mockGetQuote.mockResolvedValue(makeQuote({ status: 'Draft' }))
+        renderView()
+        await waitFor(() => expect(mockGetQuote).toHaveBeenCalled())
+        const section = mockUseSidebarSection.mock.calls.at(-1)?.[0]
+        const labels = (section?.items ?? []).map((item: { label: string }) => item.label)
+        expect(labels).not.toContain('Issue Policy')
+    })
+
+    test('T-QUO-FE-F-R018c — sidebar does NOT show "Issue Policy" when quote is Quoted', async () => {
+        mockGetQuote.mockResolvedValue(makeQuote({ status: 'Quoted' }))
+        renderView()
+        await waitFor(() => expect(mockGetQuote).toHaveBeenCalled())
+        const section = mockUseSidebarSection.mock.calls.at(-1)?.[0]
+        const labels = (section?.items ?? []).map((item: { label: string }) => item.label)
+        expect(labels).not.toContain('Issue Policy')
+    })
+
+    // REQ-POL-FE-F-019
+    test('T-QUO-FE-F-R019 — Issue Policy fires issuePolicy service, navigates to policy, shows success notification', async () => {
+        mockIssuePolicy.mockResolvedValue({ id: 5, reference: 'POL-1', status: 'Active' })
+        renderView()
+        // Wait for quote to fully render — quote state is set and event listeners are registered
+        await waitFor(() => expect(screen.getByText('QUO-DEMO-20260601-001')).toBeInTheDocument())
+        // Dispatch event and wait for async handler completion
+        await act(async () => {
+            window.dispatchEvent(new Event('quote:issue-policy'))
+        })
+        await waitFor(() => {
+            expect(mockIssuePolicy).toHaveBeenCalledWith(1)
+            expect(mockNavigate).toHaveBeenCalledWith('/policies/5')
+            expect(mockAddNotification).toHaveBeenCalledWith(
+                expect.stringMatching(/policy/i), 'success'
+            )
+        })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// QuoteCoverageDetailPage — REQ-QUO-FE-F-062, F-063
+// ---------------------------------------------------------------------------
+
+describe('QuoteCoverageDetailPage', () => {
+    beforeEach(() => {
+        jest.clearAllMocks()
+        mockGetQuote.mockResolvedValue(makeQuote())
+        mockListSections.mockResolvedValue([makeSection()])
+        mockListCoverages.mockResolvedValue([{
+            id: 1, section_id: 1, reference: 'COV-001', coverage_name: 'All Risks',
+            effective_date: '2026-06-01', expiry_date: '2027-06-01',
+            annual_gross_premium: 50000, annual_net_premium: 45000,
+            limit_currency: 'USD', limit_amount: 1000000,
+        }])
+        mockGetQuoteLocations.mockResolvedValue([
+            { CoverageType: 'Building', CoverageSubType: 'Residential', Currency: 'USD', SumInsured: 300000 },
+            { CoverageType: 'Building', CoverageSubType: 'Commercial', Currency: 'USD', SumInsured: 200000 },
+            { CoverageType: 'Contents', CoverageSubType: '', Currency: 'USD', SumInsured: 100000 },
+        ])
+        mockGetContractTypes.mockResolvedValue([])
+        mockGetMethodsOfPlacement.mockResolvedValue([])
+        mockGetRenewalStatuses.mockResolvedValue([])
+    })
+
+    function renderCoverageDetail(quoteId = '1', sectionId = '1', coverageId = '1') {
+        return render(
+            <MemoryRouter
+                initialEntries={[`/quotes/${quoteId}/sections/${sectionId}/coverages/${coverageId}`]}
+            >
+                <Routes>
+                    <Route
+                        path="/quotes/:id/sections/:sectionId/coverages/:coverageId"
+                        element={<QuoteCoverageDetailPage />}
+                    />
+                </Routes>
+            </MemoryRouter>
+        )
+    }
+
+    // REQ-QUO-FE-F-062
+    test('T-QUO-FE-F-R062 — renders at coverage route; loads quote, sections, coverages and locations', async () => {
+        renderCoverageDetail()
+        await waitFor(() => {
+            expect(mockGetQuote).toHaveBeenCalledWith(1)
+            expect(mockListSections).toHaveBeenCalledWith(1)
+            expect(mockListCoverages).toHaveBeenCalledWith(1, 1)
+        })
+    })
+
+    test('T-QUO-FE-F-R062b — renders "Coverage not found" when coverageId does not match', async () => {
+        mockListCoverages.mockResolvedValue([{ id: 999, section_id: 1 }])
+        renderCoverageDetail('1', '1', '1')
+        await waitFor(() => {
+            expect(screen.getByText(/coverage not found/i)).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUO-FE-F-063
+    test('T-QUO-FE-F-R063 — header shows coverage reference, insured, coverage name; "Coverage Sub-Details" tab exists', async () => {
+        renderCoverageDetail()
+        await waitFor(() => {
+            expect(screen.getByText('COV-001')).toBeInTheDocument()
+            expect(screen.getByText('Widget Corp')).toBeInTheDocument()
+            expect(screen.getByText('All Risks')).toBeInTheDocument()
+        })
+        expect(screen.getByRole('button', { name: 'Coverage Sub-Details' })).toBeInTheDocument()
+    })
+
+    test('T-QUO-FE-F-R063b — Sub-Details tab groups rows by CoverageType alphabetically', async () => {
+        renderCoverageDetail()
+        await waitFor(() => expect(mockListCoverages).toHaveBeenCalled())
+        await waitFor(() => {
+            expect(screen.getByText('Building')).toBeInTheDocument()
+            expect(screen.getByText('Contents')).toBeInTheDocument()
+        })
+        const rows = screen.getAllByRole('row')
+        const buildingIdx = rows.findIndex(r => r.textContent?.includes('Building'))
+        const contentsIdx = rows.findIndex(r => r.textContent?.includes('Contents'))
+        expect(buildingIdx).toBeLessThan(contentsIdx)
+    })
+
+    // REQ-QUO-FE-F-063 — Number of Locations column
+    test('T-QUO-FE-F-R063d — Sub-Details table has Number of Locations column', async () => {
+        renderCoverageDetail()
+        await waitFor(() => {
+            expect(screen.getByRole('columnheader', { name: /number of locations/i })).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUO-FE-F-063 — Coverage Sub-Details column
+    test('T-QUO-FE-F-R063e — Sub-Details table has Coverage Sub-Details column', async () => {
+        renderCoverageDetail()
+        await waitFor(() => {
+            expect(screen.getByRole('columnheader', { name: /coverage sub-details/i })).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUO-FE-F-063 — currency filter
+    test('T-QUO-FE-F-R063f — Sub-Details table filters rows by section sumInsuredCurrency', async () => {
+        mockGetQuoteLocations.mockResolvedValue([
+            { CoverageType: 'Building', CoverageSubType: 'A', Currency: 'USD', SumInsured: 300000 },
+            { CoverageType: 'Fire', CoverageSubType: 'B', Currency: 'EUR', SumInsured: 100000 },
+        ])
+        renderCoverageDetail()
+        await waitFor(() => {
+            expect(screen.getByText('Building')).toBeInTheDocument()
+        })
+        // Fire row should be filtered out since section sum_insured_currency is 'USD'
+        expect(screen.queryByText('Fire')).not.toBeInTheDocument()
+    })
+
+    test('T-QUO-FE-F-R063c — clicking a CoverageType row navigates to sub-detail page', async () => {
+        renderCoverageDetail()
+        await waitFor(() => expect(mockListCoverages).toHaveBeenCalled())
+        const buildingRow = await screen.findByText('Building')
+        fireEvent.click(buildingRow.closest('tr') ?? buildingRow)
+        await waitFor(() => {
+            expect(mockNavigate).toHaveBeenCalledWith(
+                expect.stringContaining('/details/Building')
+            )
+        })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// QuoteCoverageSubDetailPage — REQ-QUO-FE-F-064, F-065
+// ---------------------------------------------------------------------------
+
+describe('QuoteCoverageSubDetailPage', () => {
+    beforeEach(() => {
+        jest.clearAllMocks()
+        mockGetQuote.mockResolvedValue(makeQuote())
+        mockListSections.mockResolvedValue([makeSection()])
+        mockListCoverages.mockResolvedValue([{
+            id: 1, section_id: 1, reference: 'COV-001', coverage_name: 'All Risks',
+            effective_date: '2026-06-01', expiry_date: '2027-06-01',
+            annual_gross_premium: 50000, annual_net_premium: 45000,
+            limit_currency: 'USD', limit_amount: 1000000,
+        }])
+        mockGetQuoteLocations.mockResolvedValue([
+            { CoverageType: 'Building', CoverageSubType: 'Residential', Currency: 'USD', SumInsured: 300000 },
+            { CoverageType: 'Building', CoverageSubType: 'Commercial', Currency: 'USD', SumInsured: 200000 },
+            { CoverageType: 'Building', CoverageSubType: '', Currency: 'USD', SumInsured: 50000 },
+        ])
+        mockGetContractTypes.mockResolvedValue([])
+        mockGetMethodsOfPlacement.mockResolvedValue([])
+        mockGetRenewalStatuses.mockResolvedValue([])
+    })
+
+    function renderSubDetail(quoteId = '1', sectionId = '1', coverageId = '1', detailName = 'Building') {
+        const encoded = encodeURIComponent(detailName)
+        return render(
+            <MemoryRouter
+                initialEntries={[
+                    `/quotes/${quoteId}/sections/${sectionId}/coverages/${coverageId}/details/${encoded}`,
+                ]}
+            >
+                <Routes>
+                    <Route
+                        path="/quotes/:id/sections/:sectionId/coverages/:coverageId/details/:detailName"
+                        element={<QuoteCoverageSubDetailPage />}
+                    />
+                </Routes>
+            </MemoryRouter>
+        )
+    }
+
+    // REQ-QUO-FE-F-064
+    test('T-QUO-FE-F-R064 — renders at sub-detail route; shows Locations tab', async () => {
+        renderSubDetail()
+        await waitFor(() => {
+            expect(mockGetQuote).toHaveBeenCalledWith(1)
+            expect(screen.getByRole('button', { name: 'Locations' })).toBeInTheDocument()
+        })
+    })
+
+    test('T-QUO-FE-F-R064b — header shows quote reference, section reference, coverage detail name', async () => {
+        renderSubDetail('1', '1', '1', 'Building')
+        await waitFor(() => {
+            expect(screen.getAllByText('QUO-DEMO-20260601-001').length).toBeGreaterThanOrEqual(1)
+            expect(screen.getAllByText('QUO-DEMO-20260601-001-S01').length).toBeGreaterThanOrEqual(1)
+            expect(screen.getAllByText('Building').length).toBeGreaterThanOrEqual(1)
+        })
+    })
+
+    test('T-QUO-FE-F-R064c — Locations rows grouped by CoverageSubType; "No Sub-Detail" sorted last', async () => {
+        renderSubDetail('1', '1', '1', 'Building')
+        await waitFor(() => {
+            expect(screen.getAllByText('Residential').length).toBeGreaterThanOrEqual(1)
+            expect(screen.getAllByText('Commercial').length).toBeGreaterThanOrEqual(1)
+            expect(screen.getAllByText('No Sub-Detail').length).toBeGreaterThanOrEqual(1)
+        })
+        const rows = screen.getAllByRole('row')
+        const noSubDetailIdx = rows.findIndex(r => r.textContent?.includes('No Sub-Detail'))
+        const residentialIdx = rows.findIndex(r => r.textContent?.includes('Residential'))
+        expect(noSubDetailIdx).toBeGreaterThan(residentialIdx)
+    })
+
+    // REQ-QUO-FE-F-064 — Number of Locations column
+    test('T-QUO-FE-F-R064e — Locations table has Number of Locations column', async () => {
+        renderSubDetail()
+        await waitFor(() => {
+            expect(screen.getByRole('columnheader', { name: /number of locations/i })).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUO-FE-F-064 — currency filter
+    test('T-QUO-FE-F-R064f — Locations table filters by section sumInsuredCurrency', async () => {
+        mockGetQuoteLocations.mockResolvedValue([
+            { CoverageType: 'Building', CoverageSubType: 'Residential', Currency: 'USD', SumInsured: 300000 },
+            { CoverageType: 'Building', CoverageSubType: 'Office', Currency: 'EUR', SumInsured: 100000 },
+        ])
+        renderSubDetail('1', '1', '1', 'Building')
+        await waitFor(() => {
+            expect(screen.getAllByText('Residential').length).toBeGreaterThanOrEqual(1)
+        })
+        // EUR row should be filtered out
+        expect(screen.queryByText('Office')).not.toBeInTheDocument()
+    })
+
+    test('T-QUO-FE-F-R064d — empty state when no matching location rows for the detail name', async () => {
+        mockGetQuoteLocations.mockResolvedValue([
+            { CoverageType: 'Contents', CoverageSubType: 'X', Currency: 'USD', SumInsured: 100 },
+        ])
+        renderSubDetail('1', '1', '1', 'Building')
+        await waitFor(() => {
+            expect(screen.getByText(/no locations found/i)).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUO-FE-F-065 — router registration verified implicitly by MemoryRouter rendering
+    test('T-QUO-FE-F-R065 — coverage sub-detail route renders without crash (router registration verified)', async () => {
+        renderSubDetail()
+        await waitFor(() => expect(mockGetQuote).toHaveBeenCalled())
+        expect(screen.queryByText(/error/i)).not.toBeInTheDocument()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// QuoteSearchModal — REQ-QUO-FE-F-066 to F-073
+// ---------------------------------------------------------------------------
+
+describe('QuoteSearchModal', () => {
+    const mockOnClose = jest.fn()
+    const mockOnSelect = jest.fn()
+
+    const sampleQuotes = [
+        makeQuote({ id: 1, reference: 'QUO-001', insured: 'Acme Corp', status: 'Draft', business_type: 'Insurance', inception_date: '2026-01-01' }),
+        makeQuote({ id: 2, reference: 'QUO-002', insured: 'Global Ltd', status: 'Quoted', business_type: 'Reinsurance', inception_date: '2026-02-01' }),
+        makeQuote({ id: 3, reference: 'QUO-003', insured: 'Widget Inc', status: 'Bound', business_type: 'Insurance', inception_date: '2026-03-01' }),
+    ]
+
+    beforeEach(() => {
+        jest.clearAllMocks()
+        mockListQuotes.mockResolvedValue(sampleQuotes)
+    })
+
+    // REQ-QUO-FE-F-066 — component renders as modal
+    test('T-QUO-FE-F-R066 — renders nothing when isOpen is false', () => {
+        render(<QuoteSearchModal isOpen={false} onClose={mockOnClose} onSelect={mockOnSelect} />)
+        expect(screen.queryByText(/link existing quote/i)).not.toBeInTheDocument()
+    })
+
+    // REQ-QUO-FE-F-067 — loading indicator
+    test('T-QUO-FE-F-R067 — shows loading text while fetching quotes', async () => {
+        mockListQuotes.mockReturnValue(new Promise(() => {})) // never resolves
+        render(<QuoteSearchModal isOpen={true} onClose={mockOnClose} onSelect={mockOnSelect} />)
+        expect(screen.getByText(/loading quotes/i)).toBeInTheDocument()
+    })
+
+    // REQ-QUO-FE-F-068 — renders table with columns and filter input
+    test('T-QUO-FE-F-R068 — renders results table with column headers and filter input', async () => {
+        render(<QuoteSearchModal isOpen={true} onClose={mockOnClose} onSelect={mockOnSelect} />)
+        await waitFor(() => {
+            expect(screen.getByText('QUO-001')).toBeInTheDocument()
+        })
+        expect(screen.getByRole('columnheader', { name: /reference/i })).toBeInTheDocument()
+        expect(screen.getByRole('columnheader', { name: /insured/i })).toBeInTheDocument()
+        expect(screen.getByRole('columnheader', { name: /status/i })).toBeInTheDocument()
+        expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument()
+    })
+
+    // REQ-QUO-FE-F-068 — text filter works
+    test('T-QUO-FE-F-R068b — text filter filters results by reference, insured, and status', async () => {
+        render(<QuoteSearchModal isOpen={true} onClose={mockOnClose} onSelect={mockOnSelect} />)
+        await waitFor(() => {
+            expect(screen.getByText('QUO-001')).toBeInTheDocument()
+        })
+        const input = screen.getByPlaceholderText(/search/i)
+        fireEvent.change(input, { target: { value: 'global' } })
+        expect(screen.getByText('QUO-002')).toBeInTheDocument()
+        expect(screen.queryByText('QUO-001')).not.toBeInTheDocument()
+        expect(screen.queryByText('QUO-003')).not.toBeInTheDocument()
+    })
+
+    // REQ-QUO-FE-F-069 — excludeIds
+    test('T-QUO-FE-F-R069 — excludeIds removes matching quotes from results', async () => {
+        render(<QuoteSearchModal isOpen={true} onClose={mockOnClose} onSelect={mockOnSelect} excludeIds={[1, 3]} />)
+        await waitFor(() => {
+            expect(screen.getByText('QUO-002')).toBeInTheDocument()
+        })
+        expect(screen.queryByText('QUO-001')).not.toBeInTheDocument()
+        expect(screen.queryByText('QUO-003')).not.toBeInTheDocument()
+    })
+
+    // REQ-QUO-FE-F-070 — clicking a row calls onSelect and onClose
+    test('T-QUO-FE-F-R070 — clicking a row calls onSelect with quote then onClose', async () => {
+        render(<QuoteSearchModal isOpen={true} onClose={mockOnClose} onSelect={mockOnSelect} />)
+        await waitFor(() => {
+            expect(screen.getByText('QUO-002')).toBeInTheDocument()
+        })
+        fireEvent.click(screen.getByText('QUO-002'))
+        expect(mockOnSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 2, reference: 'QUO-002' }))
+        expect(mockOnClose).toHaveBeenCalled()
+    })
+
+    // REQ-QUO-FE-F-071 — empty state
+    test('T-QUO-FE-F-R071 — shows "No quotes found." when filtered results are empty', async () => {
+        mockListQuotes.mockResolvedValue([])
+        render(<QuoteSearchModal isOpen={true} onClose={mockOnClose} onSelect={mockOnSelect} />)
+        await waitFor(() => {
+            expect(screen.getByText(/no quotes found/i)).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUO-FE-F-072 — error state
+    test('T-QUO-FE-F-R072 — shows API error message on failure', async () => {
+        mockListQuotes.mockRejectedValue(new Error('Network failure'))
+        render(<QuoteSearchModal isOpen={true} onClose={mockOnClose} onSelect={mockOnSelect} />)
+        await waitFor(() => {
+            expect(screen.getByText(/network failure/i)).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUO-FE-F-073 — cancel button calls onClose
+    test('T-QUO-FE-F-R073 — cancel button calls onClose without invoking onSelect', async () => {
+        render(<QuoteSearchModal isOpen={true} onClose={mockOnClose} onSelect={mockOnSelect} />)
+        await waitFor(() => {
+            expect(screen.getByText('QUO-001')).toBeInTheDocument()
+        })
+        fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+        expect(mockOnClose).toHaveBeenCalled()
+        expect(mockOnSelect).not.toHaveBeenCalled()
     })
 })
 

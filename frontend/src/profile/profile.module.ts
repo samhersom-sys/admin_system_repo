@@ -1,1 +1,1 @@
-﻿export { default as ProfilePage } from './index'
+﻿export { default as ProfilePage } from './ProfilePage'

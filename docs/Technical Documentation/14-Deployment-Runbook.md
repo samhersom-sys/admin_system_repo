@@ -33,9 +33,11 @@
 
 ## 3. Login Entry Decision
 
-- The website login link points to `https://app.thepolicyforge.com/login`.
+- The website login control opens a chooser with two targets:
+  - `Production` -> `https://app.thepolicyforge.com/login`
+  - `UAT` -> `https://app.uat.thepolicyforge.com/login`
 - The login page lives in the SPA, not the marketing website.
-- No environment dropdown is shown on the website for the first release.
+- The marketing website remains a public entry point only; authenticated flows continue in the SPA origins.
 
 ---
 
@@ -59,8 +61,9 @@
 
 - Production website env example:
   - `website/.env.production.example`
-- Required variable:
+- Required variables:
   - `NEXT_PUBLIC_APP_URL=https://app.thepolicyforge.com`
+  - `NEXT_PUBLIC_UAT_APP_URL=https://app.uat.thepolicyforge.com`
 
 ---
 
@@ -328,7 +331,7 @@ If GitHub shows the workflow name instead of individual job names, require the c
 ## 8. Validation Before Public Cutover
 
 - Website loads on `www.thepolicyforge.com`
-- Website login link opens `app.thepolicyforge.com/login`
+- Website login chooser opens both `app.thepolicyforge.com/login` and `app.uat.thepolicyforge.com/login`
 - SPA loads on `app.thepolicyforge.com`
 - SPA API calls resolve to `api.thepolicyforge.com`
 - Backend health endpoint responds successfully
@@ -339,7 +342,22 @@ If GitHub shows the workflow name instead of individual job names, require the c
 
 ---
 
-## 9. Answer To The Repository Boundary Question
+## 9. Deferred Security Hardening Backlog
+
+- Hosted environments shall use unique, high-entropy secrets for JWT signing, database credentials, and third-party API access; no development fallback secret may remain active in UAT or production.
+- GitHub, Cloudflare, Railway, and the primary email account used for recovery shall enforce MFA for all human administrators before multi-user production operation.
+- Branch rulesets shall keep protected-branch updates restricted to approved actors only; temporary bypass relaxations used during release recovery shall be removed after the release window closes.
+- The hosted backend shall restrict production CORS origins to the explicit public app and website origins required for live traffic.
+- Authentication endpoints shall enforce rate limits for login, logout, refresh, password-reset generation, and password-reset completion flows.
+- Password reset tokens shall remain one-time use and time-limited in all hosted environments, with operator review if expiry or audit settings are changed.
+- Hosted environments shall emit operator-visible monitoring for repeated authentication failures, elevated 5xx rates, and backend health-check failures.
+- The production database shall remain isolated from public internet access except where the hosting platform requires controlled ingress; UAT and production credentials shall remain separate.
+- Hosted web surfaces shall serve security headers appropriate to public internet exposure, including at minimum HSTS, X-Content-Type-Options, Referrer-Policy, and a reviewed Content-Security-Policy.
+- Dependency and platform patching shall be reviewed on a recurring cadence, with critical security updates promoted ahead of feature work when they affect public attack surface.
+
+---
+
+## 10. Answer To The Repository Boundary Question
 
 **Will this only publish the Cleaned folder?**
 

@@ -14,7 +14,7 @@
  */
 
 import React from 'react'
-import { FiChevronUp, FiChevronDown, FiChevronsDown } from 'react-icons/fi'
+import { FaSort, FaSortUp, FaSortDown } from 'react-icons/fa'
 import { useResizableColumns } from '@/shared/lib/hooks/useResizableColumns'
 
 export interface Column {
@@ -61,7 +61,7 @@ export default function ResizableGrid({
     function SortIcon({ colKey }: { colKey: string }) {
         if (!sortConfig || sortConfig.key !== colKey) {
             return (
-                <FiChevronsDown
+                <FaSort
                     className="flex-shrink-0 text-gray-400"
                     size={12}
                     aria-hidden="true"
@@ -69,9 +69,9 @@ export default function ResizableGrid({
             )
         }
         return sortConfig.direction === 'asc' ? (
-            <FiChevronUp className="flex-shrink-0 text-brand-600" size={12} aria-hidden="true" />
+            <FaSortUp className="flex-shrink-0 text-brand-600" size={12} aria-hidden="true" />
         ) : (
-            <FiChevronDown className="flex-shrink-0 text-brand-600" size={12} aria-hidden="true" />
+            <FaSortDown className="flex-shrink-0 text-brand-600" size={12} aria-hidden="true" />
         )
     }
 

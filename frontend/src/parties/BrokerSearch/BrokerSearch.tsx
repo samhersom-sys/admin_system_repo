@@ -114,9 +114,9 @@ function BrokerSearchModal({ isOpen, onClose, onSelect }: ModalProps) {
                         <ResizableGrid
                             storageKey="table-widths-broker-search"
                             columns={[
-                                { key: 'name',     label: 'Name',          sortable: true, defaultWidth: 220 },
-                                { key: 'address',  label: 'Address',       sortable: false, defaultWidth: 220 },
-                                { key: 'city',     label: 'City',          sortable: true, defaultWidth: 130 },
+                                { key: 'name', label: 'Name', sortable: true, defaultWidth: 220 },
+                                { key: 'address', label: 'Address', sortable: false, defaultWidth: 220 },
+                                { key: 'city', label: 'City', sortable: true, defaultWidth: 130 },
                                 { key: 'postcode', label: 'Postcode / ZIP', sortable: false, defaultWidth: 130 },
                             ]}
                             rows={results}
@@ -125,9 +125,9 @@ function BrokerSearchModal({ isOpen, onClose, onSelect }: ModalProps) {
                             onRowClick={(row) => onSelect(row as Party)}
                             renderCell={(key, row) => {
                                 const party = row as Party
-                                if (key === 'name')     return party.name
-                                if (key === 'address')  return (party.addressLine1 as string) || '–'
-                                if (key === 'city')     return (party.city as string) || '–'
+                                if (key === 'name') return party.name
+                                if (key === 'address') return (party.addressLine1 as string) || '–'
+                                if (key === 'city') return (party.city as string) || '–'
                                 if (key === 'postcode') return (party.postcode as string) || (party.zipcode as string) || '–'
                                 return null
                             }}

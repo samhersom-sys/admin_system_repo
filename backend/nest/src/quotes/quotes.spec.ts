@@ -706,4 +706,97 @@ describe('QuotesService', () => {
                 .rejects.toThrow(NotFoundException)
         })
     })
+
+    // -------------------------------------------------------------------------
+    // REQ-QUO-BE-F-037 — issuePolicy
+    // -------------------------------------------------------------------------
+    describe('issuePolicy', () => {
+        it('T-QUO-BE-NE-R37a: throws NotFoundException when quote does not exist', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(null)
+
+            await expect(service.issuePolicy(99, 'TST', 'user'))
+                .rejects.toThrow(NotFoundException)
+        })
+
+        it('T-QUO-BE-NE-R37b: throws ForbiddenException when orgCode does not match', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote({ createdByOrgCode: 'OTHER' }))
+
+            await expect(service.issuePolicy(1, 'TST', 'user'))
+                .rejects.toThrow(ForbiddenException)
+        })
+
+        it('T-QUO-BE-NE-R37c: throws BadRequestException when quote is not Bound', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote({ status: 'Draft' }))
+
+            await expect(service.issuePolicy(1, 'TST', 'user'))
+                .rejects.toThrow(BadRequestException)
+        })
+
+        it('T-QUO-BE-NE-R37d: creates policy record and returns it for a Bound quote', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote({ status: 'Bound' }))
+            // First query: sequence lookup (no existing policy with this prefix)
+            mockDataSource.query.mockResolvedValueOnce([])
+            // Second query: INSERT ... RETURNING *
+            const policyRow = { id: 10, reference: 'POL-TST-20260101-001', status: 'Active' }
+            mockDataSource.query.mockResolvedValueOnce([policyRow])
+
+            const result = await service.issuePolicy(1, 'TST', 'test-user')
+            expect(result['status']).toBe('Active')
+            expect(result['id']).toBe(10)
+        })
+
+        it('T-QUO-BE-NE-R37e: increments sequence when previous policy reference exists', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote({ status: 'Bound' }))
+            // Sequence lookup returns an existing policy (seq 003)
+            mockDataSource.query.mockResolvedValueOnce([{ reference: 'POL-TST-20260101-003' }])
+            const policyRow = { id: 11, reference: 'POL-TST-20260101-004', status: 'Active' }
+            mockDataSource.query.mockResolvedValueOnce([policyRow])
+
+            const result = await service.issuePolicy(1, 'TST', 'test-user')
+            // INSERT was called with reference POL-TST-...-004
+            const insertCall = mockDataSource.query.mock.calls[1]
+            expect(insertCall[1][0]).toMatch(/-004$/)
+            expect(result['reference']).toBe('POL-TST-20260101-004')
+        })
+    })
+
+    // -------------------------------------------------------------------------
+    // REQ-QUO-BE-F-038 — getLocations
+    // -------------------------------------------------------------------------
+    describe('getLocations', () => {
+        it('T-QUO-BE-NE-R38a: throws NotFoundException when quote does not exist', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(null)
+
+            await expect(service.getLocations(99, 'TST'))
+                .rejects.toThrow(NotFoundException)
+        })
+
+        it('T-QUO-BE-NE-R38b: throws ForbiddenException when orgCode does not match', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote({ createdByOrgCode: 'OTHER' }))
+
+            await expect(service.getLocations(1, 'TST'))
+                .rejects.toThrow(ForbiddenException)
+        })
+
+        it('T-QUO-BE-NE-R38c: returns location rows ordered by id', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const locations = [{ id: 1, quote_id: 1 }, { id: 2, quote_id: 1 }]
+            mockDataSource.query.mockResolvedValue(locations)
+
+            const result = await service.getLocations(1, 'TST')
+            expect(result).toEqual(locations)
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('FROM quote_location_rows'),
+                [1],
+            )
+        })
+
+        it('T-QUO-BE-NE-R38d: returns empty array when no locations exist', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            mockDataSource.query.mockResolvedValue([])
+
+            const result = await service.getLocations(1, 'TST')
+            expect(result).toEqual([])
+        })
+    })
 })
