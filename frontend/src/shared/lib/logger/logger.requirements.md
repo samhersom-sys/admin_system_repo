@@ -15,6 +15,34 @@
 
 ---
 
+## 1a. Impact Analysis
+
+### UI Components
+
+None — `logger` is a pure utility library with no UI.
+
+### API Endpoints
+
+None — logger is client-side only. No remote logging in scope.
+
+### Data Dependencies
+
+| Source | Fields Used | Purpose |
+|--------|-------------|--------|
+| `process.env.NODE_ENV` | `'production'` vs other | Gates all console output (no-op in production) |
+
+### Consumers (all modules that import logger)
+
+- `lib/api-client` — `logger.request()`, `logger.response()`, `logger.apiError()` for HTTP tracing
+- `components/ErrorBoundary` — sole allowed `console.error` exception (REQ-LOG-C-001)
+- All domain services — `logger.log()`, `logger.warn()`, `logger.error()` for diagnostic output
+
+### Enforcement
+
+- `tools/scan-tests/` RULE-09 scan verifies no direct `console.*` calls outside `logger.ts` and `ErrorBoundary`
+
+---
+
 ## 2. Requirements
 
 **REQ-LOG-F-001:** The `logger.log`, `logger.warn`, and `logger.error` functions shall forward their arguments to `console.log`, `console.warn`, and `console.error` respectively — each prepended with `'[PF]'` — when `process.env.NODE_ENV` is not `'production'`.
@@ -56,3 +84,4 @@ None.
 |------|--------|
 | 2026-03-11 | Initial requirements written |
 | 2026-03-11 | Rewritten into formal REQ-LOG-{TYPE}-{NNN} format per Guideline 13 |
+| 2026-04-05 | Added Impact Analysis (§1a): pure utility — no UI/API/DB; documents env gate, consumers, RULE-09 enforcement |

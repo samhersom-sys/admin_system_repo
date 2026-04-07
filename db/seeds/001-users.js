@@ -29,7 +29,7 @@ const pool = new Pool({ connectionString: DB_URL })
 // Passwords are hashed at runtime; never store plaintext passwords in the DB.
 // ---------------------------------------------------------------------------
 
-const USERS = [
+const CORE_USERS = [
     {
         username: 'admin',
         email: 'admin@policyforge.com',
@@ -55,6 +55,42 @@ const USERS = [
         role: 'user',
     },
 ]
+
+// ---------------------------------------------------------------------------
+// UAT accounts — added 2026-04-07
+// MUST NOT be seeded into production. Only included when SEED_INCLUDE_UAT=true.
+// ---------------------------------------------------------------------------
+const UAT_USERS = [
+    {
+        username: 'uat_sw3k7m',
+        email: 'Stephen.Williams3046@yahoo.co.uk',
+        password: 'UatSw9@kMx3!',
+        fullName: 'Stephen Williams',
+        orgCode: 'DEMO',
+        role: 'client_admin',
+    },
+    {
+        username: 'uat_rd8p2x',
+        email: 'Rdarke01@gmail.com',
+        password: 'UatRd4#nQv7!',
+        fullName: 'R Darke',
+        orgCode: 'DEMO',
+        role: 'client_admin',
+    },
+    {
+        username: 'uat_at5n9q',
+        email: 'Anthony.Tage86@outlook.com',
+        password: 'UatAt6$mKj2!',
+        fullName: 'Anthony Tage',
+        orgCode: 'DEMO',
+        role: 'client_admin',
+    },
+]
+
+// Combine: UAT users only included when SEED_INCLUDE_UAT=true
+const USERS = process.env.SEED_INCLUDE_UAT === 'true'
+    ? [...CORE_USERS, ...UAT_USERS]
+    : CORE_USERS
 
 async function run() {
     if (process.env.NODE_ENV && process.env.NODE_ENV !== 'development') {

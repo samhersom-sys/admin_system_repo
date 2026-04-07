@@ -12,7 +12,7 @@ module.exports = {
                 // Independently editable: www.thepolicyforge.com may adopt its own marketing palette
                 // without touching the app's design tokens.
                 brand: {
-                    50:  '#edfbf8',
+                    50: '#edfbf8',
                     100: '#c8f1ea',
                     200: '#8edfcf',
                     300: '#6ed4bf',

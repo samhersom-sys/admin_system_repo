@@ -26,7 +26,7 @@ Sources read from `policy-forge-chat (BackUp)/`:
 | 5 | Error on GET fail | F-007 | COVERED |
 | 6 | Filter by `?submission_id` | F-008 | COVERED |
 | 7 | New Quote button → `/quotes/new` | F-002 | COVERED |
-| 8 | DELETE /api/quotes/:id | F-023 | NEW |
+| 8 | ~~DELETE /api/quotes/:id~~ | ~~F-023~~ | REMOVED — not required |
 | 9 | POST /api/quotes — create + navigate to `/quotes/:id` | F-011, F-012 | COVERED |
 | 10 | PUT /api/quotes/:id — save changes | F-019 | COVERED |
 | 11 | Error on POST/PUT fail | F-013, F-021 | COVERED |
@@ -73,12 +73,13 @@ Sources read from `policy-forge-chat (BackUp)/`:
 | 52 | Section coverages (list, add, edit, delete) | REQ-QUO-FE-F-054 | COVERED — Block 4 |
 | 53 | Section deductions | REQ-QUO-FE-F-055 | COVERED — Block 4 |
 | 54 | Section participations | REQ-QUO-FE-F-057 | COVERED — Block 4 |
-| 55 | Coverage detail page / sub-detail page | — | DEFERRED — Block 5 |
+| 55 | Coverage detail page / sub-detail page | REQ-QUO-FE-F-062–F-065 | COVERED — Block 5 (Batch D) |
 | 56 | Pro-rated gross premium + days-on-cover calculation | REQ-QUO-BE-F-043 | COVERED — Block 4 (server-side) |
 | 57 | POST /api/quotes/create-from-submission | — | DEFERRED — Block 5 |
 | 58 | GET/POST /api/quotes/:id/audit | REQ-QUO-BE-F-030–F-036 | COVERED — Block 3 |
 | 59 | GET /api/quotes/:id/locations | — | DEFERRED — Block 5 |
 | 60 | Sections / coverages / participations API endpoints | REQ-QUO-BE-F-037–F-046 | COVERED — Block 3 remaining + Block 4 |
+| 61 | QuoteSearchModal — reusable modal for linking existing quotes | F-066–F-073 | NEW — Block 6 |
 
 ---
 
@@ -107,7 +108,7 @@ Sources read from `policy-forge-chat (BackUp)/`:
 
 ## 3. Scope
 
-**In scope (Block 2):** QuotesListPage (`/quotes`), NewQuotePage (`/quotes/new`), QuoteViewPage (`/quotes/:id`) — full header fields panel including time fields, LTA, Contract Type, Method of Placement, UMR, and Renewal; dirty-state tracking and back-navigation barrier; locked quote banner; DELETE quote action.
+**In scope (Block 2):** QuotesListPage (`/quotes`), NewQuotePage (`/quotes/new`), QuoteViewPage (`/quotes/:id`) — full header fields panel including time fields, LTA, Contract Type, Method of Placement, UMR, and Renewal; dirty-state tracking and back-navigation barrier; locked quote banner.
 
 **Deferred to Block 3:** All tab content (Sections, Broker, Additional Insured, Financial Summary, Audit, Risk Codes); section/coverage/deduction/participation management; concurrent-user warning; audit event logging; date sync between quote and sections; submission back-propagation; create-from-submission workflow.
 
@@ -135,7 +136,7 @@ Sources read from `policy-forge-chat (BackUp)/`:
 
 **REQ-QUO-FE-F-008:** The Quotes list page shall accept an optional `?submission_id=<id>` route query parameter and, when present, pre-filter the displayed quotes to only those belonging to that submission — replacing the page heading with `"Quotes for Submission"`.
 
-**REQ-QUO-FE-F-023:** The Quotes list page shall provide a delete action for each row that calls `DELETE /api/quotes/:id`; on success the row shall be removed from the list. Any in-flight delete shall display a loading state. On failure an inline error message shall be displayed.
+**~~REQ-QUO-FE-F-023:~~** ~~REMOVED — Delete quote from list page is not required.~~
 
 ### 4.2 NewQuotePage — /quotes/new
 
@@ -271,6 +272,40 @@ The Quote view page shall not register `All Quotes` or `Issue Policy` in its con
 
 **REQ-QUO-FE-F-060:** The route `/quotes/:id/sections/:sectionId` shall be registered in `frontend/src/main.jsx`.
 
+### 4.8 QuoteCoverageDetailPage and QuoteCoverageSubDetailPage — Block 5
+
+**REQ-QUO-FE-F-062:** The system shall expose a `QuoteCoverageDetailPage` component at route `/quotes/:id/sections/:sectionId/coverages/:coverageId`. On mount it shall load: the quote via `GET /api/quotes/:id`; the section list via `GET /api/quotes/:id/sections` (finding the matching sectionId); the coverage list via `GET /api/quotes/:id/sections/:sectionId/coverages` (finding the matching coverageId); and the location schedule via `GET /api/quotes/:id/locations`. While loading, a loading indicator shall be rendered. If the coverage is not found, the component shall render a `text-red-600` error message `"Coverage not found"`; it shall not throw an uncaught exception.
+
+**REQ-QUO-FE-F-063:** `QuoteCoverageDetailPage` shall render a read-only header using `FieldGroup` components displaying: Coverage Reference, Insured (from quote), Coverage name, Sum Insured Currency, Sum Insured Amount, Effective Date, Expiry Date. Below the header a `TabsNav` with a single tab `{ key: 'subdetails', label: 'Coverage Sub-Details' }` shall be rendered.
+
+The Sub-Details tab shall display an `app-table` table with columns: Coverage Detail, Coverage Sub-Details, Number of Locations, Sum Insured. Rows shall be grouped from the location schedule by `CoverageType`, filtered to rows where `CoverageType` is non-empty and `Currency` matches the section's `sumInsuredCurrency` (defaulting to `"GBP"`). Rows shall be sorted alphabetically by Coverage Detail. Each Coverage Detail row shall be clickable, navigating to `/quotes/:id/sections/:sectionId/coverages/:coverageId/details/:detailName` (where `detailName` is URL-encoded). A totals `<tfoot>` row shall display the aggregate Sum Insured across all groups. When no rows are present, a full-colspan empty state `"No coverage details found."` shall be rendered.
+
+**REQ-QUO-FE-F-064:** The system shall expose a `QuoteCoverageSubDetailPage` component at route `/quotes/:id/sections/:sectionId/coverages/:coverageId/details/:detailName`. On mount it shall load the same quote, section, and coverage data as REQ-QUO-FE-F-062, then filter the location schedule to rows where `CoverageType` matches `decodeURIComponent(detailName)` and `Currency` matches the section's `sumInsuredCurrency`. If the coverage is not found, the component shall render a `text-red-600` error message; it shall not throw.
+
+The component shall render a read-only `FieldGroup` header with: Quote Reference, Section Reference, Class of Business, Coverage name, Coverage Detail (decoded `detailName`), Sum Insured Currency. Below the header, a `TabsNav` with a single tab `{ key: 'locations', label: 'Locations' }` shall be rendered.
+
+The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail, Number of Locations, Sum Insured. Rows shall be grouped by `CoverageSubType` (falling back to `"No Sub-Detail"` when absent), sorted alphabetically with `"No Sub-Detail"` always last. A totals `<tfoot>` row shall display the aggregate Sum Insured. An empty state `"No locations found."` shall be rendered when no rows match.
+
+**REQ-QUO-FE-F-065:** The routes `/quotes/:id/sections/:sectionId/coverages/:coverageId` and `/quotes/:id/sections/:sectionId/coverages/:coverageId/details/:detailName` shall be registered in `frontend/src/main.jsx`, declared after `/quotes/:id/sections/:sectionId`.
+
+### 4.9 QuoteSearchModal — Block 6: Reusable Quote Search and Link Modal
+
+**REQ-QUO-FE-F-066:** The application shall include a `QuoteSearchModal` component at `frontend/src/quotes/QuoteSearchModal/QuoteSearchModal.tsx` that is a reusable modal for searching and selecting an existing quote record. It shall accept props: `isOpen: boolean`, `onClose: () => void`, `onSelect: (quote: Quote) => void`, and an optional `excludeIds?: number[]`.
+
+**REQ-QUO-FE-F-067:** When `isOpen` is `true`, the `QuoteSearchModal` shall call `GET /api/quotes` on mount and display a loading indicator with the text `"Loading quotes…"` while the request is in flight.
+
+**REQ-QUO-FE-F-068:** On a successful API response, the `QuoteSearchModal` shall render a text input for filtering results and a results table with columns: Reference, Insured, Status, Business Type, Inception Date. The text input shall filter the displayed list client-side across `reference`, `insured`, and `status` fields simultaneously (case-insensitive substring match).
+
+**REQ-QUO-FE-F-069:** When the `excludeIds` prop is provided, the `QuoteSearchModal` shall remove any quote whose `id` is present in `excludeIds` from the displayed results before applying the text filter.
+
+**REQ-QUO-FE-F-070:** Clicking a row in the results table shall call the `onSelect` callback with the full quote object for that row and then call `onClose` to dismiss the modal.
+
+**REQ-QUO-FE-F-071:** The `QuoteSearchModal` shall render `"No quotes found."` when the filtered results (after `excludeIds` exclusion and text filter) produce an empty list.
+
+**REQ-QUO-FE-F-072:** The `QuoteSearchModal` shall render the API error message text when the `GET /api/quotes` call fails.
+
+**REQ-QUO-FE-F-073:** Clicking the Cancel button or the modal backdrop shall call `onClose` without invoking `onSelect`.
+
 ---
 
 ## 5. Traceability
@@ -300,9 +335,9 @@ The Quote view page shall not register `All Quotes` or `Issue Policy` in its con
 | REQ-QUO-FE-F-061 | `frontend/src/quotes/__tests__/quotes.test.tsx` | T-quotes-view-R27, R28, R29 (pending — Stage 2) |
 | REQ-QUO-FE-F-021 | `frontend/src/quotes/__tests__/quotes.test.tsx` | T-quotes-view-R05 |
 | REQ-QUO-FE-F-022 | `frontend/src/quotes/__tests__/quotes.test.tsx` | T-quotes-view-R06 |
-| REQ-QUO-FE-F-023 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
-| REQ-QUO-FE-F-024 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
-| REQ-QUO-FE-F-025 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
+| ~~REQ-QUO-FE-F-023~~ | — | REMOVED |
+| REQ-QUO-FE-F-024 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-view-R20b, R20c |
+| REQ-QUO-FE-F-025 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-view-R20d, R20e |
 | REQ-QUO-FE-F-026 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-027 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-028 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
@@ -332,15 +367,27 @@ The Quote view page shall not register `All Quotes` or `Issue Policy` in its con
 | REQ-QUO-FE-F-049 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-050 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-051 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
-| REQ-QUO-FE-F-052 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
+| REQ-QUO-FE-F-052 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-section-R15, R16, R17 |
 | REQ-QUO-FE-F-053 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-054 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-055 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-056 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
-| REQ-QUO-FE-F-057 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
-| REQ-QUO-FE-F-058 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
+| REQ-QUO-FE-F-057 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-section-R18, R19 |
+| REQ-QUO-FE-F-058 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-section-R20, R21, R22, R23 |
 | REQ-QUO-FE-F-059 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-060 | code review | — |
+| REQ-QUO-FE-F-062 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
+| REQ-QUO-FE-F-063 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R062, R062b, R063, R063b, R063c, R063d, R063e, R063f |
+| REQ-QUO-FE-F-064 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R064, R064b, R064c, R064d, R064e, R064f, R065 |
+| REQ-QUO-FE-F-065 | code review | — |
+| REQ-QUO-FE-F-066 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R066 |
+| REQ-QUO-FE-F-067 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R067 |
+| REQ-QUO-FE-F-068 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R068, R068b |
+| REQ-QUO-FE-F-069 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R069 |
+| REQ-QUO-FE-F-070 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R070 |
+| REQ-QUO-FE-F-071 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R071 |
+| REQ-QUO-FE-F-072 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R072 |
+| REQ-QUO-FE-F-073 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R073 |
 
 ---
 
@@ -369,6 +416,13 @@ The Quote view page shall not register `All Quotes` or `Issue Policy` in its con
 | 2026-03-20 | Layout correction: F-034 and F-035 corrected — form is always visible above the tab strip (matching BackUp pattern); Details tab removed; default tab changed to sections; F-036 updated to remove Details-tab language; F-042 superseded by F-046; F-045 corrected to 5 tabs with no Details tab. Violated guideline §1.1 (invented Details tab pattern not in BackUp). |
 | 2026-03-25 | F-020 amended to include Copy Quote sidebar item for Draft/Quoted/Bound states; REQ-QUO-FE-F-061 added — Copy Quote action, POST /api/quotes/:id/copy, navigate to new quote on success. Retroactive fix for §03 violation (code preceded requirement). |
 | 2026-03-25 | F-020 and F-061 amended — Copy Quote visible at all statuses including Declined (corrected; QuoteViewPage already showed Copy for all statuses). Declinature reason not copied to new Draft. T-quotes-view-R27/R28/R29 designated for Stage 2. |
+| 2026-04-04 | Block 5 (Batch D): REQ-QUO-FE-F-062 to F-065 added — QuoteCoverageDetailPage (location schedule grouped by CoverageType) and QuoteCoverageSubDetailPage (grouped by CoverageSubType); backup coverage map row 55 updated to COVERED. |
+| 2026-04-05 | Block 6: REQ-QUO-FE-F-066 to F-073 added — QuoteSearchModal reusable component (search, filter, excludeIds, select, error/empty states). Backup coverage map row 61 added. |
+| 2026-04-07 | REQ-QUO-FE-F-023 REMOVED — delete quote from list page is not required per user confirmation. Backup coverage map row 8 updated to REMOVED. Scope §3 updated. |
+| 2026-04-07 | REQ-QUO-FE-F-024 and F-025 implemented — insured/submission unconfirmed state shows red border (`border-red-500 ring-1 ring-red-400`) + warning text. Tests T-quotes-view-R20b/c/d/e added. Traceability updated. |
+| 2026-04-07 | Block 4: REQ-QUO-FE-F-052 implemented — Days on Cover (computed), Inception Time, Expiry Time, Annual Net Premium added to section header. F-057 — Risk Code uses `<select>` from `GET /api/lookups/riskCodes` with free-text fallback. F-058 — Participations inline editing, Save Participations button, 100% validation for Written/Signed Line %. Tests R15–R23 added. `getRiskCodes` added to quotes.service.ts. |
+| 2026-04-07 | Block 5: REQ-QUO-FE-F-063 — QuoteCoverageDetailPage updated with currency filter, "Coverage Sub-Details" and "Number of Locations" columns. F-064 — QuoteCoverageSubDetailPage updated with currency filter and "Number of Locations" column. Tests R063d–R063f, R064e–R064f added. Traceability updated. |
+| 2026-04-07 | Block 6: REQ-QUO-FE-F-066 to F-073 implemented — QuoteSearchModal component at `frontend/src/quotes/QuoteSearchModal/QuoteSearchModal.tsx`. Tests R066–R073 added (8 tests). All 111 quotes tests pass. |
 
 ---
 

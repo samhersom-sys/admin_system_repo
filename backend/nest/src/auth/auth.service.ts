@@ -25,7 +25,7 @@ export class AuthService {
     private readonly userRepo: Repository<User>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   async login(email: string, password: string) {
     if (!email || !password) {
@@ -252,5 +252,48 @@ export class AuthService {
     )
 
     return { message: 'Password reset successfully' }
+  }
+
+  async updateProfile(userId: number, name: string) {
+    if (!name || !name.trim()) {
+      throw new BadRequestException({ error: 'Name is required' })
+    }
+    if (name.trim().length > 100) {
+      throw new BadRequestException({ error: 'Name must be 100 characters or fewer' })
+    }
+
+    const user = await this.userRepo.findOne({ where: { id: userId } })
+    if (!user) {
+      throw new NotFoundException({ error: 'User not found' })
+    }
+
+    user.fullName = name.trim()
+    await this.userRepo.save(user)
+
+    return { data: { id: user.id, name: user.fullName, email: user.email, role: user.role } }
+  }
+
+  async changePassword(userId: number, currentPassword: string, newPassword: string) {
+    if (!currentPassword || !newPassword) {
+      throw new BadRequestException({ error: 'currentPassword and newPassword are required' })
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      select: { id: true, passwordHash: true },
+    })
+    if (!user) {
+      throw new NotFoundException({ error: 'User not found' })
+    }
+
+    const isMatch = await bcryptjs.compare(currentPassword, user.passwordHash)
+    if (!isMatch) {
+      throw new UnauthorizedException({ error: 'Current password is incorrect' })
+    }
+
+    user.passwordHash = await bcryptjs.hash(newPassword, 10)
+    await this.userRepo.save(user)
+
+    return { message: 'Password changed successfully' }
   }
 }

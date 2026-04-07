@@ -19,6 +19,55 @@ It does not cover:
 
 ---
 
+## 1a. Impact Analysis
+
+### UI Components (to create / modify)
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| HomeDashboard | `app/features/home/HomeDashboard.tsx` | Page shell — renders widget grid inside AppLayout |
+| KpiWidget | `app/features/home/KpiWidget.tsx` | Open submissions, active quotes, bound policies, active BAs counts |
+| GwpChartWidget | `app/features/home/GwpChartWidget.tsx` | Bar chart — GWP by year (3-year comparison) |
+| CumulativeGwpWidget | `app/features/home/CumulativeGwpWidget.tsx` | Line chart — cumulative GWP over 3 years |
+| RecentActivityWidget | `app/features/home/RecentActivityWidget.tsx` | Current user's recently opened records from audit events |
+| TasksWidget | `app/features/home/TasksWidget.tsx` | Pending tasks assigned to current user |
+
+### API Endpoints (consumed)
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/submissions?status=open&orgCode={orgCode}` | KPI — open submission count |
+| GET | `/api/quotes?status=active&orgCode={orgCode}` | KPI — active quote count |
+| GET | `/api/policies?status=bound&orgCode={orgCode}` | KPI — bound policy count |
+| GET | `/api/binding-authorities?status=active&orgCode={orgCode}` | KPI — active BA count |
+| GET | `/api/policies/gwp-summary?orgCode={orgCode}` | GWP summary data for bar chart |
+| GET | `/api/policies/gwp-monthly?years=3` | Monthly GWP data for line chart |
+| GET | `/api/policies/gwp-cumulative?years=3` | Cumulative GWP data for line chart |
+| GET | `/api/activity/recent?userId={userId}&limit=10` | Recent activity for current user |
+| GET | `/api/tasks?assignedTo={userId}&status=pending` | Pending tasks for current user |
+
+### Database Tables (read by API)
+
+| Table | Key Columns | Role |
+|-------|-------------|------|
+| `submissions` | id, status, org_code | Source for open submissions KPI |
+| `quotes` | id, status, org_code | Source for active quotes KPI |
+| `policies` | id, status, org_code, gwp | Source for bound policies KPI + GWP charts |
+| `binding_authorities` | id, status, org_code | Source for active BA KPI |
+| `audit_events` | id, user_id, action, entity_type, entity_id, created_at | Recent activity source |
+| `tasks` | id, assigned_to, status | Pending tasks source |
+
+### Dependencies
+
+- `lib/api-client` — HTTP wrapper for all endpoint calls
+- `lib/auth-session` — `getSession()` for userId and orgCode context
+- `lib/formatters` — `number`, `currency`, `relativeTime`, `date` formatters
+- `Chart.js` — Charting library for GWP bar/line charts
+- `components/ErrorBoundary` — Widget-level error isolation
+- `components/LoadingSpinner` — Per-widget loading states
+
+---
+
 ## 2. Route and Access Control
 
 | Property | Value |
@@ -348,3 +397,4 @@ Each organisation sees only the data relevant to them.  The widget layout and st
 | 2026-03-11 | Initial requirements written |
 | 2026-03-11 | Formal REQ-HOME-{TYPE}-{NNN} statements added per Guideline 13 |
 | 2026-03-25 | §5.4 RecentActivityWidget data source amended — widget now shows current user's own recently opened records (audit-event based, `userId`-filtered) rather than org-level last-opened. API updated to `GET /api/activity/recent?userId={userId}&limit=10`. Scope note updated. (OQ-QUO-FE-001) |
+| 2026-04-05 | Added Impact Analysis (§1a): 6 UI components, 9 API endpoints, 6 DB tables, 6 dependencies |

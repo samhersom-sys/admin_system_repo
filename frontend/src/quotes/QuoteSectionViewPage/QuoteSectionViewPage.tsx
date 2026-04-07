@@ -7,7 +7,7 @@
  * Route: /quotes/:id/sections/:sectionId
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { FiArrowLeft, FiPlus, FiSave } from 'react-icons/fi'
 import ResizableGrid from '@/shared/components/ResizableGrid/ResizableGrid'
@@ -26,6 +26,8 @@ import {
     updateSection,
     listCoverages,
     listParticipations,
+    saveParticipations,
+    getRiskCodes,
     type Quote,
     type QuoteSection,
     type Coverage,
@@ -245,10 +247,12 @@ function DeductionsTable({
 function RiskCodesTable({
     editable,
     rows,
+    riskCodeOptions,
     onChange,
 }: {
     editable: boolean
     rows: RiskSplitRow[]
+    riskCodeOptions: string[]
     onChange: React.Dispatch<React.SetStateAction<RiskSplitRow[]>>
 }) {
     const colKeys = editable ? ['riskCode', 'allocation', 'actions'] : ['riskCode', 'allocation']
@@ -307,16 +311,33 @@ function RiskCodesTable({
                                     <tr key={idx}>
                                         <td>
                                             {editable ? (
-                                                <input
-                                                    type="text"
-                                                    className="input-field-sm"
-                                                    value={row.riskCode}
-                                                    onChange={(e) =>
-                                                        onChange((rs) =>
-                                                            rs.map((r, i) => (i === idx ? { ...r, riskCode: e.target.value } : r))
-                                                        )
-                                                    }
-                                                />
+                                                riskCodeOptions.length > 0 ? (
+                                                    <select
+                                                        className="input-field-sm"
+                                                        value={row.riskCode}
+                                                        onChange={(e) =>
+                                                            onChange((rs) =>
+                                                                rs.map((r, i) => (i === idx ? { ...r, riskCode: e.target.value } : r))
+                                                            )
+                                                        }
+                                                    >
+                                                        <option value="">— Select —</option>
+                                                        {riskCodeOptions.map((code) => (
+                                                            <option key={code} value={code}>{code}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        className="input-field-sm"
+                                                        value={row.riskCode}
+                                                        onChange={(e) =>
+                                                            onChange((rs) =>
+                                                                rs.map((r, i) => (i === idx ? { ...r, riskCode: e.target.value } : r))
+                                                            )
+                                                        }
+                                                    />
+                                                )
                                             ) : (
                                                 row.riskCode
                                             )}
@@ -393,10 +414,12 @@ export default function QuoteSectionViewPage() {
 
     // Risk Codes tab state — sourced from section.payload.riskSplits
     const [riskSplitRows, setRiskSplitRows] = useState<RiskSplitRow[]>([])
+    const [riskCodeOptions, setRiskCodeOptions] = useState<string[]>([])
 
     // Participations tab state
     const [participations, setParticipations] = useState<Participation[]>([])
     const [participationsLoaded, setParticipationsLoaded] = useState(false)
+    const [participationError, setParticipationError] = useState<string | null>(null)
 
     // Action state
     const [actionError, setActionError] = useState<string | null>(null)
@@ -456,6 +479,16 @@ export default function QuoteSectionViewPage() {
     }, [id, sectionId])
 
     // ---------------------------------------------------------------------------
+    // Load risk code lookup on mount (F-057)
+    // ---------------------------------------------------------------------------
+
+    useEffect(() => {
+        getRiskCodes()
+            .then(setRiskCodeOptions)
+            .catch(() => setRiskCodeOptions([]))
+    }, [])
+
+    // ---------------------------------------------------------------------------
     // Load participations on first tab activation (F-058)
     // ---------------------------------------------------------------------------
 
@@ -485,6 +518,8 @@ export default function QuoteSectionViewPage() {
                 class_of_business: section.class_of_business ?? undefined,
                 inception_date: section.inception_date ?? undefined,
                 expiry_date: section.expiry_date ?? undefined,
+                inception_time: section.inception_time ?? undefined,
+                expiry_time: section.expiry_time ?? undefined,
                 limit_currency: section.limit_currency ?? undefined,
                 limit_amount: section.limit_amount,
                 limit_loss_qualifier: section.limit_loss_qualifier ?? undefined,
@@ -495,6 +530,7 @@ export default function QuoteSectionViewPage() {
                 sum_insured_amount: section.sum_insured_amount,
                 premium_currency: section.premium_currency ?? undefined,
                 gross_premium: section.gross_premium,
+                annual_net_premium: section.annual_net_premium,
                 written_order: section.written_order,
                 signed_order: section.signed_order,
                 payload: {
@@ -635,6 +671,62 @@ export default function QuoteSectionViewPage() {
                                 <p className="text-sm text-gray-900">{section.expiry_date ?? '—'}</p>
                             )}
                         </div>
+
+                        {/* Inception Time (F-052) */}
+                        <div>
+                            <label htmlFor="section-inception-time" className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                                Inception Time
+                            </label>
+                            {editable ? (
+                                <input
+                                    id="section-inception-time"
+                                    aria-label="Inception Time"
+                                    type="time"
+                                    step="1"
+                                    className="input-field"
+                                    value={section.inception_time ?? '00:00:00'}
+                                    onChange={(e) =>
+                                        setSection((s) => s ? { ...s, inception_time: e.target.value } : s)
+                                    }
+                                />
+                            ) : (
+                                <p className="text-sm text-gray-900">{section.inception_time ?? '—'}</p>
+                            )}
+                        </div>
+
+                        {/* Expiry Time (F-052) */}
+                        <div>
+                            <label htmlFor="section-expiry-time" className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                                Expiry Time
+                            </label>
+                            {editable ? (
+                                <input
+                                    id="section-expiry-time"
+                                    aria-label="Expiry Time"
+                                    type="time"
+                                    step="1"
+                                    className="input-field"
+                                    value={section.expiry_time ?? '23:59:59'}
+                                    onChange={(e) =>
+                                        setSection((s) => s ? { ...s, expiry_time: e.target.value } : s)
+                                    }
+                                />
+                            ) : (
+                                <p className="text-sm text-gray-900">{section.expiry_time ?? '—'}</p>
+                            )}
+                        </div>
+
+                        {/* Days on Cover (F-052) — read-only computed */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                                Days on Cover
+                            </label>
+                            <p className="text-sm text-gray-900">
+                                {section.inception_date && section.expiry_date
+                                    ? Math.max(0, Math.ceil((new Date(section.expiry_date).getTime() - new Date(section.inception_date).getTime()) / 86400000))
+                                    : '—'}
+                            </p>
+                        </div>
                     </div>
 
                     {/* Right column — limits, premium, order */}
@@ -733,6 +825,28 @@ export default function QuoteSectionViewPage() {
                             ) : (
                                 <p className="text-sm text-gray-900 text-right">
                                     {section.gross_premium != null ? Number(section.gross_premium).toLocaleString() : '—'}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Annual Net Premium (F-052) */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                                Annual Net Premium
+                            </label>
+                            {editable ? (
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    className="input-field"
+                                    value={section.annual_net_premium ?? ''}
+                                    onChange={(e) =>
+                                        setSection((s) => s ? { ...s, annual_net_premium: Number(e.target.value) } : s)
+                                    }
+                                />
+                            ) : (
+                                <p className="text-sm text-gray-900 text-right">
+                                    {section.annual_net_premium != null ? Number(section.annual_net_premium).toLocaleString() : '—'}
                                 </p>
                             )}
                         </div>
@@ -1013,6 +1127,7 @@ export default function QuoteSectionViewPage() {
                 <RiskCodesTable
                     editable={editable}
                     rows={riskSplitRows}
+                    riskCodeOptions={riskCodeOptions}
                     onChange={setRiskSplitRows}
                 />
             )}
@@ -1022,6 +1137,9 @@ export default function QuoteSectionViewPage() {
             {/* ------------------------------------------------------------------ */}
             {activeTab === 'participations' && (
                 <div>
+                    {participationError && (
+                        <p className="text-sm text-red-600 mb-2">{participationError}</p>
+                    )}
                     <ResizableGrid
                         storageKey="table-widths-section-participations"
                         columns={[
@@ -1048,15 +1166,99 @@ export default function QuoteSectionViewPage() {
                             }))
                         }
                         rowKey={(row, idx) => (row as Participation).id ?? idx}
-                        emptyMessage={!participationsLoaded ? 'Loading…' : 'No participations.'}
+                        emptyMessage={!participationsLoaded ? 'Loading…' : 'No participations found.'}
                         renderCell={(key, row, idx) => {
                             const p = row as Participation
-                            if (key === 'market_name') return p.market_name ?? '—'
-                            if (key === 'written_line') return p.written_line ?? '—'
-                            if (key === 'signed_line') return p.signed_line ?? '—'
-                            if (key === 'role') return p.role ?? '—'
-                            if (key === 'reference') return p.reference ?? '—'
-                            if (key === 'notes') return p.notes ?? '—'
+                            if (key === 'market_name') {
+                                return editable ? (
+                                    <input
+                                        type="text"
+                                        className="input-field-sm"
+                                        value={p.market_name ?? ''}
+                                        onChange={(e) =>
+                                            setParticipations((ps) =>
+                                                ps.map((r, i) => (i === idx ? { ...r, market_name: e.target.value } : r))
+                                            )
+                                        }
+                                    />
+                                ) : (p.market_name ?? '—')
+                            }
+                            if (key === 'written_line') {
+                                return editable ? (
+                                    <input
+                                        type="number"
+                                        step="0.000001"
+                                        min="0"
+                                        max="100"
+                                        className="input-field-sm text-right"
+                                        value={p.written_line ?? 0}
+                                        onChange={(e) =>
+                                            setParticipations((ps) =>
+                                                ps.map((r, i) => (i === idx ? { ...r, written_line: Number(e.target.value) } : r))
+                                            )
+                                        }
+                                    />
+                                ) : (p.written_line ?? '—')
+                            }
+                            if (key === 'signed_line') {
+                                return editable ? (
+                                    <input
+                                        type="number"
+                                        step="0.000001"
+                                        min="0"
+                                        max="100"
+                                        className="input-field-sm text-right"
+                                        value={p.signed_line ?? 0}
+                                        onChange={(e) =>
+                                            setParticipations((ps) =>
+                                                ps.map((r, i) => (i === idx ? { ...r, signed_line: Number(e.target.value) } : r))
+                                            )
+                                        }
+                                    />
+                                ) : (p.signed_line ?? '—')
+                            }
+                            if (key === 'role') {
+                                return editable ? (
+                                    <input
+                                        type="text"
+                                        className="input-field-sm"
+                                        value={p.role ?? ''}
+                                        onChange={(e) =>
+                                            setParticipations((ps) =>
+                                                ps.map((r, i) => (i === idx ? { ...r, role: e.target.value } : r))
+                                            )
+                                        }
+                                    />
+                                ) : (p.role ?? '—')
+                            }
+                            if (key === 'reference') {
+                                return editable ? (
+                                    <input
+                                        type="text"
+                                        className="input-field-sm"
+                                        value={p.reference ?? ''}
+                                        onChange={(e) =>
+                                            setParticipations((ps) =>
+                                                ps.map((r, i) => (i === idx ? { ...r, reference: e.target.value } : r))
+                                            )
+                                        }
+                                    />
+                                ) : (p.reference ?? '—')
+                            }
+                            if (key === 'notes') {
+                                return editable ? (
+                                    <input
+                                        type="text"
+                                        className="input-field-sm"
+                                        value={p.notes ?? ''}
+                                        onChange={(e) =>
+                                            setParticipations((ps) =>
+                                                ps.map((r, i) => (i === idx ? { ...r, notes: e.target.value } : r))
+                                            )
+                                        }
+                                    />
+                                ) : (p.notes ?? '—')
+                            }
                             if (key === 'actions') {
                                 return (
                                     <button
@@ -1073,6 +1275,54 @@ export default function QuoteSectionViewPage() {
                             return null
                         }}
                     />
+                    {editable && (
+                        <div className="flex items-center gap-4 mt-3">
+                            <button
+                                type="button"
+                                className="text-brand-600 hover:text-brand-800 text-sm font-medium"
+                                onClick={() =>
+                                    setParticipations((ps) => [
+                                        ...ps,
+                                        { section_id: Number(sectionId), market_name: '', written_line: 0, signed_line: 0, role: 'Follow', reference: null, notes: null },
+                                    ])
+                                }
+                            >
+                                + Add Participation
+                            </button>
+                            <button
+                                type="button"
+                                className="px-4 py-1.5 bg-brand-600 text-white text-sm rounded hover:bg-brand-700"
+                                onClick={async () => {
+                                    setParticipationError(null)
+                                    const totalWritten = participations.reduce((s, p) => s + (Number(p.written_line) || 0), 0)
+                                    const totalSigned = participations.reduce((s, p) => s + (Number(p.signed_line) || 0), 0)
+                                    if (Math.abs(totalWritten - 100) > 0.0001) {
+                                        setParticipationError(`Written Line % must total 100%. Current total: ${totalWritten.toFixed(4)}%`)
+                                        return
+                                    }
+                                    if (Math.abs(totalSigned - 100) > 0.0001) {
+                                        setParticipationError(`Signed Line % must total 100%. Current total: ${totalSigned.toFixed(4)}%`)
+                                        return
+                                    }
+                                    try {
+                                        const saved = await saveParticipations(
+                                            Number(sectionId),
+                                            participations.map(({ market_name, written_line, signed_line, role, reference, notes }) => ({
+                                                market_name, written_line, signed_line, role, reference, notes,
+                                            }))
+                                        )
+                                        setParticipations(saved)
+                                        addNotification('Participations saved.', 'success')
+                                    } catch {
+                                        setParticipationError('Failed to save participations.')
+                                        addNotification('Failed to save participations.', 'error')
+                                    }
+                                }}
+                            >
+                                Save Participations
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

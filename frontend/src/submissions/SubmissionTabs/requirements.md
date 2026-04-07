@@ -8,14 +8,13 @@ A tabbed section that appears on the submission view page, providing access to t
 - Tab bar with labels
 - Rendering the correct tab pane based on the active tab
 - Adjusting visible tabs based on `contractType`
-- Real content panes for: Placing Broking (R06 — **editable**), Quotes (R08), Related Submissions (R09), and Audit (R07)
-- Stub content for: Policies, Binding Authority Contracts
+- Real content panes for: Placing Broking (R06 — **editable**), Quotes (R08), Policies (R10), Related Submissions (R09), and Audit (R07)
+- Stub content for: Binding Authority Contracts
 
 **Out of scope:**
-- Policies tab content (deferred until the policies domain is built — no backend table exists)
 - Binding Authority Contracts tab content (deferred)
 - Contacts lookup for individual broker person within a company (future — requires a `party_contact` table; for now, broker name is a free-text field)
-- Modal dialogs for linking existing quotes (future — new quotes are created via `/quotes/new?submissionId=X`)
+- Modal dialogs for linking existing quotes (future — new quotes are created via `/quotes/new?submissionId=X`; see `QuoteSearchModal` in quotes domain requirements for the reusable modal specification)
 
 **Future development note (Block E — Related Submissions matching rules):**
 The business context for linking related submissions is that the same underlying risk (e.g. the same client placing the same exposure) may be submitted to an insurer or MGA by two or more competing brokers independently. The "related" link surfaces this so an underwriter can see all submissions for the same risk, regardless of the broker placing them. What constitutes "the same risk" will vary by organisation — one insurer may match on `insuredId`; another may match on insured name + inception year + class of business. A future **Organisation Configuration** page in Settings should allow `client_admin` users to define per-org matching rules (e.g. field combinations used to auto-suggest related submissions). These rules will be stored in a new `org_submission_matching_rules` table. Until that feature is built, related submissions are linked manually by the user searching and selecting.
@@ -54,7 +53,7 @@ Each tab pane renders as its own `<div role="tabpanel">`. Non-active panes are h
 
 - **Placing Broking** — editable pane; see R06.
 - **Quotes** — real data table; see R08.
-- **Policies** — renders `<p>Policies — coming soon.</p>` (stub — no backend table exists).
+- **Policies** — real data table; see R10.
 - **Binding Authority Contracts** — renders `<p>Binding Authority Contracts — coming soon.</p>` (stub).
 - **Related Submissions** — real data table; see R09.
 - **Audit** — renders the full audit trail (R07).
@@ -162,6 +161,22 @@ Acceptance criteria:
 
 **REQ-SUB-TABS-R09i:** When the API call fails, the pane shall render the error message.
 
+### R10 — Policies pane — functional
+
+**REQ-SUB-TABS-R10a:** The Policies pane shall fetch `GET /api/policies?submission_id=:submissionId` on first activation (lazy load).
+
+**REQ-SUB-TABS-R10b:** While the fetch is in flight, the pane shall render `"Loading policies…"`.
+
+**REQ-SUB-TABS-R10c:** On success, the pane shall render a table with columns: Reference, Insured, Status, Inception Date, Expiry Date, Actions.
+
+**REQ-SUB-TABS-R10d:** Each row’s Reference column shall render the policy reference as a navigation link to `/policies/:id` styled in the brand colour (per §14.7 RULE 9).
+
+**REQ-SUB-TABS-R10e:** Each row’s Actions column shall contain a `"View"` link that navigates to `/policies/:id`.
+
+**REQ-SUB-TABS-R10f:** When the API returns an empty array, the pane shall render `"No policies linked to this submission."`.
+
+**REQ-SUB-TABS-R10g:** When the API call fails, the pane shall render the error message.
+
 ## Dependencies
 - `@/shared/lib/api-client` � `get`, `put`, `post` (used by all functional panes)
 - `@/parties/parties.service` � `listParties` (used by PartySearchModal within Placing Broking pane)
@@ -178,3 +193,4 @@ Acceptance criteria:
 | 2026-03-20 | Future Development note added: org-level submission matching rules (configurable via Organisation Configuration in Settings; deferred) |
 | 2026-03-20 | R04 updated: Policies remains stub (no backend table); Broker Generated Submission note added |
 | 2026-03-23 | Added `isEditLocked` parent override and R06j-R06k so Placing Broking honours the submission concurrent edit lock |
+| 2026-04-05 | R10 added: Policies tab upgraded from stub to functional pane (GET /api/policies?submission_id). Scope updated. R04 Policies line updated. QuoteSearchModal cross-reference added to Out-of-scope note. |

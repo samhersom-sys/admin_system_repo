@@ -30,12 +30,12 @@ import { getSession } from '@/shared/lib/auth-session/auth-session'
 
 function mockRuntimeLocation(url: string) {
     const nextLocation = new URL(url)
-    ; (globalThis as typeof globalThis & {
-        __POLICYFORGE_RUNTIME_LOCATION__?: { protocol: string; hostname: string }
-    }).__POLICYFORGE_RUNTIME_LOCATION__ = {
-        protocol: nextLocation.protocol,
-        hostname: nextLocation.hostname,
-    }
+        ; (globalThis as typeof globalThis & {
+            __POLICYFORGE_RUNTIME_LOCATION__?: { protocol: string; hostname: string }
+        }).__POLICYFORGE_RUNTIME_LOCATION__ = {
+            protocol: nextLocation.protocol,
+            hostname: nextLocation.hostname,
+        }
 }
 
 function mockResponse(status: number, body: unknown) {
@@ -54,7 +54,7 @@ const WITH_SESSION = {
 
 beforeEach(() => {
     mockFetch.mockReset()
-    ;(getSession as jest.Mock).mockReturnValue(NO_SESSION)
+        ; (getSession as jest.Mock).mockReturnValue(NO_SESSION)
     mockRuntimeLocation('http://localhost/')
 })
 
@@ -135,7 +135,7 @@ describe('T-lib-api-client-R04: del() sends DELETE', () => {
 
 describe('T-lib-api-client-R05: Authorization header injected from session', () => {
     it('includes Authorization header when session token exists', async () => {
-        ;(getSession as jest.Mock).mockReturnValue(WITH_SESSION)
+        ; (getSession as jest.Mock).mockReturnValue(WITH_SESSION)
         mockResponse(200, {})
         await get('/api/test')
         const headers = mockFetch.mock.calls[0][1].headers
@@ -143,7 +143,7 @@ describe('T-lib-api-client-R05: Authorization header injected from session', () 
     })
 
     it('omits Authorization header when no session exists', async () => {
-        ;(getSession as jest.Mock).mockReturnValue(null)
+        ; (getSession as jest.Mock).mockReturnValue(null)
         mockResponse(200, {})
         await get('/api/test')
         const headers = mockFetch.mock.calls[0][1].headers
@@ -157,7 +157,7 @@ describe('T-lib-api-client-R05: Authorization header injected from session', () 
 
 describe('T-lib-api-client-R06: x-org-code header injected from session', () => {
     it('includes x-org-code header when session orgCode exists', async () => {
-        ;(getSession as jest.Mock).mockReturnValue(WITH_SESSION)
+        ; (getSession as jest.Mock).mockReturnValue(WITH_SESSION)
         mockResponse(200, {})
         await get('/api/test')
         const headers = mockFetch.mock.calls[0][1].headers
@@ -165,7 +165,7 @@ describe('T-lib-api-client-R06: x-org-code header injected from session', () => 
     })
 
     it('omits x-org-code when no session exists', async () => {
-        ;(getSession as jest.Mock).mockReturnValue(null)
+        ; (getSession as jest.Mock).mockReturnValue(null)
         mockResponse(200, {})
         await get('/api/test')
         const headers = mockFetch.mock.calls[0][1].headers

@@ -1,1 +1,7 @@
-﻿export { default as PoliciesPage } from './index'
+﻿export { default as PoliciesListPage } from './PoliciesListPage/PoliciesListPage'
+export { default as PolicyViewPage } from './PolicyViewPage/PolicyViewPage'
+export { default as PolicySectionViewPage } from './PolicySectionViewPage/PolicySectionViewPage'
+export { default as PolicyEndorsePage } from './PolicyEndorsePage/PolicyEndorsePage'
+export { default as PolicyEndorsementPage } from './PolicyEndorsementPage/PolicyEndorsementPage'
+export { default as PolicyCoverageDetailPage } from './PolicyCoverageDetailPage/PolicyCoverageDetailPage'
+export { default as PolicyCoverageSubDetailPage } from './PolicyCoverageSubDetailPage/PolicyCoverageSubDetailPage'

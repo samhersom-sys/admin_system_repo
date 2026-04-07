@@ -340,3 +340,32 @@ export async function getMethodsOfPlacement(): Promise<string[]> {
 export async function getRenewalStatuses(): Promise<string[]> {
     return get<string[]>('/api/lookups/renewalStatuses')
 }
+
+export async function getRiskCodes(): Promise<string[]> {
+    return get<string[]>('/api/lookups/riskCodes')
+}
+
+// ---------------------------------------------------------------------------
+// Issue Policy (REQ-POL-FE-F-019)
+// ---------------------------------------------------------------------------
+
+/** Issue a policy from a Bound quote. Returns the created policy record. */
+export async function issuePolicy(quoteId: number): Promise<{ id: number; reference: string; status: string }> {
+    return post<{ id: number; reference: string; status: string }>(`/api/quotes/${quoteId}/issue-policy`, {})
+}
+
+// ---------------------------------------------------------------------------
+// Location data — used by coverage detail pages (REQ-QUO-FE-F-062)
+// ---------------------------------------------------------------------------
+
+export interface LocationRow {
+    CoverageType: string
+    CoverageSubType: string
+    Currency: string
+    SumInsured: number
+}
+
+/** Fetch location/detail rows for a quote (used by QuoteCoverageDetailPage). */
+export async function getQuoteLocations(quoteId: number): Promise<LocationRow[]> {
+    return get<LocationRow[]>(`/api/quotes/${quoteId}/locations`)
+}

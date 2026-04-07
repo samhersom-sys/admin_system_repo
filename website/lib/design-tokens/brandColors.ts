@@ -11,16 +11,16 @@
 
 // ─── Core monochrome constants ────────────────────────────────────────────────
 const CHROME_TEXT = '#ffffff'
-const NEAR_BLACK   = '#111826'  // neutral.900
-const DARKER       = '#1f2937'  // neutral.800
-const DARK         = '#374151'  // neutral.700
-const MID_DARK     = '#4b5563'  // neutral.600
-const MID          = '#6b7280'  // neutral.500
-const MID_LIGHT    = '#9ca3af'  // neutral.400
-const SOFT         = '#d1d5db'  // neutral.300
-const LIGHT        = '#e5e7eb'  // neutral.200
-const LIGHTER      = '#f3f4f6'  // neutral.100
-const OFF_WHITE    = '#f9fafb'  // neutral.50
+const NEAR_BLACK = '#111826'  // neutral.900
+const DARKER = '#1f2937'  // neutral.800
+const DARK = '#374151'  // neutral.700
+const MID_DARK = '#4b5563'  // neutral.600
+const MID = '#6b7280'  // neutral.500
+const MID_LIGHT = '#9ca3af'  // neutral.400
+const SOFT = '#d1d5db'  // neutral.300
+const LIGHT = '#e5e7eb'  // neutral.200
+const LIGHTER = '#f3f4f6'  // neutral.100
+const OFF_WHITE = '#f9fafb'  // neutral.50
 
 // ─── Exported palette ─────────────────────────────────────────────────────────
 export const brandColors = {
@@ -35,7 +35,7 @@ export const brandColors = {
   },
 
   neutral: {
-    50:  OFF_WHITE,
+    50: OFF_WHITE,
     100: LIGHTER,
     200: LIGHT,
     300: SOFT,
@@ -49,19 +49,19 @@ export const brandColors = {
 
   success: '#10b981',  // emerald-500
   warning: '#f59e0b',  // amber-500
-  error:   '#ef4444',  // red-500
+  error: '#ef4444',  // red-500
 
   ui: {
-    chromeText:   CHROME_TEXT,
-    homeBeige:    '#ede8df',
+    chromeText: CHROME_TEXT,
+    homeBeige: '#ede8df',
   },
 
   typeScale: {
-    xs:    '0.75rem',
-    sm:    '0.875rem',
-    base:  '1rem',
-    lg:    '1.125rem',
-    xl:    '1.25rem',
+    xs: '0.75rem',
+    sm: '0.875rem',
+    base: '1rem',
+    lg: '1.125rem',
+    xl: '1.25rem',
     '2xl': '1.5rem',
     '3xl': '1.75rem',
     '4xl': '2.25rem',
@@ -73,10 +73,10 @@ export const brandColors = {
   },
 
   fontWeight: {
-    normal:   400,
-    medium:   500,
+    normal: 400,
+    medium: 500,
     semibold: 600,
-    bold:     700,
+    bold: 700,
   },
 } as const
 

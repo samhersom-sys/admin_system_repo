@@ -44,6 +44,7 @@ import {
     listSections,
     createSection,
     deleteSection,
+    issuePolicy,
 } from '@/quotes/quotes.service'
 import type { Quote, QuoteSection, CreateSectionInput } from '@/quotes/quotes.service'
 import { getSubmission } from '@/submissions/submissions.service'
@@ -421,6 +422,10 @@ export default function QuoteViewPage() {
         if (quote && !['Bound', 'Declined'].includes(quote.status)) {
             items.push({ label: 'Decline Quote', icon: FiXCircle, event: 'quote:decline' })
         }
+        // Issue Policy when Bound
+        if (quote?.status === 'Bound') {
+            items.push({ label: 'Issue Policy', icon: FiCheckCircle, event: 'quote:issue-policy' })
+        }
         // Copy Quote available in all states
         if (quote) {
             items.push({ label: 'Copy Quote', icon: FiCopy, event: 'quote:copy' })
@@ -518,6 +523,18 @@ export default function QuoteViewPage() {
         }
     }, [quote, quoteId, addNotification, navigate])
 
+    const handleIssuePolicy = useCallback(async () => {
+        if (!quote) return
+        try {
+            const policy = await issuePolicy(quoteId)
+            addNotification(`Policy created: ${policy.reference}`, 'success')
+            navigate(`/policies/${policy.id}`)
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Failed to issue policy.'
+            addNotification(`Issue Policy failed: ${msg}`, 'error')
+        }
+    }, [quote, quoteId, addNotification, navigate])
+
     const handleDeclineSubmit = useCallback(async () => {
         if (!declineReasonCode.trim()) {
             setDeclineError('Reason code is required.')
@@ -542,6 +559,7 @@ export default function QuoteViewPage() {
         const onBind = () => handleBind()
         const onDecline = () => setShowDeclineModal(true)
         const onCopy = () => handleCopyQuote()
+        const onIssuePolicy = () => handleIssuePolicy()
 
         const onAddSection = () => { setSectionForm({}); setSectionError(null); setShowAddSectionModal(true) }
 
@@ -550,6 +568,7 @@ export default function QuoteViewPage() {
         window.addEventListener('quote:bind', onBind)
         window.addEventListener('quote:decline', onDecline)
         window.addEventListener('quote:copy', onCopy)
+        window.addEventListener('quote:issue-policy', onIssuePolicy)
         window.addEventListener('quote:add-section', onAddSection)
 
         return () => {
@@ -558,9 +577,10 @@ export default function QuoteViewPage() {
             window.removeEventListener('quote:bind', onBind)
             window.removeEventListener('quote:decline', onDecline)
             window.removeEventListener('quote:copy', onCopy)
+            window.removeEventListener('quote:issue-policy', onIssuePolicy)
             window.removeEventListener('quote:add-section', onAddSection)
         }
-    }, [handleSave, handleMarkQuoted, handleBind, handleCopyQuote])
+    }, [handleSave, handleMarkQuoted, handleBind, handleCopyQuote, handleIssuePolicy])
 
     // Sections: add handler
     const handleAddSection = useCallback(async () => {
@@ -707,13 +727,16 @@ export default function QuoteViewPage() {
                                                 </button>
                                             </div>
                                         ) : (
-                                            <SubmissionSearch
-                                                hideLabel
-                                                onSelect={(s) => {
-                                                    setLinkedSubmission(s)
-                                                    setFormValues((v) => ({ ...v, submission_id: s.id }))
-                                                }}
-                                            />
+                                            <div data-testid="submission-unconfirmed" className="border border-red-500 ring-1 ring-red-400 rounded p-2">
+                                                <SubmissionSearch
+                                                    hideLabel
+                                                    onSelect={(s) => {
+                                                        setLinkedSubmission(s)
+                                                        setFormValues((v) => ({ ...v, submission_id: s.id }))
+                                                    }}
+                                                />
+                                                <p className="text-xs text-red-500 mt-1">Submission not confirmed — please search and select</p>
+                                            </div>
                                         )
                                     ) : linkedSubmission ? (
                                         <Link
@@ -755,7 +778,7 @@ export default function QuoteViewPage() {
                         </div>
                     </FieldGroup>
 
-                    {/* F-038 — Insured */}
+                    {/* F-038 / F-024 — Insured */}
                     <FieldGroup title="Insured">
                         {editable ? (
                             insuredParty ? (
@@ -773,14 +796,17 @@ export default function QuoteViewPage() {
                                     </button>
                                 </div>
                             ) : (
-                                <InsuredSearch
-                                    hideLabel
-                                    selectedParty={null}
-                                    onSelect={(party: Party) => {
-                                        setInsuredParty(party)
-                                        setFormValues((v) => ({ ...v, insured: party.name, insured_id: party.id }))
-                                    }}
-                                />
+                                <div data-testid="insured-unconfirmed" className="border border-red-500 ring-1 ring-red-400 rounded p-2">
+                                    <InsuredSearch
+                                        hideLabel
+                                        selectedParty={null}
+                                        onSelect={(party: Party) => {
+                                            setInsuredParty(party)
+                                            setFormValues((v) => ({ ...v, insured: party.name, insured_id: party.id }))
+                                        }}
+                                    />
+                                    <p className="text-xs text-red-500 mt-1">Insured not confirmed — please search and select</p>
+                                </div>
                             )
                         ) : (
                             readText(quote.insured)
