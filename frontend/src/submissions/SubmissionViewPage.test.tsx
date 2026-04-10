@@ -197,6 +197,51 @@ describe('T-SUB-VIEW-R38: concurrent edit lock is acquired and released', () => 
     })
 })
 
+describe('T-SUB-VIEW-R43: lifecycle audit events are posted on open and close', () => {
+    it('posts Submission Opened after the submission loads', async () => {
+        renderPage()
+
+        await waitFor(() => {
+            expect(mockSubmitWorkflow).toHaveBeenCalledWith(
+                '/api/audit/event',
+                expect.objectContaining({
+                    entityType: 'Submission',
+                    entityId: 1,
+                    action: 'Submission Opened',
+                })
+            )
+        })
+    })
+
+    it('posts Submission Closed when the page unmounts', async () => {
+        const view = renderPage()
+
+        await waitFor(() => {
+            expect(mockSubmitWorkflow).toHaveBeenCalledWith(
+                '/api/audit/event',
+                expect.objectContaining({
+                    entityType: 'Submission',
+                    entityId: 1,
+                    action: 'Submission Opened',
+                })
+            )
+        })
+
+        view.unmount()
+
+        await waitFor(() => {
+            expect(mockSubmitWorkflow).toHaveBeenCalledWith(
+                '/api/audit/event',
+                expect.objectContaining({
+                    entityType: 'Submission',
+                    entityId: 1,
+                    action: 'Submission Closed',
+                })
+            )
+        })
+    })
+})
+
 // ---------------------------------------------------------------------------
 // REQ-SUB-VIEW-F-002: Loading indicator while request is in flight
 // ---------------------------------------------------------------------------
@@ -967,13 +1012,15 @@ describe('T-SUB-VIEW-R28: audit event posted after successful save', () => {
         renderPage()
         await waitFor(() => screen.getByText('Widget Corp'))
 
+        mockSubmitWorkflow.mockClear()
+
         window.dispatchEvent(new CustomEvent('submission:save'))
 
         // Allow async handlers to settle, then confirm no audit post was made
         await new Promise((r) => setTimeout(r, 50))
         expect(mockSubmitWorkflow).not.toHaveBeenCalledWith(
             '/api/audit/event',
-            expect.anything()
+            expect.objectContaining({ action: 'Submission Updated' })
         )
     })
 })

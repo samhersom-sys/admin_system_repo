@@ -146,7 +146,7 @@ export class DashboardService {
              LIMIT 25`,
             [orgCode],
             ),
-        )
+        ).catch(() => [])
 
         const quoteRows = await this.fetchWithAuditOrFallback(
             auditByType['Quote'],
