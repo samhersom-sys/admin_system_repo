@@ -47,8 +47,9 @@ export const typeOrmOptions: DataSourceOptions = {
   // NEVER synchronize in any environment — always use explicit migrations
   synchronize: false,
 
-  // Run migrations automatically on startup once the baseline is established
-  migrationsRun: false,
+  // Run pending migrations automatically on server startup
+  // Migrations use CREATE TABLE IF NOT EXISTS so re-runs are safe
+  migrationsRun: true,
 
   ssl: shouldUseDatabaseSsl ? { rejectUnauthorized: false } : false,
 

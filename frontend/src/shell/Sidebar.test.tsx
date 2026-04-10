@@ -244,12 +244,18 @@ describe('Sidebar — Create menu', () => {
     renderSidebar('/app-home')
     fireEvent.click(screen.getByTitle('Create'))
     expect(screen.getByTitle('Submission')).toBeInTheDocument()
-    expect(screen.getByTitle('Pre-Submission')).toBeInTheDocument()
     expect(screen.getByTitle('Quote')).toBeInTheDocument()
     expect(screen.getByTitle('Binding Authority')).toBeInTheDocument()
     expect(screen.getByTitle('Policy')).toBeInTheDocument()
     expect(screen.getByTitle('Claim')).toBeInTheDocument()
     expect(screen.getByTitle('Party')).toBeInTheDocument()
+  })
+
+  it('T-SIDEBAR-CREATE-R04: Reporting shows create actions on list pages', () => {
+    renderSidebar('/reports')
+    fireEvent.mouseEnter(screen.getByTitle('Reporting').closest('li')!)
+    expect(screen.getByTitle('Create Report')).toBeInTheDocument()
+    expect(screen.getByTitle('Create Dashboard')).toBeInTheDocument()
   })
 })
 
@@ -304,6 +310,20 @@ describe('Sidebar — contextual section', () => {
 
     expect(received).toHaveLength(0)
     window.removeEventListener('sidebar:save', handler)
+  })
+
+  it('T-SIDEBAR-CONTEXT-R05: reporting contextual section renders under Reporting and replaces create actions', async () => {
+    const section = {
+      title: 'Reporting',
+      items: [
+        { label: 'Save', icon: FiSave, event: 'reporting:save' },
+      ],
+    }
+    renderSidebarWithSection(section, '/reports/create')
+    const reportingLink = screen.getByTitle('Reporting')
+    expect(reportingLink).toBeInTheDocument()
+    expect(await screen.findByTitle('Save')).toBeInTheDocument()
+    expect(screen.queryByTitle('Create Report')).not.toBeInTheDocument()
   })
 })
 

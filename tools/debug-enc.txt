@@ -1,0 +1,3 @@
+﻿NOT FOUND: checking for alternate dash character...
+Found at position 51383
+Surrounding text: " it('T-BA-FE-F-R086 ├óÔé¼ÔÇØ GPI Monitoring tab renders placeholder text', async () => {\n        renderBASectionViewPage('1', '10')\n        await screen.findByRole('heading', { name: 'SEC-001' })\n        await "

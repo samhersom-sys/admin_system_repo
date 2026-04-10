@@ -99,7 +99,7 @@ None — all required tables and columns already exist.
 
 ### 2.5 Sections Tab
 
-**REQ-POL-FE-F-007:** The Sections tab shall display a `ResizableGrid` with the following columns matching the QuoteViewPage sections grid: Reference, Class of Business, Inception, Expiry, Limit Currency, Limit Amount, Limit Loss Qualifier, Excess Currency, Excess Amount, Excess Loss Qualifier, Sum Insured Currency, Sum Insured Amount, Premium Currency, Gross Gross Premium, Gross Premium, Deductions, Net Premium, Annual Gross, Annual Net, Written Order, Signed Order, Actions. The Actions column header shall contain an `FiPlus` icon to add a section; each row shall contain an `FiSearch` icon linking to `/policies/:policyId/sections/:sectionId` and an `FiTrash2` icon to delete (with confirmation).
+**REQ-POL-FE-F-007:** The Sections tab shall display a `ResizableGrid` with the following columns matching the BackUp PolicySections table (using current PolicySection data model fields): Reference (navigation link to `/policies/:policyId/sections/:sectionId`), Class of Business, Inception Date, Expiry Date, Limit Currency, Limit Loss Qualifier, Limit Amount, Excess Currency, Excess Loss Qualifier, Excess Amount, Sum Insured Currency, Sum Insured, Premium Currency, Gross Gross Premium, Gross Premium, Deductions, Net Premium, Annual Rated Gross Premium (`annual_gross` field), Annual Rated Net Premium (`annual_net` field), Written Order, Signed Order. Deferred columns (not in current data model — Block 3): Effective Date, Time Basis, Days on Cover, Tax Receivable. The FiSearch icon in each Reference cell navigates to the section detail. Add/delete actions are deferred until `createPolicySection`/`deletePolicySection` service functions are added.
 
 ### 2.6 PolicySectionViewPage
 

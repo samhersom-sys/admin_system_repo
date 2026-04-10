@@ -30,6 +30,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard'
  *   POST   /api/report-templates/:id/run      R06 — execute report
  *   GET    /api/report-templates/:id/history  R07 — execution history
  *   GET    /api/report-field-mappings/:domain R08 — semantic field list
+ *   GET    /api/date-basis                    R09 — date basis options
  */
 @Controller()
 @UseGuards(JwtAuthGuard)
@@ -89,5 +90,17 @@ export class ReportingController {
     @Get('report-field-mappings/:domain')
     getFieldMappings(@Param('domain') domain: string) {
         return this.reportingService.getFieldMappings(domain)
+    }
+
+    // R09 — Date basis options (static lookup)
+    @Get('date-basis')
+    getDateBasisOptions() {
+        return this.reportingService.getDateBasisOptions()
+    }
+
+    @Post('dashboards/widgets/data')
+    @HttpCode(HttpStatus.OK)
+    getDashboardWidgetData(@Req() req: any, @Body() body: Record<string, any>) {
+        return this.reportingService.getDashboardWidgetData(req.user.orgCode, body.widget, body.filters)
     }
 }

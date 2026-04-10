@@ -259,7 +259,7 @@
 
 ### 3.13 — GET /api/quotes/:id/sections/:sectionId/coverages
 
-**REQ-QUO-BE-F-041:** The `GET /api/quotes/:id/sections/:sectionId/coverages` endpoint shall require a valid JWT token (401), check parent quote ownership (403/404), verify the section exists (404), and return HTTP 200 with an array of all non-soft-deleted rows from `quote_section_coverages` for that section sorted by `id ASC`. **Prerequisite:** migration 094 must create the `quote_section_coverages` table before this endpoint can be implemented.
+**REQ-QUO-BE-F-041:** The `GET /api/quotes/:id/sections/:sectionId/coverages` endpoint shall require a valid JWT token (401), check parent quote ownership (403/404), verify the section exists (404), and return HTTP 200 with an array of all non-soft-deleted rows from `quote_section_coverages` for that section sorted by `id ASC`. **Prerequisite:** migration 100 creates the `quote_section_coverages` table.
 
 | Field | Value |
 |---|---|

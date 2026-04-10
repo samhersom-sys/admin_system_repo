@@ -16,12 +16,22 @@ import ResizableGrid, { type Column, type SortConfig } from '@/shared/components
 import {
     getReportTemplate,
     runReport,
+    runCoreReport,
     getReportHistory,
     type ReportTemplate,
     type ExecutionHistory,
 } from '../reporting.service'
 
 type Tab = 'results' | 'history' | 'audit'
+
+// Core report templates — mirrors ReportsListPage CORE_TEMPLATES
+// Loaded locally so navigating to /reports/run/submissions works without an API call.
+const CORE_REPORT_TEMPLATES: Record<string, ReportTemplate> = {
+    submissions: { id: -1, name: 'Submissions Report', description: 'All submissions with status and broker info.', type: 'core', data_source: 'submissions', created_by: 'System' },
+    quotes: { id: -2, name: 'New Business Report', description: 'New policies written in the selected period.', type: 'core', data_source: 'quotes', created_by: 'System' },
+    parties: { id: -3, name: 'Parties Report', description: 'Party directory with roles and contact info.', type: 'core', data_source: 'parties', created_by: 'System' },
+    policies: { id: -4, name: 'Policies Report', description: 'All policies with premium and expiry data.', type: 'core', data_source: 'policies', created_by: 'System' },
+}
 
 function toCsv(headers: string[], rows: Record<string, unknown>[]): string {
     const escape = (v: unknown) => {
@@ -90,6 +100,15 @@ export default function ReportRunPage() {
 
     useEffect(() => {
         if (!reportId) return
+
+        // Core report slug (e.g. "submissions") — load template locally, no API call needed
+        const coreTemplate = CORE_REPORT_TEMPLATES[reportId]
+        if (coreTemplate) {
+            setTemplate(coreTemplate)
+            setLoadingTemplate(false)
+            return
+        }
+
         const id = parseInt(reportId, 10)
         if (isNaN(id)) return
 
@@ -108,10 +127,12 @@ export default function ReportRunPage() {
 
     async function handleRun() {
         if (!reportId) return
-        const id = parseInt(reportId, 10)
+        const coreTemplate = CORE_REPORT_TEMPLATES[reportId]
         setRunning(true)
         try {
-            const res = await runReport(id)
+            const res = coreTemplate
+                ? await runCoreReport(coreTemplate.data_source!)
+                : await runReport(parseInt(reportId, 10))
             setResults(res)
             setActiveTab('results')
         } catch {

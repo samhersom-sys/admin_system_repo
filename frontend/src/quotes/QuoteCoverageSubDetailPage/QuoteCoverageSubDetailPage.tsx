@@ -160,7 +160,7 @@ export default function QuoteCoverageSubDetailPage() {
                     </div>
                     <div>
                         <p className="text-xs text-gray-500">Coverage</p>
-                        <p className="text-gray-900">{coverage.coverage_name ?? coverage.reference}</p>
+                        <p className="text-gray-900">{coverage.coverage ?? coverage.reference}</p>
                     </div>
                     <div>
                         <p className="text-xs text-gray-500">Coverage Type</p>

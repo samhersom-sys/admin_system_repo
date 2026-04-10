@@ -416,14 +416,14 @@ export class SubmissionsService {
       `SELECT s.id, s.reference, s.insured, s."placingBroker", s.status,
               s."inceptionDate"
          FROM submission_related sr
-         JOIN submission s ON s.id = sr.related_id
+         JOIN submission s ON s.id = sr.related_submission_id
         WHERE sr.submission_id = $1
         UNION
        SELECT s.id, s.reference, s.insured, s."placingBroker", s.status,
               s."inceptionDate"
          FROM submission_related sr
          JOIN submission s ON s.id = sr.submission_id
-        WHERE sr.related_id = $1
+        WHERE sr.related_submission_id = $1
         ORDER BY reference ASC`,
       [id],
     )
@@ -438,16 +438,22 @@ export class SubmissionsService {
     id: number,
     relatedSubmissionId: number,
   ): Promise<Record<string, unknown>> {
+    if (!relatedSubmissionId || !Number.isInteger(Number(relatedSubmissionId))) {
+      throw new BadRequestException('relatedSubmissionId is required and must be an integer')
+    }
     await this.getAccessibleSubmission(orgCode, id)
     if (id === relatedSubmissionId) {
       throw new BadRequestException('A submission cannot be linked to itself')
     }
-    // Normalise order so (min,max) is always stored the same way
+    // Normalise order so (min,max) is always stored the same way — idempotent inserts
     const [a, b] = id < relatedSubmissionId ? [id, relatedSubmissionId] : [relatedSubmissionId, id]
     await this.dataSource.query(
-      `INSERT INTO submission_related (submission_id, related_id)
-       VALUES ($1, $2)
-       ON CONFLICT DO NOTHING`,
+      `INSERT INTO submission_related (submission_id, related_submission_id)
+       SELECT $1, $2
+        WHERE NOT EXISTS (
+            SELECT 1 FROM submission_related
+             WHERE submission_id = $1 AND related_submission_id = $2
+        )`,
       [a, b],
     )
     const rows = await this.dataSource.query<Record<string, unknown>[]>(
@@ -467,7 +473,7 @@ export class SubmissionsService {
     await this.getAccessibleSubmission(orgCode, id)
     const [a, b] = id < relatedId ? [id, relatedId] : [relatedId, id]
     await this.dataSource.query(
-      `DELETE FROM submission_related WHERE submission_id = $1 AND related_id = $2`,
+      `DELETE FROM submission_related WHERE submission_id = $1 AND related_submission_id = $2`,
       [a, b],
     )
   }

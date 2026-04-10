@@ -6,6 +6,7 @@ import Card from '@/shared/Card/Card'
 import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
 import ResizableGrid from '@/shared/components/ResizableGrid/ResizableGrid'
 import type { SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
+import { brandClasses } from '@/shared/lib/design-tokens/brandClasses'
 
 /**
  * RecentActivityWidget � unified list of recent records matching the backup RecentRecords table.
@@ -25,15 +26,15 @@ const TYPE_ROUTES = {
 }
 
 const COLUMNS = [
-  { key: 'reference',      label: 'Reference',       sortable: true, defaultWidth: 140 },
-  { key: 'recordType',     label: 'Record Type',      sortable: true, defaultWidth: 130 },
-  { key: 'submissionType', label: 'Submission Type',  sortable: true, defaultWidth: 140 },
-  { key: 'policyStatus',   label: 'Policy Status',    sortable: true, defaultWidth: 120 },
-  { key: 'recordStatus',   label: 'Record Status',    sortable: true, defaultWidth: 120 },
-  { key: 'insured',        label: 'Insured',          sortable: true, defaultWidth: 160 },
-  { key: 'broker',         label: 'Broker',           sortable: true, defaultWidth: 150 },
-  { key: 'lastOpened',     label: 'Last Opened',      sortable: true, defaultWidth: 130 },
-  { key: 'action',         label: 'Action',           sortable: false, defaultWidth: 70 },
+  { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 140 },
+  { key: 'recordType', label: 'Record Type', sortable: true, defaultWidth: 130 },
+  { key: 'submissionType', label: 'Submission Type', sortable: true, defaultWidth: 140 },
+  { key: 'policyStatus', label: 'Policy Status', sortable: true, defaultWidth: 120 },
+  { key: 'recordStatus', label: 'Record Status', sortable: true, defaultWidth: 120 },
+  { key: 'insured', label: 'Insured', sortable: true, defaultWidth: 160 },
+  { key: 'broker', label: 'Broker', sortable: true, defaultWidth: 150 },
+  { key: 'lastOpened', label: 'Last Opened', sortable: true, defaultWidth: 130 },
+  { key: 'action', label: 'Action', sortable: false, defaultWidth: 70 },
 ]
 
 interface ActivityItem {
@@ -117,14 +118,14 @@ export default function RecentActivityWidget({ orgCode }: { orgCode: string }) {
 
   const getValue = (item: ActivityItem, key: string): string => {
     switch (key) {
-      case 'reference':      return item.reference ?? ''
-      case 'recordType':     return item.type ?? ''
+      case 'reference': return item.reference ?? ''
+      case 'recordType': return item.type ?? ''
       case 'submissionType': return item.submissionType ?? ''
-      case 'policyStatus':   return item.policyStatus ?? ''
-      case 'recordStatus':   return formatRecordStatus(item)
-      case 'insured':        return item.insuredName ?? ''
-      case 'broker':         return item.broker ?? ''
-      case 'lastOpened':     return item.lastUpdated ?? ''
+      case 'policyStatus': return item.policyStatus ?? ''
+      case 'recordStatus': return formatRecordStatus(item)
+      case 'insured': return item.insuredName ?? ''
+      case 'broker': return item.broker ?? ''
+      case 'lastOpened': return item.lastUpdated ?? ''
       default: return ''
     }
   }
@@ -184,11 +185,7 @@ export default function RecentActivityWidget({ orgCode }: { orgCode: string }) {
             renderCell={(key, row) => {
               const item = row as ActivityItem
               if (key === 'reference') {
-                return (
-                  <a href={buildHref(item)} className="text-brand-600 hover:text-brand-800 font-medium">
-                    {item.reference}
-                  </a>
-                )
+                return <span>{item.reference}</span>
               }
               if (key === 'recordType') return <span className="capitalize text-gray-600">{item.type.replace('-', ' ')}</span>
               if (key === 'submissionType') return <span className="text-gray-600">{item.submissionType || '—'}</span>
@@ -204,7 +201,7 @@ export default function RecentActivityWidget({ orgCode }: { orgCode: string }) {
               if (key === 'action') return (
                 <a
                   href={buildHref(item)}
-                  className="inline-flex items-center justify-center text-brand-600 hover:text-brand-800"
+                  className={`inline-flex items-center justify-center ${brandClasses.icon.actionOpen}`}
                   aria-label="View record"
                 >
                   <FiSearch size={15} aria-hidden="true" />

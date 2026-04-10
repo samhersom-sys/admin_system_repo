@@ -50,8 +50,8 @@ export class ReportTemplate {
     @Column({ name: 'sort_by', type: 'text', nullable: true })
     sortBy: string | null
 
-    @Column({ name: 'sort_order', type: 'text', nullable: true })
-    sortOrder: string | null
+    @Column({ name: 'sort_order', type: 'text', nullable: false, default: 'asc' })
+    sortOrder: string
 
     /** Selected fields (array of field keys from FIELD_MAPPINGS). */
     @Column({ type: 'jsonb', nullable: true })

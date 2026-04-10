@@ -289,39 +289,48 @@ describe('T-SEARCH-FE-R11: results table columns', () => {
 // REQ-SEARCH-FE-F-014
 // ---------------------------------------------------------------------------
 
-describe('T-SEARCH-FE-R14: Reference link navigates to domain record', () => {
-    it('T-SEARCH-FE-R14a: reference cell is a link pointing to /submissions/:id', async () => {
+describe('T-SEARCH-FE-R14: Action icon navigates to domain record', () => {
+    it('T-SEARCH-FE-R14a: action icon links to /submissions/:id and reference is plain text', async () => {
         mockGet.mockResolvedValue(MOCK_RESPONSE)
         renderPage()
 
         await waitFor(() => screen.getByText('SUB-ORG-20260301-001'))
 
-        const refLink = screen.getByRole('link', { name: 'SUB-ORG-20260301-001' })
-        expect(refLink).toBeInTheDocument()
-        expect(refLink).toHaveAttribute('href', '/submissions/1')
+        // Reference is plain text, not a link
+        expect(screen.queryByRole('link', { name: 'SUB-ORG-20260301-001' })).not.toBeInTheDocument()
+        // Action icon links to the record
+        expect(document.querySelector('a[href="/submissions/1"]')).not.toBeNull()
     })
 
-    it('T-SEARCH-FE-R14b: quote reference links use the live /quotes/:id route, not the legacy /quotes/view/:id route', async () => {
+    it('T-SEARCH-FE-R14b: action icon links to /quotes/:id and not the legacy /quotes/view/:id route', async () => {
         mockGet.mockResolvedValue(MOCK_RESPONSE)
         renderPage()
 
-        await waitFor(() => screen.getByRole('link', { name: 'QUO-ORG-20260301-001' }))
+        await waitFor(() => screen.getByText('QUO-ORG-20260301-001'))
 
-        const quoteLink = screen.getByRole('link', { name: 'QUO-ORG-20260301-001' })
-        expect(quoteLink).toHaveAttribute('href', '/quotes/7')
-        expect(quoteLink).not.toHaveAttribute('href', '/quotes/view/7')
+        // Reference is plain text, not a link
+        expect(screen.queryByRole('link', { name: 'QUO-ORG-20260301-001' })).not.toBeInTheDocument()
+        // Action icon links to the correct route
+        expect(document.querySelector('a[href="/quotes/7"]')).not.toBeNull()
+        expect(document.querySelector('a[href="/quotes/view/7"]')).toBeNull()
     })
 
-    it('T-SEARCH-FE-R14c: non-routable record types do not render dead legacy links', async () => {
+    it('T-SEARCH-FE-R14c: routable types have action icon links; claims have no link; no legacy view/ links exist', async () => {
         mockGet.mockResolvedValue(MOCK_RESPONSE)
         renderPage()
 
         await waitFor(() => screen.getByText('POL-ORG-20260301-001'))
 
+        // References are plain text — none are links
         expect(screen.queryByRole('link', { name: 'POL-ORG-20260301-001' })).not.toBeInTheDocument()
         expect(screen.queryByRole('link', { name: 'BA-ORG-20260301-001' })).not.toBeInTheDocument()
         expect(screen.queryByRole('link', { name: 'CLM-ORG-20260301-001' })).not.toBeInTheDocument()
-        expect(document.querySelector('a[href="/policies/9"]')).toBeNull()
+        // Policy and BA now have action icon links
+        expect(document.querySelector('a[href="/policies/9"]')).not.toBeNull()
+        expect(document.querySelector('a[href="/binding-authorities/11"]')).not.toBeNull()
+        // Claims still have no link
+        expect(document.querySelector('a[href="/claims/13"]')).toBeNull()
+        // No legacy view/ routes
         expect(document.querySelector('a[href="/binding-authorities/view/11"]')).toBeNull()
         expect(document.querySelector('a[href="/parties/view/12"]')).toBeNull()
         expect(document.querySelector('a[href="/claims/view/13"]')).toBeNull()

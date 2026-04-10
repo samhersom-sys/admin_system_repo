@@ -559,8 +559,15 @@ export class QuotesService {
             { entityType: 'Quote', entityId: id, action, details },
             user,
         )
-        const audit = await this.auditService.getHistory('Quote', id)
-        return { success: true, audit, otherUsersOpen: writeResult.otherUsersOpen ?? [] }
+        // Return the created audit event with snake_case HTTP fields (REQ-QUO-BE-NE-F-009)
+        return {
+            id: writeResult.id,
+            action: writeResult.action,
+            entity_type: writeResult.entityType,
+            entity_id: writeResult.entityId,
+            created_at: writeResult.createdAt,
+            otherUsersOpen: writeResult.otherUsersOpen ?? [],
+        }
     }
 
     // ---------------------------------------------------------------------------
@@ -628,6 +635,177 @@ export class QuotesService {
             `SELECT * FROM quote_location_rows WHERE quote_id = $1 ORDER BY id`,
             [quoteId],
         )
+    }
+
+    // ---------------------------------------------------------------------------
+    // REQ-QUO-BE-F-041 — GET /api/quotes/:id/sections/:sectionId/coverages
+    // ---------------------------------------------------------------------------
+    async getCoverages(
+        quoteId: number,
+        sectionId: number,
+        orgCode: string,
+    ): Promise<unknown[]> {
+        const quote = await this.quoteRepo.findOne({ where: { id: quoteId } })
+        if (!quote) throw new NotFoundException('Quote not found.')
+        if (quote.createdByOrgCode !== orgCode) throw new ForbiddenException('Forbidden.')
+        return this.dataSource.query(
+            `SELECT * FROM quote_section_coverages
+             WHERE quote_id = $1 AND section_id = $2 AND deleted_at IS NULL
+             ORDER BY id`,
+            [quoteId, sectionId],
+        )
+    }
+
+    // ---------------------------------------------------------------------------
+    // REQ-QUO-BE-F-042 — POST /api/quotes/:id/sections/:sectionId/coverages
+    // ---------------------------------------------------------------------------
+    async createCoverage(
+        quoteId: number,
+        sectionId: number,
+        orgCode: string,
+        body: Record<string, unknown>,
+        createdBy: string | null,
+    ): Promise<unknown> {
+        const quote = await this.quoteRepo.findOne({ where: { id: quoteId } })
+        if (!quote) throw new NotFoundException('Quote not found.')
+        if (quote.createdByOrgCode !== orgCode) throw new ForbiddenException('Forbidden.')
+
+        const section = await this.sectionRepo.findOne({ where: { id: sectionId } })
+        if (!section) throw new NotFoundException('Section not found.')
+
+        // Count non-deleted coverages for this section to generate NNN
+        const [{ count }] = await this.dataSource.query(
+            `SELECT COUNT(*) AS count FROM quote_section_coverages
+             WHERE section_id = $1 AND deleted_at IS NULL`,
+            [sectionId],
+        )
+        const seq = parseInt(count, 10) + 1
+        const reference = `${section.reference}-COV-${String(seq).padStart(3, '0')}`
+
+        const rows = await this.dataSource.query(
+            `INSERT INTO quote_section_coverages
+                (quote_id, section_id, reference, coverage, class_of_business,
+                 effective_date, expiry_date, days_on_cover,
+                 limit_currency, limit_amount, limit_loss_qualifier,
+                 excess_currency, excess_amount,
+                 sum_insured_currency, sum_insured,
+                 premium_currency, gross_premium, net_premium, tax_receivable,
+                 payload, created_at)
+             VALUES
+                ($1, $2, $3, $4, $5,
+                 $6, $7, $8,
+                 $9, $10, $11,
+                 $12, $13,
+                 $14, $15,
+                 $16, $17, $18, $19,
+                 $20, NOW())
+             RETURNING *`,
+            [
+                quoteId, sectionId, reference,
+                body.coverage ?? null, body.class_of_business ?? null,
+                body.effective_date ?? null, body.expiry_date ?? null,
+                body.effective_date && body.expiry_date
+                    ? Math.max(0, Math.ceil((new Date(body.expiry_date as string).getTime() - new Date(body.effective_date as string).getTime()) / 86400000))
+                    : null,
+                body.limit_currency ?? null, body.limit_amount ?? null, body.limit_loss_qualifier ?? null,
+                body.excess_currency ?? null, body.excess_amount ?? null,
+                body.sum_insured_currency ?? null, body.sum_insured ?? null,
+                body.premium_currency ?? null, body.gross_premium ?? null,
+                body.net_premium ?? null, body.tax_receivable ?? null,
+                body.payload ?? {},
+            ],
+        )
+        return rows[0]
+    }
+
+    // ---------------------------------------------------------------------------
+    // REQ-QUO-BE-F-043 — PUT /api/quotes/:id/sections/:sectionId/coverages/:coverageId
+    // ---------------------------------------------------------------------------
+    async updateCoverage(
+        quoteId: number,
+        sectionId: number,
+        coverageId: number,
+        orgCode: string,
+        body: Record<string, unknown>,
+        updatedBy: string | null,
+    ): Promise<unknown> {
+        const quote = await this.quoteRepo.findOne({ where: { id: quoteId } })
+        if (!quote) throw new NotFoundException('Quote not found.')
+        if (quote.createdByOrgCode !== orgCode) throw new ForbiddenException('Forbidden.')
+
+        const existing = await this.dataSource.query(
+            `SELECT * FROM quote_section_coverages
+             WHERE id = $1 AND section_id = $2 AND quote_id = $3 AND deleted_at IS NULL`,
+            [coverageId, sectionId, quoteId],
+        )
+        if (!existing.length) throw new NotFoundException('Coverage not found.')
+
+        const mutableFields = [
+            'coverage', 'class_of_business', 'effective_date', 'expiry_date',
+            'limit_currency', 'limit_amount', 'limit_loss_qualifier',
+            'excess_currency', 'excess_amount',
+            'sum_insured_currency', 'sum_insured',
+            'premium_currency', 'gross_premium', 'net_premium', 'tax_receivable',
+            'payload',
+        ]
+
+        const setClauses: string[] = []
+        const values: unknown[] = []
+        let idx = 1
+
+        for (const field of mutableFields) {
+            if (field in body) {
+                setClauses.push(`${field} = $${idx}`)
+                values.push((body as Record<string, unknown>)[field])
+                idx++
+            }
+        }
+
+        // Compute days_on_cover when both dates are present
+        const effDate = (body.effective_date ?? existing[0].effective_date) as string | null
+        const expDate = (body.expiry_date ?? existing[0].expiry_date) as string | null
+        if (effDate && expDate) {
+            const doc = Math.max(0, Math.ceil(
+                (new Date(expDate).getTime() - new Date(effDate).getTime()) / 86400000,
+            ))
+            setClauses.push(`days_on_cover = $${idx}`)
+            values.push(doc)
+            idx++
+        }
+
+        if (!setClauses.length) return existing[0]
+
+        values.push(coverageId)
+        // TypeORM v0.3 returns [rawRows, rowCount] for UPDATE queries (unlike SELECT/INSERT which return rawRows directly)
+        const [updatedRows] = await this.dataSource.query(
+            `UPDATE quote_section_coverages SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+            values,
+        )
+        return updatedRows[0]
+    }
+
+    // ---------------------------------------------------------------------------
+    // REQ-QUO-BE-F-044 — DELETE /api/quotes/:id/sections/:sectionId/coverages/:coverageId
+    // ---------------------------------------------------------------------------
+    async deleteCoverage(
+        quoteId: number,
+        sectionId: number,
+        coverageId: number,
+        orgCode: string,
+        deletedBy: string | null,
+    ): Promise<void> {
+        const quote = await this.quoteRepo.findOne({ where: { id: quoteId } })
+        if (!quote) throw new NotFoundException('Quote not found.')
+        if (quote.createdByOrgCode !== orgCode) throw new ForbiddenException('Forbidden.')
+
+        const rows = await this.dataSource.query(
+            `UPDATE quote_section_coverages
+             SET deleted_at = NOW()
+             WHERE id = $1 AND section_id = $2 AND quote_id = $3 AND deleted_at IS NULL
+             RETURNING id`,
+            [coverageId, sectionId, quoteId],
+        )
+        if (!rows.length) throw new NotFoundException('Coverage not found.')
     }
 }
 

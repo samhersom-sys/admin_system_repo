@@ -7,6 +7,7 @@ import { BASection } from '../entities/ba-section.entity'
 import { BATransaction } from '../entities/ba-transaction.entity'
 import { BASectionParticipation } from '../entities/ba-section-participation.entity'
 import { BASectionAuthorizedRisk } from '../entities/ba-section-authorized-risk.entity'
+import { BADocument } from '../entities/ba-document.entity'
 
 const ORG = 'ORG1'
 const OTHER_ORG = 'ORG2'
@@ -79,6 +80,7 @@ describe('BindingAuthoritiesService', () => {
         { provide: getRepositoryToken(BATransaction), useValue: mockRepo() },
         { provide: getRepositoryToken(BASectionParticipation), useValue: mockRepo() },
         { provide: getRepositoryToken(BASectionAuthorizedRisk), useValue: mockRepo() },
+        { provide: getRepositoryToken(BADocument), useValue: mockRepo() },
       ],
     }).compile()
 

@@ -85,6 +85,30 @@ const UAT_USERS = [
         orgCode: 'DEMO',
         role: 'client_admin',
     },
+    {
+        username: 'uat_dv6w4p',
+        email: 'Devansh251190@gmail.com',
+        password: 'UatDv3#hRn8!',
+        fullName: 'Devansh',
+        orgCode: 'DEMO',
+        role: 'client_admin',
+    },
+    {
+        username: 'uat_ph2m8z',
+        email: 'Prashappy07@gmail.com',
+        password: 'UatPh7$kQx4!',
+        fullName: 'Prasha',
+        orgCode: 'DEMO',
+        role: 'client_admin',
+    },
+    {
+        username: 'uat_of7r3n',
+        email: 'ofellowes@gmail.com',
+        password: 'UatOf5#vLp9!',
+        fullName: 'Oliver Fellowes',
+        orgCode: 'DEMO',
+        role: 'client_admin',
+    },
 ]
 
 // Combine: UAT users only included when SEED_INCLUDE_UAT=true

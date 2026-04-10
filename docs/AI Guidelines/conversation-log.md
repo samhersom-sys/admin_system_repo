@@ -4,6 +4,63 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-04-09] — Batch D: Fix pre-existing Layer 2 failures (R08c, R09a–R09d)
+
+**Request:**
+Fix the 5 remaining Layer 2 integration test failures identified during Batch C test run: R08c (POST /audit response shape mismatch) and R09a–R09d (submission_related endpoints returning 500).
+
+**Root Causes:**
+- **R08c**: REQ-QUO-BE-NE-F-009 required `postAudit` to return `{ success, audit, otherUsersOpen }` but the Layer 2 test expected the created audit event `{ id, action, entity_type, entity_id }`. Requirements, service, and spec were updated to the RESTful created-resource shape.
+- **R09a–R09d**: `submission_related` table exists but uses `related_submission_id` (not `related_id`). NestJS service SQL used wrong column name and `ON CONFLICT DO NOTHING` without a UNIQUE constraint. Input validation for missing `relatedSubmissionId` was also absent (R09d returned 500 not 400).
+
+**Outcome:**
+All 5 failures resolved. Layer 2: 207/211 (4 todo, 0 failures). Layer 3: 414/414. Layer 1 unchanged.
+
+**Files Changed:**
+- `backend/nest/src/quotes/quotes.service.ts` — `postAudit` returns `{ id, action, entity_type, entity_id, created_at, otherUsersOpen }`; `getHistory` call removed
+- `backend/nest/src/quotes/quotes.spec.ts` — T-QUO-BE-NE-R09a and R14a updated to match new postAudit shape
+- `backend/nest/src/quotes/quotes.requirements.md` — REQ-QUO-BE-NE-F-009 updated to RESTful created-event shape
+- `backend/nest/src/submissions/submissions.service.ts` — `findRelated`/`linkRelated`/`removeRelated` SQL updated from `related_id` → `related_submission_id`; `ON CONFLICT` replaced with `WHERE NOT EXISTS`; input validation added to `linkRelated`
+- `backend/nest/src/submissions/submissions.spec.ts` — spec comment and SQL assertion updated to match new SQL pattern
+- `db/migrations/101-create-submission-related-table.js` — adds FK indexes to existing `submission_related` table
+
+---
+
+### [2026-04-09] — Batch C: Quote & Policy Section Coverages
+
+**Request:**
+Implement Batch C — close the quote and policy section coverages gaps identified in the comprehensive audit. Resolve OQ-C-001 (table naming) and OQ-C-003 (field name) before building.
+
+**Outcome:**
+Migration 099 renames `policy_coverages` → `policy_section_coverages` and adds `days_on_cover`. Migration 100 creates `quote_section_coverages`. Four NestJS service methods (`getCoverages`, `createCoverage`, `updateCoverage`, `deleteCoverage`) and four controller routes implemented. Frontend field name `coverage_name` corrected to `coverage` across all affected files. Seeds 027–030 created (quote_sections, policy_sections, quote_section_coverages, policy_section_coverages). All migrations and seeds run on local and UAT. 71/71 NestJS spec tests pass. AI-guidelines compliance gaps fixed retroactively: REQ-QUO-BE-NE-F-041–044 added to NestJS requirements file; OQ-048 and OQ-049 logged; this entry added.
+
+**Files Changed:**
+- `db/migrations/099-rename-policy-coverages-table.js` — rename policy_coverages → policy_section_coverages; add days_on_cover
+- `db/migrations/100-create-quote-section-coverages-table.js` — create quote_section_coverages table
+- `backend/nest/src/quotes/quotes.service.ts` — getCoverages, createCoverage, updateCoverage, deleteCoverage methods added
+- `backend/nest/src/quotes/quotes.controller.ts` — 4 coverage routes added
+- `backend/nest/src/quotes/quotes.requirements.md` — REQ-QUO-BE-NE-F-041–044 added; traceability table updated
+- `backend/nest/src/quotes/quotes.spec.ts` — T-QUO-BE-NE-R41a/b/c through R44a/b/c added (12 tests)
+- `backend/__tests__/quotes.test.js` — Layer 2 coverage tests for REQ-QUO-BE-F-041–044 added
+- `frontend/src/quotes/quotes.service.ts` — coverage_name → coverage in Coverage type
+- `frontend/src/quotes/QuoteSectionViewPage/QuoteSectionViewPage.tsx` — coverage_name → coverage
+- `frontend/src/quotes/QuoteCoverageDetailPage/QuoteCoverageDetailPage.tsx` — coverage_name → coverage
+- `frontend/src/quotes/QuoteCoverageSubDetailPage/QuoteCoverageSubDetailPage.tsx` — coverage_name → coverage
+- `frontend/src/quotes/__tests__/quotes.test.tsx` — coverage_name → coverage in mock data
+- `db/seeds/027-quote-sections.js` — 7 rows seeded
+- `db/seeds/028-policy-sections.js` — 3 rows seeded
+- `db/seeds/029-quote-section-coverages.js` — 8 rows seeded
+- `db/seeds/030-policy-section-coverages.js` — 4 rows seeded
+- `package.json` — db:migrate chain updated (099+100); db:seed chain updated (027–030)
+- `docs/Technical Documentation/08-Open-Questions.md` — OQ-048 and OQ-049 logged and answered
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Open Questions / Deferred:**
+- Policy coverages write API (POST/PUT/DELETE) — deferred to Batch D
+- Finance domain tables — deferred to Batch D
+
+---
+
 ### [2026-04-01] [HH:MM] — Branch Model Switched To Development And Production
 
 **Request:**

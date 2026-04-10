@@ -445,3 +445,146 @@ describe('Layer 2: /api/quotes (audit)', () => {
         expect(res.status).toBe(404)
     })
 })
+
+// ===========================================================================
+// Layer 2 — Quote Section Coverages
+// GET    /api/quotes/:id/sections/:sectionId/coverages           (REQ-QUO-BE-F-041)
+// POST   /api/quotes/:id/sections/:sectionId/coverages           (REQ-QUO-BE-F-042)
+// PUT    /api/quotes/:id/sections/:sectionId/coverages/:covId    (REQ-QUO-BE-F-043)
+// DELETE /api/quotes/:id/sections/:sectionId/coverages/:covId    (REQ-QUO-BE-F-044)
+// ===========================================================================
+
+describe('Layer 2: /api/quotes (section coverages)', () => {
+    let token, quoteId, sectionId, sectionRef, coverageId
+
+    beforeAll(async () => {
+        token = await getAuthToken()
+
+        // Create a fresh quote
+        const qRes = await agent
+            .post('/api/quotes')
+            .set('Authorization', `Bearer ${token}`)
+            .send({ insured: `CovTest-${Date.now()}`, inception_date: '2026-06-01' })
+        expect(qRes.status).toBe(201)
+        quoteId = qRes.body.id
+
+        // Create a section under it
+        const sRes = await agent
+            .post(`/api/quotes/${quoteId}/sections`)
+            .set('Authorization', `Bearer ${token}`)
+            .send({})
+        expect(sRes.status).toBe(201)
+        sectionId = sRes.body.id
+        sectionRef = sRes.body.reference
+    })
+
+    // -----------------------------------------------------------------------
+    // GET /api/quotes/:id/sections/:sectionId/coverages  (REQ-QUO-BE-F-041)
+    // -----------------------------------------------------------------------
+
+    test('T-BE-quotes-R41a — GET coverages returns 200 with an array', async () => {
+        const res = await agent
+            .get(`/api/quotes/${quoteId}/sections/${sectionId}/coverages`)
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body)).toBe(true)
+    })
+
+    test('T-BE-quotes-R41b — GET coverages returns 401 without token', async () => {
+        const res = await agent.get(`/api/quotes/${quoteId}/sections/${sectionId}/coverages`)
+        expect(res.status).toBe(401)
+    })
+
+    test('T-BE-quotes-R41c — GET coverages returns 404 for unknown quote', async () => {
+        const res = await agent
+            .get(`/api/quotes/999999999/sections/${sectionId}/coverages`)
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(404)
+    })
+
+    // -----------------------------------------------------------------------
+    // POST /api/quotes/:id/sections/:sectionId/coverages  (REQ-QUO-BE-F-042)
+    // -----------------------------------------------------------------------
+
+    test('T-BE-quotes-R42a — POST creates coverage with auto-generated reference and returns 201', async () => {
+        const res = await agent
+            .post(`/api/quotes/${quoteId}/sections/${sectionId}/coverages`)
+            .set('Authorization', `Bearer ${token}`)
+            .send({ coverage: 'Property Damage' })
+        expect(res.status).toBe(201)
+        expect(res.body.id).toBeDefined()
+        expect(res.body.reference).toMatch(new RegExp(`^${sectionRef}-COV-\\d{3}$`))
+        expect(res.body.coverage).toBe('Property Damage')
+        coverageId = res.body.id
+    })
+
+    test('T-BE-quotes-R42b — POST returns 401 without token', async () => {
+        const res = await agent
+            .post(`/api/quotes/${quoteId}/sections/${sectionId}/coverages`)
+            .send({ coverage: 'Unauthorized' })
+        expect(res.status).toBe(401)
+    })
+
+    test('T-BE-quotes-R42c — POST returns 404 for unknown quote', async () => {
+        const res = await agent
+            .post(`/api/quotes/999999999/sections/${sectionId}/coverages`)
+            .set('Authorization', `Bearer ${token}`)
+            .send({ coverage: 'Testing' })
+        expect(res.status).toBe(404)
+    })
+
+    // -----------------------------------------------------------------------
+    // PUT /api/quotes/:id/sections/:sectionId/coverages/:covId  (REQ-QUO-BE-F-043)
+    // -----------------------------------------------------------------------
+
+    test('T-BE-quotes-R43a — PUT updates mutable fields and returns 200', async () => {
+        expect(coverageId).toBeDefined()
+        const res = await agent
+            .put(`/api/quotes/${quoteId}/sections/${sectionId}/coverages/${coverageId}`)
+            .set('Authorization', `Bearer ${token}`)
+            .send({ coverage: 'Business Interruption', class_of_business: 'Property' })
+        expect(res.status).toBe(200)
+        expect(res.body.coverage).toBe('Business Interruption')
+        expect(res.body.class_of_business).toBe('Property')
+    })
+
+    test('T-BE-quotes-R43b — PUT with effective_date + expiry_date auto-computes days_on_cover', async () => {
+        expect(coverageId).toBeDefined()
+        const res = await agent
+            .put(`/api/quotes/${quoteId}/sections/${sectionId}/coverages/${coverageId}`)
+            .set('Authorization', `Bearer ${token}`)
+            .send({ effective_date: '2026-01-01', expiry_date: '2026-04-01' })
+        expect(res.status).toBe(200)
+        expect(res.body.days_on_cover).toBe(90)
+    })
+
+    test('T-BE-quotes-R43c — PUT returns 404 for unknown coverage', async () => {
+        const res = await agent
+            .put(`/api/quotes/${quoteId}/sections/${sectionId}/coverages/999999999`)
+            .set('Authorization', `Bearer ${token}`)
+            .send({ coverage: 'Testing' })
+        expect(res.status).toBe(404)
+    })
+
+    // -----------------------------------------------------------------------
+    // DELETE /api/quotes/:id/sections/:sectionId/coverages/:covId (REQ-QUO-BE-F-044)
+    // -----------------------------------------------------------------------
+
+    test('T-BE-quotes-R44a — DELETE soft-deletes coverage and returns 204', async () => {
+        expect(coverageId).toBeDefined()
+        const res = await agent
+            .delete(`/api/quotes/${quoteId}/sections/${sectionId}/coverages/${coverageId}`)
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(204)
+    })
+
+    test('T-BE-quotes-R44b — GET after DELETE excludes soft-deleted coverage', async () => {
+        expect(coverageId).toBeDefined()
+        const res = await agent
+            .get(`/api/quotes/${quoteId}/sections/${sectionId}/coverages`)
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(200)
+        const found = res.body.find((c) => c.id === coverageId)
+        expect(found).toBeUndefined()
+    })
+})

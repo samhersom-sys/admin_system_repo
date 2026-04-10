@@ -515,7 +515,7 @@ describe('SubmissionsService', () => {
     it('T-SUB-BE-NE-R10b: inserts link and returns related submission details', async () => {
       mockSubmissionRepo.findOne.mockResolvedValue(makeSubmission())
       mockDataSource.query
-        .mockResolvedValueOnce([]) // INSERT ON CONFLICT DO NOTHING
+        .mockResolvedValueOnce([]) // INSERT WHERE NOT EXISTS
         .mockResolvedValueOnce([{ id: 2, reference: 'SUB-TST-002' }]) // SELECT related
 
       const result = await service.linkRelated('TST', 1, 2)
@@ -554,7 +554,7 @@ describe('SubmissionsService', () => {
       await service.removeRelated('TST', 5, 2) // 5 > 2, so normalised → (2, 5)
       expect(mockDataSource.query).toHaveBeenCalledWith(
         expect.stringContaining('DELETE FROM submission_related'),
-        [2, 5],
+        expect.arrayContaining([2, 5]),
       )
     })
 

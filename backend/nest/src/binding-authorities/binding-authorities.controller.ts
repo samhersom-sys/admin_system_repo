@@ -8,9 +8,11 @@ import {
   Body,
   Query,
   Req,
+  Res,
   HttpCode,
   UseGuards,
 } from '@nestjs/common'
+import { Response } from 'express'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { BindingAuthoritiesService } from './binding-authorities.service'
 
@@ -141,5 +143,37 @@ export class BindingAuthoritiesController {
     @Body() body: Record<string, unknown>,
   ) {
     return this.baService.updateTransaction(req.user.orgCode, +id, +transId, body)
+  }
+
+  // ------------------------------------------------------------------
+  // Documents (REQ-BA-FE-F-090 to F-098)
+  // ------------------------------------------------------------------
+
+  @Get('binding-authorities/:id/documents')
+  getDocuments(@Req() req: any, @Param('id') id: string) {
+    return this.baService.getDocuments(req.user.orgCode, +id)
+  }
+
+  @Post('binding-authorities/:id/documents/generate')
+  @HttpCode(201)
+  generateDocument(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Query('format') format: string,
+  ) {
+    return this.baService.generateDocument(req.user.orgCode, +id, format || 'pdf')
+  }
+
+  @Get('binding-authorities/:id/documents/:docId/download')
+  async downloadDocument(
+    @Req() req: any,
+    @Res() res: Response,
+    @Param('id') id: string,
+    @Param('docId') docId: string,
+  ) {
+    const doc = await this.baService.getDocument(req.user.orgCode, +id, +docId)
+    res.setHeader('Content-Type', doc.format === 'pdf' ? 'application/pdf' : 'application/octet-stream')
+    res.setHeader('Content-Disposition', `attachment; filename="${doc.filename}"`)
+    res.send(doc.content)
   }
 }

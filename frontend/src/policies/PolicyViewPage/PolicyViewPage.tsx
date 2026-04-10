@@ -67,14 +67,27 @@ const TABS: TabItem[] = [
 ]
 
 const SECTION_COLUMNS: Column[] = [
-    { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 200 },
-    { key: 'class_of_business', label: 'Class of Business', sortable: true, defaultWidth: 150 },
-    { key: 'inception_date', label: 'Inception', sortable: true, defaultWidth: 120 },
-    { key: 'expiry_date', label: 'Expiry', sortable: true, defaultWidth: 120 },
-    { key: 'sum_insured_currency', label: 'SI Ccy', sortable: false, defaultWidth: 80 },
-    { key: 'sum_insured_amount', label: 'Sum Insured', sortable: true, defaultWidth: 120 },
-    { key: 'written_order', label: 'Written Order', sortable: true, defaultWidth: 110 },
-    { key: 'signed_order', label: 'Signed Order', sortable: true, defaultWidth: 110 },
+    { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 160 },
+    { key: 'class_of_business', label: 'Class of Business', sortable: true, defaultWidth: 200 },
+    { key: 'inception_date', label: 'Inception Date', sortable: true, defaultWidth: 130 },
+    { key: 'expiry_date', label: 'Expiry Date', sortable: true, defaultWidth: 130 },
+    { key: 'limit_currency', label: 'Limit Currency', sortable: false, defaultWidth: 120 },
+    { key: 'limit_loss_qualifier', label: 'Limit Loss Qualifier', sortable: false, defaultWidth: 160 },
+    { key: 'limit_amount', label: 'Limit Amount', sortable: true, defaultWidth: 150 },
+    { key: 'excess_currency', label: 'Excess Currency', sortable: false, defaultWidth: 120 },
+    { key: 'excess_loss_qualifier', label: 'Excess Loss Qualifier', sortable: false, defaultWidth: 160 },
+    { key: 'excess_amount', label: 'Excess Amount', sortable: true, defaultWidth: 150 },
+    { key: 'sum_insured_currency', label: 'Sum Insured Currency', sortable: false, defaultWidth: 160 },
+    { key: 'sum_insured_amount', label: 'Sum Insured', sortable: true, defaultWidth: 150 },
+    { key: 'premium_currency', label: 'Premium Currency', sortable: false, defaultWidth: 140 },
+    { key: 'gross_gross_premium', label: 'Gross Gross Premium', sortable: true, defaultWidth: 180 },
+    { key: 'gross_premium', label: 'Gross Premium', sortable: true, defaultWidth: 160 },
+    { key: 'deductions', label: 'Deductions', sortable: true, defaultWidth: 140 },
+    { key: 'net_premium', label: 'Net Premium', sortable: true, defaultWidth: 140 },
+    { key: 'annual_gross', label: 'Annual Rated Gross Premium', sortable: true, defaultWidth: 200 },
+    { key: 'annual_net', label: 'Annual Rated Net Premium', sortable: true, defaultWidth: 200 },
+    { key: 'written_order', label: 'Written Order', sortable: true, defaultWidth: 120 },
+    { key: 'signed_order', label: 'Signed Order', sortable: true, defaultWidth: 120 },
 ]
 
 const INVOICE_COLUMNS: Column[] = [
@@ -294,8 +307,27 @@ export default function PolicyViewPage() {
                 </Link>
             )
         }
-        const val = (s as Record<string, unknown>)[key]
-        return val != null ? String(val) : '—'
+        if (key === 'class_of_business') return s.class_of_business || '—'
+        if (key === 'inception_date') return s.inception_date || '—'
+        if (key === 'expiry_date') return s.expiry_date || '—'
+        if (key === 'limit_currency') return s.limit_currency || '—'
+        if (key === 'limit_loss_qualifier') return s.limit_loss_qualifier || '—'
+        if (key === 'limit_amount') return s.limit_amount != null ? Number(s.limit_amount).toLocaleString() : '—'
+        if (key === 'excess_currency') return s.excess_currency || '—'
+        if (key === 'excess_loss_qualifier') return s.excess_loss_qualifier || '—'
+        if (key === 'excess_amount') return s.excess_amount != null ? Number(s.excess_amount).toLocaleString() : '—'
+        if (key === 'sum_insured_currency') return s.sum_insured_currency || '—'
+        if (key === 'sum_insured_amount') return s.sum_insured_amount != null ? Number(s.sum_insured_amount).toLocaleString() : '—'
+        if (key === 'premium_currency') return s.premium_currency || '—'
+        if (key === 'gross_gross_premium') return s.gross_gross_premium != null ? Number(s.gross_gross_premium).toLocaleString() : '—'
+        if (key === 'gross_premium') return s.gross_premium != null ? Number(s.gross_premium).toLocaleString() : '—'
+        if (key === 'deductions') return s.deductions != null ? Number(s.deductions).toLocaleString() : '—'
+        if (key === 'net_premium') return s.net_premium != null ? Number(s.net_premium).toLocaleString() : '—'
+        if (key === 'annual_gross') return s.annual_gross != null ? Number(s.annual_gross).toLocaleString() : '—'
+        if (key === 'annual_net') return s.annual_net != null ? Number(s.annual_net).toLocaleString() : '—'
+        if (key === 'written_order') return s.written_order != null ? `${s.written_order}%` : '—'
+        if (key === 'signed_order') return s.signed_order != null ? `${s.signed_order}%` : '—'
+        return '—'
     }
 
     function renderInvoiceCell(key: string, row: unknown): React.ReactNode {

@@ -1031,8 +1031,8 @@ export default function QuoteViewPage() {
                                     { key: 'gross_premium', label: 'Gross Premium', defaultWidth: 160 },
                                     { key: 'deductions', label: 'Deductions', defaultWidth: 140 },
                                     { key: 'net_premium', label: 'Net Premium', defaultWidth: 140 },
-                                    { key: 'annual_gross_premium', label: 'Annual Gross Premium', defaultWidth: 180 },
-                                    { key: 'annual_net_premium', label: 'Annual Net Premium', defaultWidth: 180 },
+                                    { key: 'annual_gross_premium', label: 'Annual Rated GP', defaultWidth: 180 },
+                                    { key: 'annual_net_premium', label: 'Annual Rated NP', defaultWidth: 180 },
                                     { key: 'written_order', label: 'Written Order %', defaultWidth: 130 },
                                     { key: 'signed_order', label: 'Signed Order %', defaultWidth: 130 },
                                 ]}

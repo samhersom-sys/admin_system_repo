@@ -61,6 +61,94 @@ export class PoliciesService {
     }
 
     // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-GWP-1 — GET /api/policies/gwp-monthly
+    // Monthly GWP grouped by year-of-account for the requesting org.
+    // -----------------------------------------------------------------------
+    async getGwpMonthly(orgCode: string): Promise<{ series: any[] }> {
+        const rows = await this.dataSource.query(
+            `SELECT
+                 EXTRACT(YEAR  FROM inception_date::date) AS yr,
+                 EXTRACT(MONTH FROM inception_date::date) AS mo,
+                 COALESCE(SUM(gross_written_premium), 0)  AS total
+             FROM policies
+             WHERE created_by_org_code = $1
+               AND deleted_at IS NULL
+               AND inception_date IS NOT NULL
+               AND gross_written_premium IS NOT NULL
+             GROUP BY yr, mo
+             ORDER BY yr, mo`,
+            [orgCode],
+        )
+        const byYear: Record<string, { label: string; months: string[]; values: number[] }> = {}
+        for (const r of rows) {
+            const yr = String(r.yr)
+            if (!byYear[yr]) byYear[yr] = { label: yr, months: [], values: [] }
+            byYear[yr].months.push(`${yr}-${String(r.mo).padStart(2, '0')}`)
+            byYear[yr].values.push(Number(r.total))
+        }
+        return { series: Object.values(byYear) }
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-GWP-2 — GET /api/policies/gwp-cumulative
+    // Running cumulative GWP grouped by year-of-account.
+    // -----------------------------------------------------------------------
+    async getGwpCumulative(orgCode: string): Promise<{ series: any[] }> {
+        const rows = await this.dataSource.query(
+            `SELECT
+                 EXTRACT(YEAR  FROM inception_date::date) AS yr,
+                 EXTRACT(MONTH FROM inception_date::date) AS mo,
+                 COALESCE(SUM(gross_written_premium), 0)  AS total
+             FROM policies
+             WHERE created_by_org_code = $1
+               AND deleted_at IS NULL
+               AND inception_date IS NOT NULL
+               AND gross_written_premium IS NOT NULL
+             GROUP BY yr, mo
+             ORDER BY yr, mo`,
+            [orgCode],
+        )
+        const byYear: Record<string, { label: string; months: string[]; values: number[] }> = {}
+        for (const r of rows) {
+            const yr = String(r.yr)
+            if (!byYear[yr]) byYear[yr] = { label: yr, months: [], values: [] }
+            const prev = byYear[yr].values.length > 0
+                ? byYear[yr].values[byYear[yr].values.length - 1] : 0
+            byYear[yr].months.push(`${yr}-${String(r.mo).padStart(2, '0')}`)
+            byYear[yr].values.push(prev + Number(r.total))
+        }
+        return { series: Object.values(byYear) }
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-GWP-3 — GET /api/policies/gwp-summary
+    // Org-level and user-level GWP totals.
+    // -----------------------------------------------------------------------
+    async getGwpSummary(orgCode: string, username: string): Promise<{ orgTotal: number; userTotal: number }> {
+        const orgRows = await this.dataSource.query(
+            `SELECT COALESCE(SUM(gross_written_premium), 0) AS total
+             FROM policies
+             WHERE created_by_org_code = $1
+               AND deleted_at IS NULL
+               AND gross_written_premium IS NOT NULL`,
+            [orgCode],
+        )
+        const userRows = await this.dataSource.query(
+            `SELECT COALESCE(SUM(gross_written_premium), 0) AS total
+             FROM policies
+             WHERE created_by_org_code = $1
+               AND created_by = $2
+               AND deleted_at IS NULL
+               AND gross_written_premium IS NOT NULL`,
+            [orgCode, username],
+        )
+        return {
+            orgTotal: Number(orgRows[0]?.total ?? 0),
+            userTotal: Number(userRows[0]?.total ?? 0),
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // REQ-POL-BE-F-002 — GET /api/policies/:id
     // -----------------------------------------------------------------------
     async findOne(id: number, orgCode: string): Promise<Policy> {

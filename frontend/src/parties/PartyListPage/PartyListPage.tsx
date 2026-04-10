@@ -12,10 +12,12 @@
  */
 
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { FiSearch } from 'react-icons/fi'
 import { listParties } from '@/parties/parties.service'
 import type { Party, PartyFilters } from '@/parties/parties.service'
 import { useNotifications } from '@/shell/NotificationDock'
+import { brandClasses } from '@/shared/lib/design-tokens/brandClasses'
 import ResizableGrid from '@/shared/components/ResizableGrid/ResizableGrid'
 import type { Column } from '@/shared/components/ResizableGrid/ResizableGrid'
 
@@ -27,6 +29,7 @@ const GRID_COLUMNS: Column[] = [
     { key: 'type', label: 'Type', sortable: false, defaultWidth: 120 },
     { key: 'city', label: 'City', sortable: false, defaultWidth: 140 },
     { key: 'country', label: 'Country', sortable: false, defaultWidth: 140 },
+    { key: '_action', label: '', sortable: false, defaultWidth: 44 },
 ]
 
 export default function PartyListPage() {
@@ -111,6 +114,15 @@ export default function PartyListPage() {
                         if (key === 'type') return p.type
                         if (key === 'city') return <span className="text-gray-500">{(p.city as string) || '–'}</span>
                         if (key === 'country') return <span className="text-gray-500">{(p.country as string) || '–'}</span>
+                        if (key === '_action') return (
+                            <Link
+                                to={`/parties/${p.id}`}
+                                className={`inline-flex items-center justify-center ${brandClasses.icon.actionOpen}`}
+                                aria-label="View record"
+                            >
+                                <FiSearch size={15} aria-hidden="true" />
+                            </Link>
+                        )
                         return '—'
                     }}
                     rowKey={(row) => (row as Party).id}

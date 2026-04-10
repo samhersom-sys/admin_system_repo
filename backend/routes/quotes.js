@@ -729,4 +729,215 @@ router.delete('/:id/sections/:sectionId', async (req, res) => {
     }
 })
 
+// ---------------------------------------------------------------------------
+// R41 — GET /api/quotes/:id/sections/:sectionId/coverages
+// Returns all non-soft-deleted coverages for a section, ordered by id ASC.
+// REQ-QUO-BE-F-041
+// ---------------------------------------------------------------------------
+
+router.get('/:id/sections/:sectionId/coverages', async (req, res) => {
+    const orgCode = req.user.orgCode
+    const { id, sectionId } = req.params
+    try {
+        const quoteRows = await runQuery(
+            'SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL',
+            [parseInt(id, 10)]
+        )
+        if (quoteRows.length === 0) return res.status(404).json({ error: 'Quote not found' })
+        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+
+        const sectionRows = await runQuery(
+            'SELECT * FROM quote_sections WHERE id = $1 AND quote_id = $2 AND deleted_at IS NULL',
+            [parseInt(sectionId, 10), parseInt(id, 10)]
+        )
+        if (sectionRows.length === 0) return res.status(404).json({ error: 'Section not found' })
+
+        const coverages = await runQuery(
+            'SELECT * FROM quote_section_coverages WHERE section_id = $1 AND deleted_at IS NULL ORDER BY id ASC',
+            [parseInt(sectionId, 10)]
+        )
+        res.json(coverages)
+    } catch (err) {
+        await logError(req, 'GET /api/quotes/:id/sections/:sectionId/coverages', 'ERR_COVERAGES_FETCH_500', err.message, { id, sectionId })
+        res.status(500).json({ error: err.message })
+    }
+})
+
+// ---------------------------------------------------------------------------
+// R42 — POST /api/quotes/:id/sections/:sectionId/coverages
+// Creates a coverage with auto-generated reference {sectionRef}-COV-NNN.
+// REQ-QUO-BE-F-042
+// ---------------------------------------------------------------------------
+
+router.post('/:id/sections/:sectionId/coverages', async (req, res) => {
+    const orgCode = req.user.orgCode
+    const { id, sectionId } = req.params
+    try {
+        const quoteRows = await runQuery(
+            'SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL',
+            [parseInt(id, 10)]
+        )
+        if (quoteRows.length === 0) return res.status(404).json({ error: 'Quote not found' })
+        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+
+        const sectionRows = await runQuery(
+            'SELECT * FROM quote_sections WHERE id = $1 AND quote_id = $2 AND deleted_at IS NULL',
+            [parseInt(sectionId, 10), parseInt(id, 10)]
+        )
+        if (sectionRows.length === 0) return res.status(404).json({ error: 'Section not found' })
+
+        const sectionRef = sectionRows[0].reference
+
+        const countRows = await runQuery(
+            'SELECT COUNT(*) FROM quote_section_coverages WHERE section_id = $1 AND deleted_at IS NULL',
+            [parseInt(sectionId, 10)]
+        )
+        const nextSeq = parseInt(countRows[0].count, 10) + 1
+        const reference = `${sectionRef}-COV-${String(nextSeq).padStart(3, '0')}`
+
+        const {
+            coverage, class_of_business, effective_date, expiry_date,
+            limit_currency, limit_amount, limit_loss_qualifier,
+            excess_currency, excess_amount,
+            sum_insured_currency, sum_insured,
+            premium_currency, gross_premium, net_premium, tax_receivable,
+            payload,
+        } = req.body
+
+        let days_on_cover = null
+        if (effective_date && expiry_date) {
+            days_on_cover = Math.max(0, Math.ceil((new Date(expiry_date) - new Date(effective_date)) / 86400000))
+        }
+
+        const inserted = await runQuery(
+            `INSERT INTO quote_section_coverages
+                (quote_id, section_id, reference, coverage, class_of_business,
+                 effective_date, expiry_date, days_on_cover,
+                 limit_currency, limit_amount, limit_loss_qualifier,
+                 excess_currency, excess_amount,
+                 sum_insured_currency, sum_insured,
+                 premium_currency, gross_premium, net_premium, tax_receivable,
+                 payload, created_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW())
+             RETURNING *`,
+            [
+                parseInt(id, 10), parseInt(sectionId, 10), reference, coverage ?? null, class_of_business ?? null,
+                effective_date ?? null, expiry_date ?? null, days_on_cover,
+                limit_currency ?? null, limit_amount ?? null, limit_loss_qualifier ?? null,
+                excess_currency ?? null, excess_amount ?? null,
+                sum_insured_currency ?? null, sum_insured ?? null,
+                premium_currency ?? null, gross_premium ?? null, net_premium ?? null, tax_receivable ?? null,
+                payload ?? null,
+            ]
+        )
+        res.status(201).json(inserted[0])
+    } catch (err) {
+        await logError(req, 'POST /api/quotes/:id/sections/:sectionId/coverages', 'ERR_COVERAGE_CREATE_500', err.message, { id, sectionId })
+        res.status(500).json({ error: err.message })
+    }
+})
+
+// ---------------------------------------------------------------------------
+// R43 — PUT /api/quotes/:id/sections/:sectionId/coverages/:coverageId
+// Updates mutable fields; auto-computes days_on_cover when both dates present.
+// REQ-QUO-BE-F-043
+// ---------------------------------------------------------------------------
+
+router.put('/:id/sections/:sectionId/coverages/:coverageId', async (req, res) => {
+    const orgCode = req.user.orgCode
+    const { id, sectionId, coverageId } = req.params
+    try {
+        const quoteRows = await runQuery(
+            'SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL',
+            [parseInt(id, 10)]
+        )
+        if (quoteRows.length === 0) return res.status(404).json({ error: 'Quote not found' })
+        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+
+        const covRows = await runQuery(
+            'SELECT * FROM quote_section_coverages WHERE id = $1 AND section_id = $2 AND deleted_at IS NULL',
+            [parseInt(coverageId, 10), parseInt(sectionId, 10)]
+        )
+        if (covRows.length === 0) return res.status(404).json({ error: 'Coverage not found' })
+
+        const MUTABLE = [
+            'coverage', 'class_of_business', 'effective_date', 'expiry_date',
+            'limit_currency', 'limit_amount', 'limit_loss_qualifier',
+            'excess_currency', 'excess_amount',
+            'sum_insured_currency', 'sum_insured',
+            'premium_currency', 'gross_premium', 'net_premium', 'tax_receivable',
+            'payload',
+        ]
+
+        const setClauses = []
+        const values = []
+        let paramIdx = 1
+
+        for (const field of MUTABLE) {
+            if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+                setClauses.push(`${field} = $${paramIdx++}`)
+                values.push(req.body[field])
+            }
+        }
+
+        const effectiveDate = Object.prototype.hasOwnProperty.call(req.body, 'effective_date')
+            ? req.body.effective_date
+            : covRows[0].effective_date
+        const expiryDate = Object.prototype.hasOwnProperty.call(req.body, 'expiry_date')
+            ? req.body.expiry_date
+            : covRows[0].expiry_date
+
+        if (effectiveDate && expiryDate) {
+            const computed = Math.max(0, Math.ceil((new Date(expiryDate) - new Date(effectiveDate)) / 86400000))
+            setClauses.push(`days_on_cover = $${paramIdx++}`)
+            values.push(computed)
+        }
+
+        if (setClauses.length === 0) return res.json(covRows[0])
+
+        values.push(parseInt(coverageId, 10))
+        const updated = await runQuery(
+            `UPDATE quote_section_coverages SET ${setClauses.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+            values
+        )
+        res.json(updated[0])
+    } catch (err) {
+        await logError(req, 'PUT /api/quotes/:id/sections/:sectionId/coverages/:coverageId', 'ERR_COVERAGE_UPDATE_500', err.message, { id, sectionId, coverageId })
+        res.status(500).json({ error: err.message })
+    }
+})
+
+// ---------------------------------------------------------------------------
+// R44 — DELETE /api/quotes/:id/sections/:sectionId/coverages/:coverageId
+// Soft-deletes a coverage (sets deleted_at). Returns 204.
+// REQ-QUO-BE-F-044
+// ---------------------------------------------------------------------------
+
+router.delete('/:id/sections/:sectionId/coverages/:coverageId', async (req, res) => {
+    const orgCode = req.user.orgCode
+    const { id, sectionId, coverageId } = req.params
+    try {
+        const quoteRows = await runQuery(
+            'SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL',
+            [parseInt(id, 10)]
+        )
+        if (quoteRows.length === 0) return res.status(404).json({ error: 'Quote not found' })
+        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+
+        const updated = await runQuery(
+            `UPDATE quote_section_coverages
+             SET deleted_at = NOW()
+             WHERE id = $1 AND section_id = $2 AND deleted_at IS NULL
+             RETURNING id`,
+            [parseInt(coverageId, 10), parseInt(sectionId, 10)]
+        )
+        if (updated.length === 0) return res.status(404).json({ error: 'Coverage not found' })
+
+        res.status(204).send()
+    } catch (err) {
+        await logError(req, 'DELETE /api/quotes/:id/sections/:sectionId/coverages/:coverageId', 'ERR_COVERAGE_DELETE_500', err.message, { id, sectionId, coverageId })
+        res.status(500).json({ error: err.message })
+    }
+})
+
 module.exports = router

@@ -22,6 +22,25 @@ export class PoliciesController {
         return this.policiesService.findAll(req.user.orgCode)
     }
 
+    // REQ-POL-BE-F-GWP-1 — GET /api/policies/gwp-monthly
+    // MUST be declared before @Get(':id') to avoid ParseIntPipe matching "gwp-monthly"
+    @Get('gwp-monthly')
+    getGwpMonthly(@Req() req: any) {
+        return this.policiesService.getGwpMonthly(req.user.orgCode)
+    }
+
+    // REQ-POL-BE-F-GWP-2 — GET /api/policies/gwp-cumulative
+    @Get('gwp-cumulative')
+    getGwpCumulative(@Req() req: any) {
+        return this.policiesService.getGwpCumulative(req.user.orgCode)
+    }
+
+    // REQ-POL-BE-F-GWP-3 — GET /api/policies/gwp-summary
+    @Get('gwp-summary')
+    getGwpSummary(@Req() req: any) {
+        return this.policiesService.getGwpSummary(req.user.orgCode, req.user.username)
+    }
+
     // REQ-POL-BE-F-002 — GET /api/policies/:id
     @Get(':id')
     findOne(@Param('id', ParseIntPipe) id: number, @Req() req: any) {

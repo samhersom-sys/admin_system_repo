@@ -160,7 +160,7 @@ export default function QuoteCoverageDetailPage() {
                     </div>
                     <div>
                         <p className="text-xs text-gray-500">Coverage</p>
-                        <p className="text-gray-900">{coverage.coverage_name ?? '—'}</p>
+                        <p className="text-gray-900">{coverage.coverage ?? '—'}</p>
                     </div>
                     <div>
                         <p className="text-xs text-gray-500">Insured</p>

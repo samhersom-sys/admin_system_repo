@@ -9,8 +9,7 @@
  *   REQ-RPT-FE-S-001, S-002    (security)
  */
 
-import React from 'react'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
@@ -37,8 +36,14 @@ const mockGetFieldMappings = jest.fn()
 const mockCreateReportTemplate = jest.fn()
 const mockUpdateReportTemplate = jest.fn()
 const mockRunReport = jest.fn()
+const mockRunCoreReport = jest.fn()
 const mockGetReportHistory = jest.fn()
 const mockGetDateBasisOptions = jest.fn()
+const mockCreateDashboard = jest.fn()
+const mockGetDashboard = jest.fn()
+const mockUpdateDashboard = jest.fn()
+const mockGetDashboardWidgetData = jest.fn()
+const mockUseSidebarSection = jest.fn()
 
 jest.mock('../reporting.service', () => ({
     getReportTemplates: (...a: unknown[]) => mockGetReportTemplates(...a),
@@ -48,8 +53,13 @@ jest.mock('../reporting.service', () => ({
     createReportTemplate: (...a: unknown[]) => mockCreateReportTemplate(...a),
     updateReportTemplate: (...a: unknown[]) => mockUpdateReportTemplate(...a),
     runReport: (...a: unknown[]) => mockRunReport(...a),
+    runCoreReport: (...a: unknown[]) => mockRunCoreReport(...a),
     getReportHistory: (...a: unknown[]) => mockGetReportHistory(...a),
     getDateBasisOptions: (...a: unknown[]) => mockGetDateBasisOptions(...a),
+    createDashboard: (...a: unknown[]) => mockCreateDashboard(...a),
+    getDashboard: (...a: unknown[]) => mockGetDashboard(...a),
+    updateDashboard: (...a: unknown[]) => mockUpdateDashboard(...a),
+    getDashboardWidgetData: (...a: unknown[]) => mockGetDashboardWidgetData(...a),
 }))
 
 const mockAddNotification = jest.fn()
@@ -57,12 +67,15 @@ jest.mock('@/shell/NotificationDock', () => ({
     useNotifications: () => ({ addNotification: mockAddNotification }),
 }))
 jest.mock('@/shell/SidebarContext', () => ({
-    useSidebarSection: jest.fn(),
+    useSidebarSection: (...args: unknown[]) => mockUseSidebarSection(...args),
 }))
 
 import ReportsListPage from '../ReportsListPage/ReportsListPage'
 import ReportCreatePage from '../ReportCreatePage/ReportCreatePage'
 import ReportRunPage from '../ReportRunPage/ReportRunPage'
+import DashboardCreatePage from '../DashboardCreatePage/DashboardCreatePage'
+import DashboardConfigurePage from '../DashboardConfigurePage/DashboardConfigurePage'
+import DashboardViewPage from '../DashboardViewPage/DashboardViewPage'
 
 const SAMPLE_CORE: import('../reporting.service').ReportTemplate = {
     id: 10,
@@ -78,6 +91,13 @@ const SAMPLE_CUSTOM: import('../reporting.service').ReportTemplate = {
     type: 'custom',
     created_by: 'Alice',
     data_source: 'submissions',
+}
+const SAMPLE_DASHBOARD: import('../reporting.service').ReportTemplate = {
+    id: 30,
+    name: 'Ops Dashboard',
+    description: 'Desc C',
+    type: 'dashboard',
+    created_by: 'Alice',
 }
 
 function renderListPage(path = '/reports') {
@@ -110,6 +130,12 @@ function renderRunPage(reportId = '42') {
     )
 }
 
+async function triggerSidebarEvent(eventName: string) {
+    await act(async () => {
+        window.dispatchEvent(new Event(eventName))
+    })
+}
+
 // ---------------------------------------------------------------------------
 // ReportsListPage — REQ-RPT-FE-F-001 to F-008
 // ---------------------------------------------------------------------------
@@ -127,9 +153,11 @@ describe('ReportsListPage — /reports', () => {
     })
 
     // REQ-RPT-FE-F-002
-    it('T-RPT-FE-F-R002 — renders "Create Report" button', async () => {
+    it('T-RPT-FE-F-R002 — page header does NOT render an inline "Create Report" button', async () => {
         renderListPage()
-        expect(await screen.findByRole('button', { name: /create report/i })).toBeInTheDocument()
+        expect(await screen.findByText('Submissions Report')).toBeInTheDocument()
+        // Create Report lives in the sidebar only — no inline button on the page
+        expect(screen.queryAllByRole('button', { name: /create report/i })).toHaveLength(0)
     })
 
     // REQ-RPT-FE-F-003
@@ -165,11 +193,62 @@ describe('ReportsListPage — /reports', () => {
         expect(runButtons.length).toBeGreaterThan(0)
     })
 
+    it('T-RPT-FE-F-R005b — core report Run button navigates to /reports/run/{data_source}', async () => {
+        mockGetReportTemplates.mockResolvedValue([])
+        render(
+            <MemoryRouter initialEntries={['/reports']}>
+                <Routes>
+                    <Route path="/reports" element={<ReportsListPage />} />
+                    <Route path="/reports/run/:reportId" element={<div data-testid="run-page">run-page</div>} />
+                </Routes>
+            </MemoryRouter>
+        )
+        await screen.findByText('Submissions Report')
+        // First Run button belongs to Submissions Report (data_source: submissions)
+        const runButtons = screen.getAllByTitle('Run Report')
+        await userEvent.click(runButtons[0])
+        expect(await screen.findByTestId('run-page')).toBeInTheDocument()
+    })
+
     // REQ-RPT-FE-F-006
     it('T-RPT-FE-F-R006 — custom report cards show Edit and Delete buttons', async () => {
         renderListPage()
         expect(await screen.findByRole('button', { name: /edit/i })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R006c — dashboard rows edit via /dashboards/edit/:id not /reports/edit/:id', async () => {
+        mockGetReportTemplates.mockResolvedValue([SAMPLE_CORE, SAMPLE_DASHBOARD])
+        render(
+            <MemoryRouter initialEntries={['/reports']}>
+                <Routes>
+                    <Route path="/reports" element={<ReportsListPage />} />
+                    <Route path="/dashboards/edit/:id" element={<div>dashboard-edit</div>} />
+                    <Route path="/reports/edit/:id" element={<div>report-edit</div>} />
+                </Routes>
+            </MemoryRouter>
+        )
+        await screen.findByText('Ops Dashboard')
+        await userEvent.click(screen.getByTitle('Edit Report'))
+        expect(await screen.findByText('dashboard-edit')).toBeInTheDocument()
+        expect(screen.queryByText('report-edit')).not.toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R006d — dashboard rows open /dashboards/view/:id instead of the report runner', async () => {
+        mockGetReportTemplates.mockResolvedValue([SAMPLE_CORE, SAMPLE_DASHBOARD])
+        render(
+            <MemoryRouter initialEntries={['/reports']}>
+                <Routes>
+                    <Route path="/reports" element={<ReportsListPage />} />
+                    <Route path="/dashboards/view/:reportId" element={<div>dashboard-view</div>} />
+                    <Route path="/reports/run/:reportId" element={<div>report-run</div>} />
+                </Routes>
+            </MemoryRouter>
+        )
+        await screen.findByText('Ops Dashboard')
+        await userEvent.click(screen.getByTitle('View Dashboard'))
+        expect(await screen.findByText('dashboard-view')).toBeInTheDocument()
+        expect(screen.queryByText('report-run')).not.toBeInTheDocument()
     })
 
     it('T-RPT-FE-F-R006b — core reports do not show Edit or Delete buttons', async () => {
@@ -212,6 +291,7 @@ describe('ReportsListPage — /reports', () => {
 
 describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
     beforeEach(() => {
+        mockUseSidebarSection.mockReset()
         mockGetFieldMappings.mockResolvedValue([])
         mockGetDateBasisOptions.mockResolvedValue(['Created Date', 'Inception Date', 'Expiry Date'])
         mockCreateReportTemplate.mockResolvedValue({ id: 99, name: 'Test', type: 'custom' })
@@ -239,11 +319,10 @@ describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
     })
 
     // REQ-RPT-FE-F-012
-    it('T-RPT-FE-F-R012 — form renders Report Name, Description, Data Source, Date Basis, Date From, Date To, Sort By, Sort Order fields', () => {
+    it('T-RPT-FE-F-R012 — form renders Report Name, Description, Date Basis, Date From, Date To, Sort By, Sort Order fields', () => {
         renderCreatePage()
         expect(screen.getByLabelText(/report name/i)).toBeInTheDocument()
         expect(screen.getByLabelText(/description/i)).toBeInTheDocument()
-        expect(screen.getByLabelText(/data source/i)).toBeInTheDocument()
         expect(screen.getByLabelText(/date basis/i)).toBeInTheDocument()
         expect(screen.getByLabelText(/date from/i)).toBeInTheDocument()
         expect(screen.getByLabelText(/date to/i)).toBeInTheDocument()
@@ -251,16 +330,25 @@ describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
         expect(screen.getByLabelText(/sort order/i)).toBeInTheDocument()
     })
 
-    it('T-RPT-FE-F-R012b — Data Source select contains all 7 domain options', () => {
+    it('T-RPT-FE-F-R012e — report create page registers a sidebar Save action', () => {
         renderCreatePage()
-        const sourceSelect = screen.getByLabelText(/data source/i)
-        const options = within(sourceSelect).getAllByRole('option')
-        const values = options.map((o) => (o as HTMLOptionElement).value).filter(Boolean)
-        expect(values).toEqual(expect.arrayContaining([
-            'submissions', 'quotes', 'policies', 'policyTransactions',
-            'bindingAuthorities', 'parties', 'claims',
-        ]))
-        expect(values).toHaveLength(7)
+        expect(mockUseSidebarSection).toHaveBeenCalledWith(expect.objectContaining({
+            items: expect.arrayContaining([
+                expect.objectContaining({ label: 'Save' }),
+            ]),
+        }))
+    })
+
+    it('T-RPT-FE-F-R012b — getFieldMappings is called for all 7 data sources on mount', async () => {
+        renderCreatePage()
+        await waitFor(() => expect(mockGetFieldMappings).toHaveBeenCalledTimes(7))
+        expect(mockGetFieldMappings).toHaveBeenCalledWith('submissions')
+        expect(mockGetFieldMappings).toHaveBeenCalledWith('quotes')
+        expect(mockGetFieldMappings).toHaveBeenCalledWith('policies')
+        expect(mockGetFieldMappings).toHaveBeenCalledWith('policyTransactions')
+        expect(mockGetFieldMappings).toHaveBeenCalledWith('bindingAuthorities')
+        expect(mockGetFieldMappings).toHaveBeenCalledWith('parties')
+        expect(mockGetFieldMappings).toHaveBeenCalledWith('claims')
     })
 
     it('T-RPT-FE-F-R012c — Date Basis is a select populated from getDateBasisOptions', async () => {
@@ -280,18 +368,13 @@ describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
     })
 
     // REQ-RPT-FE-F-013
-    it('T-RPT-FE-F-R013 — selecting a Data Source calls getFieldMappings and renders two-panel field selection', async () => {
-        mockGetFieldMappings.mockResolvedValue([
-            { key: 'id', label: 'ID', domain: 'Submissions' },
-            { key: 'reference', label: 'Reference', domain: 'Submissions' },
-        ])
+    it('T-RPT-FE-F-R013 — Available Fields and Selected Fields panels are always visible on mount', async () => {
         renderCreatePage()
-        const sourceSelect = screen.getByLabelText(/data source/i)
-        await userEvent.selectOptions(sourceSelect, 'submissions')
+        // Panels are visible immediately without selecting a data source (use testids to avoid ambiguous text matches)
+        expect(screen.getByTestId('available-fields')).toBeInTheDocument()
+        expect(screen.getByTestId('selected-fields')).toBeInTheDocument()
+        // getFieldMappings is called for all sources on mount
         await waitFor(() => expect(mockGetFieldMappings).toHaveBeenCalledWith('submissions'))
-        // Two-panel UI: "Available Fields" and "Selected Fields" headings
-        expect(await screen.findByText(/available fields/i)).toBeInTheDocument()
-        expect(screen.getByText(/selected fields/i)).toBeInTheDocument()
     })
 
     it('T-RPT-FE-F-R013b — clicking Add on an available field moves it to the selected panel', async () => {
@@ -300,10 +383,8 @@ describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
             { key: 'reference', label: 'Reference', domain: 'Submissions' },
         ])
         renderCreatePage()
-        await userEvent.selectOptions(screen.getByLabelText(/data source/i), 'submissions')
-        await screen.findByText(/available fields/i)
-        // Click Add on the first available field
-        const addButtons = await screen.findAllByRole('button', { name: /add/i })
+        // Wait for field-level Add buttons to appear (fields loaded from all sources on mount)
+        const addButtons = await screen.findAllByTitle(/add field/i)
         const fieldAddBtn = addButtons.find((b) => b.closest('[data-testid="available-fields"]'))
         if (fieldAddBtn) await userEvent.click(fieldAddBtn)
         // Field should now appear in selected panel
@@ -318,16 +399,14 @@ describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
             { key: 'id', label: 'ID', domain: 'Submissions' },
         ])
         renderCreatePage()
-        await userEvent.selectOptions(screen.getByLabelText(/data source/i), 'submissions')
-        await screen.findByText(/available fields/i)
-        // Add field
-        const addButtons = await screen.findAllByRole('button', { name: /add/i })
+        // Add field (wait for field-level Add buttons to appear on mount)
+        const addButtons = await screen.findAllByTitle(/add field/i)
         const fieldAddBtn = addButtons.find((b) => b.closest('[data-testid="available-fields"]'))
         if (fieldAddBtn) await userEvent.click(fieldAddBtn)
         // Fill required fields and save
         await userEvent.type(screen.getByLabelText(/report name/i), 'Test')
         await userEvent.type(screen.getByLabelText(/description/i), 'Desc')
-        await userEvent.click(screen.getByRole('button', { name: /save report/i }))
+        await triggerSidebarEvent('reporting:save')
         await waitFor(() => expect(mockCreateReportTemplate).toHaveBeenCalled())
         const payload = mockCreateReportTemplate.mock.calls[0][0]
         expect(payload.fields).toEqual(expect.arrayContaining([
@@ -341,16 +420,9 @@ describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
             { key: 'id', label: 'ID', domain: 'Submissions' },
         ])
         renderCreatePage()
-        // Select a data source and add a field first so filter field dropdown has options
-        await userEvent.selectOptions(screen.getByLabelText(/data source/i), 'submissions')
-        await screen.findByText(/available fields/i)
-        const addFieldBtns = await screen.findAllByRole('button', { name: /add/i })
-        const fieldAddBtn = addFieldBtns.find((b) => b.closest('[data-testid="available-fields"]'))
-        if (fieldAddBtn) await userEvent.click(fieldAddBtn)
-
-        const addFilterBtn = screen.getByRole('button', { name: /add filter/i })
-        await userEvent.click(addFilterBtn)
-        // Filter row should have a field select and value input
+        // Filter field dropdown uses ALL fieldMappings — no need to add a field to selected panel first
+        await waitFor(() => expect(mockGetFieldMappings).toHaveBeenCalled())
+        // Filter row should have an operator select (contains 'equals' option)
         const filterSelects = screen.getAllByRole('combobox').filter(s => {
             const opts = within(s).queryAllByRole('option')
             return opts.some(o => (o as HTMLOptionElement).value === 'equals')
@@ -358,10 +430,15 @@ describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
         expect(filterSelects.length).toBeGreaterThan(0)
     })
 
-    it('T-RPT-FE-F-R014b — filter operator select includes all 8 operators', async () => {
+    it('T-RPT-FE-F-R014a — a blank filter row is visible by default on first render', async () => {
+        renderCreatePage()
+        const filterSection = await screen.findByTestId('filters-section')
+        expect(within(filterSection).getByPlaceholderText(/search field or domain/i)).toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R014b — filter operator select includes all 8 standard operators', async () => {
         renderCreatePage()
         await userEvent.click(screen.getByRole('button', { name: /add filter/i }))
-        // Find the operator select
         const allSelects = screen.getAllByRole('combobox')
         const operatorSelect = allSelects.find(s => {
             const opts = within(s).queryAllByRole('option')
@@ -381,38 +458,161 @@ describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
     it('T-RPT-FE-F-R014c — clicking Remove on a filter row removes that row', async () => {
         renderCreatePage()
         await userEvent.click(screen.getByRole('button', { name: /add filter/i }))
-        // Find remove button in filter area
-        const allButtons = screen.getAllByRole('button')
-        const removeBtn = allButtons.find((b) => !b.textContent?.match(/add filter|save|cancel/i) && b.closest('[data-testid="filters-section"]'))
+        const filterSection = document.querySelector('[data-testid="filters-section"]')
+        expect(filterSection).not.toBeNull()
+        const removeBtn = filterSection
+            ? within(filterSection as HTMLElement).getAllByTitle(/remove filter/i)[0]
+            : undefined
         if (removeBtn) await userEvent.click(removeBtn)
-        // If no data-testid falls back to generic remove
-        const genericRemoveBtn = allButtons.find((b) => !b.textContent?.match(/add filter|save|cancel|add/i))
-        if (!removeBtn && genericRemoveBtn) await userEvent.click(genericRemoveBtn)
+        // After removal only one filter row should remain
+        if (removeBtn) {
+            const remaining = filterSection
+                ? within(filterSection as HTMLElement).queryAllByRole('combobox').filter(s => {
+                    const opts = within(s).queryAllByRole('option')
+                    return opts.some(o => (o as HTMLOptionElement).value === 'equals')
+                })
+                : []
+            expect(remaining.length).toBe(1)
+        }
+    })
+
+    // REQ-RPT-FE-F-014 — filter field uses ALL field mappings (not restricted to selected fields)
+    it('T-RPT-FE-F-R014d — filter field dropdown lists fields from ALL loaded mappings, not just selected fields', async () => {
+        mockGetFieldMappings.mockResolvedValue([
+            { key: 'status', label: 'Status', domain: 'Submissions', type: 'lookup', lookupValues: ['open', 'closed'] },
+            { key: 'reference', label: 'Reference', domain: 'Submissions' },
+        ])
+        renderCreatePage()
+        await waitFor(() => expect(mockGetFieldMappings).toHaveBeenCalled())
+        const filterSection = document.querySelector('[data-testid="filters-section"]')
+        expect(filterSection).not.toBeNull()
+        const fieldInput = filterSection
+            ? within(filterSection as HTMLElement).getByPlaceholderText(/search field or domain/i)
+            : undefined
+        expect(fieldInput).toBeDefined()
+        if (fieldInput) {
+            await userEvent.click(fieldInput)
+            expect(await screen.findByText('Status (Submissions)')).toBeInTheDocument()
+            expect(screen.getByText('Reference (Submissions)')).toBeInTheDocument()
+        }
+    })
+
+    // REQ-RPT-FE-F-014 — filter row ordering (Move Up / Move Down)
+    it('T-RPT-FE-F-R014e — filter rows have Move Up and Move Down buttons', async () => {
+        renderCreatePage()
+        // Add two filter rows
+        const addFilterBtn = screen.getByRole('button', { name: /add filter/i })
+        await userEvent.click(addFilterBtn)
+        await userEvent.click(addFilterBtn)
+        const filterSection = document.querySelector('[data-testid="filters-section"]')
+        expect(filterSection).not.toBeNull()
+        // Move Up and Move Down titles should be present in filter section
+        const moveUpBtns = filterSection
+            ? within(filterSection as HTMLElement).queryAllByTitle(/move up/i)
+            : []
+        const moveDownBtns = filterSection
+            ? within(filterSection as HTMLElement).queryAllByTitle(/move down/i)
+            : []
+        expect(moveUpBtns.length + moveDownBtns.length).toBeGreaterThan(0)
+    })
+
+    // REQ-RPT-FE-F-014 — AND/OR connector and group between filter rows
+    it('T-RPT-FE-F-R014f — AND/OR connector toggle and group selector appear between multiple filter rows', async () => {
+        renderCreatePage()
+        const addFilterBtn = screen.getByRole('button', { name: /add filter/i })
+        await userEvent.click(addFilterBtn)
+        await userEvent.click(addFilterBtn)
+        const filterSection = document.querySelector('[data-testid="filters-section"]')
+        expect(filterSection).not.toBeNull()
+        const connectorText = filterSection?.textContent ?? ''
+        expect(connectorText).toMatch(/AND|OR/)
+        expect(within(filterSection as HTMLElement).getAllByLabelText(/group/i).length).toBeGreaterThan(0)
+    })
+
+    // REQ-RPT-FE-F-014 — field value uses searchable creatable multi-value input
+    it('T-RPT-FE-F-R014g — filter operator includes "in" and value control allows adding multiple free-text values', async () => {
+        mockGetFieldMappings.mockResolvedValue([
+            { key: 'status', label: 'Status', domain: 'Submissions', type: 'lookup', lookupValues: ['open', 'closed', 'bound'] },
+        ])
+        renderCreatePage()
+        await waitFor(() => expect(mockGetFieldMappings).toHaveBeenCalled())
+        await userEvent.click(screen.getByRole('button', { name: /add filter/i }))
+
+        // Select 'status' (lookup) in the filter field select
+        const filterSection = document.querySelector('[data-testid="filters-section"]')
+        expect(filterSection).not.toBeNull()
+        const fieldSelect = filterSection
+            ? within(filterSection as HTMLElement).getAllByRole('combobox').find(s => {
+                const opts = within(s).queryAllByRole('option')
+                return opts.some(o => (o as HTMLOptionElement).value === 'status')
+            })
+            : undefined
+        if (fieldSelect) {
+            await userEvent.selectOptions(fieldSelect, 'status')
+            const operatorSelect = filterSection
+                ? within(filterSection as HTMLElement).getAllByRole('combobox').find(s => {
+                    const opts = within(s).queryAllByRole('option')
+                    return opts.some(o => (o as HTMLOptionElement).value === 'equals') ||
+                        opts.some(o => (o as HTMLOptionElement).value === 'in')
+                })
+                : undefined
+            if (operatorSelect) {
+                const opts = within(operatorSelect).getAllByRole('option')
+                const values = opts.map(o => (o as HTMLOptionElement).value)
+                expect(values).toContain('in')
+                await userEvent.selectOptions(operatorSelect, 'in')
+            }
+            const freeTextInput = await screen.findByPlaceholderText(/search or add value/i)
+            await userEvent.type(freeTextInput, 'broker created')
+            await userEvent.keyboard('{Enter}')
+            await userEvent.type(freeTextInput, 'open')
+            await userEvent.keyboard('{Enter}')
+            expect(screen.getByText('broker created')).toBeInTheDocument()
+            expect(screen.getByText('open')).toBeInTheDocument()
+        }
+    })
+
+    it('T-RPT-FE-F-R017b — loading a dashboard through /reports/edit/:id redirects to /dashboards/edit/:id instead of crashing', async () => {
+        mockGetReportTemplate.mockResolvedValueOnce({
+            id: 8,
+            name: 'Saved Dashboard',
+            description: 'Dashboard config',
+            type: 'dashboard',
+            fields: { pages: [], showMetadata: true },
+        })
+        render(
+            <MemoryRouter initialEntries={['/reports/edit/8']}>
+                <Routes>
+                    <Route path="/reports/edit/:id" element={<ReportCreatePage />} />
+                    <Route path="/dashboards/edit/:id" element={<div>dashboard-edit</div>} />
+                </Routes>
+            </MemoryRouter>
+        )
+        expect(await screen.findByText('dashboard-edit')).toBeInTheDocument()
     })
 
     // REQ-RPT-FE-F-015
-    it('T-RPT-FE-F-R015 — clicking Save on /reports/create calls createReportTemplate and navigates to /reports', async () => {
+    it('T-RPT-FE-F-R015 — sidebar Save on /reports/create calls createReportTemplate and navigates to /reports', async () => {
         renderCreatePage('/reports/create')
         await userEvent.type(screen.getByLabelText(/report name/i), 'My Report')
         await userEvent.type(screen.getByLabelText(/description/i), 'My Desc')
-        await userEvent.selectOptions(screen.getByLabelText(/data source/i), 'submissions')
-        await userEvent.click(screen.getByRole('button', { name: /save report/i }))
+        await triggerSidebarEvent('reporting:save')
         await waitFor(() => expect(mockCreateReportTemplate).toHaveBeenCalled())
         await waitFor(() => expect(screen.getByText('reports-list')).toBeInTheDocument())
     })
 
-    it('T-RPT-FE-F-R015b — clicking Save on /reports/edit/:id calls updateReportTemplate', async () => {
+    it('T-RPT-FE-F-R015b — sidebar Save on /reports/edit/:id calls updateReportTemplate', async () => {
         renderCreatePage('/reports/edit/5')
         await screen.findByRole('heading', { name: /edit report/i })
-        await userEvent.click(screen.getByRole('button', { name: /save report/i }))
+        await triggerSidebarEvent('reporting:save')
         await waitFor(() => expect(mockUpdateReportTemplate).toHaveBeenCalledWith(5, expect.any(Object)))
     })
 
     // REQ-RPT-FE-F-016
-    it('T-RPT-FE-F-R016 — clicking Cancel navigates to /reports', async () => {
+    it('T-RPT-FE-F-R016 — report create page does not render inline Save or Cancel buttons', async () => {
         renderCreatePage('/reports/create')
-        await userEvent.click(screen.getByRole('button', { name: /cancel/i }))
-        expect(screen.getByText('reports-list')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /save report/i })).not.toBeInTheDocument()
     })
 
     // REQ-RPT-FE-F-017
@@ -423,10 +623,10 @@ describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
     })
 
     // REQ-RPT-FE-F-018
-    it('T-RPT-FE-F-R018 — validation: Report Name required; save not called when name is empty', async () => {
+    it('T-RPT-FE-F-R018 — validation: Report Name required; save not called when sidebar save fires', async () => {
         renderCreatePage('/reports/create')
         // Do not fill Report Name
-        await userEvent.click(screen.getByRole('button', { name: /save report/i }))
+        await triggerSidebarEvent('reporting:save')
         expect(mockCreateReportTemplate).not.toHaveBeenCalled()
         expect(mockAddNotification).toHaveBeenCalledWith(expect.stringMatching(/required/i), 'error')
     })
@@ -435,19 +635,31 @@ describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
         renderCreatePage('/reports/create')
         await userEvent.type(screen.getByLabelText(/report name/i), 'My Report')
         // Leave description empty
-        await userEvent.click(screen.getByRole('button', { name: /save report/i }))
+        await triggerSidebarEvent('reporting:save')
         expect(mockCreateReportTemplate).not.toHaveBeenCalled()
         expect(mockAddNotification).toHaveBeenCalledWith(expect.stringMatching(/required/i), 'error')
     })
 
-    it('T-RPT-FE-F-R018c — validation: Data Source required', async () => {
-        renderCreatePage('/reports/create')
-        await userEvent.type(screen.getByLabelText(/report name/i), 'My Report')
-        await userEvent.type(screen.getByLabelText(/description/i), 'Desc')
-        // Do not select data source
-        await userEvent.click(screen.getByRole('button', { name: /save report/i }))
-        expect(mockCreateReportTemplate).not.toHaveBeenCalled()
-        expect(mockAddNotification).toHaveBeenCalledWith(expect.stringMatching(/required/i), 'error')
+    // REQ-RPT-FE-F-013 search — field search replaces the removed data source dropdown
+    it('T-RPT-FE-F-R013d — field search box filters available fields by name or domain', async () => {
+        mockGetFieldMappings.mockImplementation((source: string) =>
+            source === 'submissions'
+                ? Promise.resolve([{ key: 'ref', label: 'Submission Reference', domain: 'Submissions' }])
+                : source === 'quotes'
+                    ? Promise.resolve([{ key: 'premium', label: 'Premium Amount', domain: 'Quotes' }])
+                    : Promise.resolve([])
+        )
+        renderCreatePage()
+        // Wait for fields to load — both domains appear
+        expect(await screen.findByText('Submission Reference')).toBeInTheDocument()
+        expect(screen.getByText('Premium Amount')).toBeInTheDocument()
+        // Search for 'Quotes' — only Quotes-domain fields remain
+        const searchInput = screen.getByPlaceholderText(/search fields/i)
+        await userEvent.type(searchInput, 'Quotes')
+        await waitFor(() => {
+            expect(screen.queryByText('Submission Reference')).not.toBeInTheDocument()
+            expect(screen.getByText('Premium Amount')).toBeInTheDocument()
+        })
     })
 
     // REQ-RPT-FE-F-019 (deferred placeholder)
@@ -571,6 +783,49 @@ describe('ReportRunPage — /reports/run/:reportId', () => {
 })
 
 // ---------------------------------------------------------------------------
+// ReportRunPage — Core report execution (REQ-RPT-FE-F-005a)
+// ---------------------------------------------------------------------------
+
+describe('ReportRunPage — core report slug navigation', () => {
+    beforeEach(() => {
+        mockRunCoreReport.mockResolvedValue([{ id: 1, reference: 'SUB-001', status: 'open' }])
+    })
+    afterEach(() => jest.clearAllMocks())
+
+    function renderRunPageSlug(slug: string) {
+        return render(
+            <MemoryRouter initialEntries={[`/reports/run/${slug}`]}>
+                <Routes>
+                    <Route path="/reports/run/:reportId" element={<ReportRunPage />} />
+                </Routes>
+            </MemoryRouter>
+        )
+    }
+
+    // REQ-RPT-FE-F-005a
+    it('T-RPT-FE-F-R005a — core report slug shows template name without calling getReportTemplate API', async () => {
+        renderRunPageSlug('submissions')
+        expect(await screen.findByText('Submissions Report')).toBeInTheDocument()
+        expect(mockGetReportTemplate).not.toHaveBeenCalled()
+    })
+
+    it('T-RPT-FE-F-R005a-b — clicking Run Report on core slug calls runCoreReport not runReport', async () => {
+        renderRunPageSlug('submissions')
+        await screen.findByText('Submissions Report')
+        await userEvent.click(screen.getByRole('button', { name: /run report/i }))
+        await waitFor(() => expect(mockRunCoreReport).toHaveBeenCalledWith('submissions'))
+        expect(mockRunReport).not.toHaveBeenCalled()
+    })
+
+    it('T-RPT-FE-F-R005a-c — core report results render in table after run', async () => {
+        renderRunPageSlug('submissions')
+        await screen.findByText('Submissions Report')
+        await userEvent.click(screen.getByRole('button', { name: /run report/i }))
+        expect(await screen.findByText('SUB-001')).toBeInTheDocument()
+    })
+})
+
+// ---------------------------------------------------------------------------
 // Constraints — REQ-RPT-FE-C-001 to C-002
 // ---------------------------------------------------------------------------
 
@@ -623,5 +878,531 @@ describe('Reporting — Security', () => {
         await screen.findByText('Submissions Report')
         expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// DashboardCreatePage — REQ-RPT-FE-F-031 to F-037
+// ---------------------------------------------------------------------------
+
+describe('DashboardCreatePage — /dashboards/create and /dashboards/edit/:id', () => {
+    const SAMPLE_DASHBOARD_CONFIG = {
+        pages: [
+            {
+                id: 1,
+                name: 'Overview',
+                template: 'twoColumn',
+                widgets: [],
+                scrollEnabled: false,
+                maxRows: 12,
+                sections: null,
+            },
+        ],
+        showMetadata: true,
+    }
+
+    beforeEach(() => {
+        mockUseSidebarSection.mockReset()
+        mockCreateDashboard.mockResolvedValue({ id: 77, name: 'New Dashboard', type: 'dashboard' })
+        mockUpdateDashboard.mockResolvedValue({ id: 77, name: 'Updated Dashboard', type: 'dashboard' })
+        mockGetDashboard.mockResolvedValue({
+            id: 77,
+            name: 'Existing Dashboard',
+            description: 'An existing one',
+            type: 'dashboard',
+            dashboardConfig: SAMPLE_DASHBOARD_CONFIG,
+        })
+    })
+    afterEach(() => jest.clearAllMocks())
+
+    function renderDashboardPage(path = '/dashboards/create') {
+        return render(
+            <MemoryRouter initialEntries={[path]}>
+                <Routes>
+                    <Route path="/dashboards/create" element={<DashboardCreatePage />} />
+                    <Route path="/dashboards/edit/:id" element={<DashboardCreatePage />} />
+                    <Route path="/dashboards/configure/:id" element={<div>dashboard-configure</div>} />
+                    <Route path="/reports" element={<div>reports-list</div>} />
+                </Routes>
+            </MemoryRouter>,
+        )
+    }
+
+    // REQ-RPT-FE-F-031
+    it('T-RPT-FE-F-R031 — renders "Create Dashboard" heading on /dashboards/create', () => {
+        renderDashboardPage('/dashboards/create')
+        expect(screen.getByRole('heading', { name: /create dashboard/i })).toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R031b — renders "Edit Dashboard" heading on /dashboards/edit/:id', async () => {
+        renderDashboardPage('/dashboards/edit/77')
+        expect(await screen.findByRole('heading', { name: /edit dashboard/i })).toBeInTheDocument()
+    })
+
+    // REQ-RPT-FE-F-032
+    it('T-RPT-FE-F-R032 — renders Dashboard Name and Description inputs', () => {
+        renderDashboardPage()
+        expect(screen.getByLabelText(/dashboard name/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/description/i)).toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R032b — dashboard pages register sidebar Save actions', () => {
+        renderDashboardPage('/dashboards/create')
+        expect(mockUseSidebarSection).toHaveBeenCalledWith(expect.objectContaining({
+            items: expect.arrayContaining([
+                expect.objectContaining({ label: 'Save' }),
+            ]),
+        }))
+    })
+
+    // REQ-RPT-FE-F-033
+    it('T-RPT-FE-F-R033 — renders Show Dashboard Metadata checkbox checked by default', () => {
+        renderDashboardPage()
+        const checkbox = screen.getByLabelText(/show dashboard metadata/i) as HTMLInputElement
+        expect(checkbox).toBeInTheDocument()
+        expect(checkbox.checked).toBe(true)
+    })
+
+    // REQ-RPT-FE-F-034
+    it('T-RPT-FE-F-R034 — renders Dashboard Layout section with at least one page configuration', () => {
+        renderDashboardPage()
+        expect(screen.getByText(/dashboard layout/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/enable page scroll/i)).toBeInTheDocument()
+    })
+
+    // REQ-RPT-FE-F-035
+    it('T-RPT-FE-F-R035 — Add Page button increments the page count', async () => {
+        renderDashboardPage()
+        const addPageBtn = screen.getByRole('button', { name: /add page/i })
+        // Initially 1 page rendered; Page 1 visible
+        expect(screen.getByText(/page 1/i)).toBeInTheDocument()
+        await userEvent.click(addPageBtn)
+        // After click expect Page 2 section header
+        expect(await screen.findByText(/page 2/i)).toBeInTheDocument()
+    })
+
+    // REQ-RPT-FE-F-036
+    it('T-RPT-FE-F-R036 — clicking Layout Template button opens TemplateSelector modal', async () => {
+        renderDashboardPage()
+        const templateBtn = screen.getByRole('button', { name: /layout template/i })
+        await userEvent.click(templateBtn)
+        expect(await screen.findByRole('heading', { name: /choose dashboard layout/i })).toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R036b — TemplateSelector modal shows template cards', async () => {
+        renderDashboardPage()
+        await userEvent.click(screen.getByRole('button', { name: /layout template/i }))
+        // At least one template card should be visible
+        expect(await screen.findByText('Single Widget')).toBeInTheDocument()
+        expect(screen.getByText('Two Columns')).toBeInTheDocument()
+    })
+
+    // REQ-RPT-FE-F-037
+    it('T-RPT-FE-F-R037 — sidebar Save on create calls createDashboard and navigates to /dashboards/configure/:id', async () => {
+        renderDashboardPage('/dashboards/create')
+        await userEvent.type(screen.getByLabelText(/dashboard name/i), 'My Dashboard')
+        await triggerSidebarEvent('dashboard:save')
+        await waitFor(() => expect(mockCreateDashboard).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'My Dashboard' }),
+        ))
+        expect(await screen.findByText('dashboard-configure')).toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R037e — edit mode registers a sidebar Configure Widgets action', async () => {
+        renderDashboardPage('/dashboards/edit/77')
+        expect(await screen.findByRole('heading', { name: /edit dashboard/i })).toBeInTheDocument()
+        expect(mockUseSidebarSection).toHaveBeenCalledWith(expect.objectContaining({
+            items: expect.arrayContaining([
+                expect.objectContaining({ label: 'Configure Widgets', to: '/dashboards/configure/77' }),
+            ]),
+        }))
+    })
+
+    it('T-RPT-FE-F-R037b — sidebar Save in edit mode calls updateDashboard and navigates to configure widgets', async () => {
+        renderDashboardPage('/dashboards/edit/77')
+        await screen.findByRole('heading', { name: /edit dashboard/i })
+        await triggerSidebarEvent('dashboard:save')
+        await waitFor(() => expect(mockUpdateDashboard).toHaveBeenCalledWith(
+            77, expect.objectContaining({ name: 'Existing Dashboard' }),
+        ))
+        expect(await screen.findByText('dashboard-configure')).toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R037c — dashboard create page does not render inline Save or Cancel buttons', async () => {
+        renderDashboardPage('/dashboards/create')
+        expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /save dashboard/i })).not.toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R037d — validation: sidebar Save without Dashboard Name shows error notification', async () => {
+        renderDashboardPage('/dashboards/create')
+        // Do not fill dashboard name
+        await triggerSidebarEvent('dashboard:save')
+        expect(mockCreateDashboard).not.toHaveBeenCalled()
+        expect(mockAddNotification).toHaveBeenCalledWith(
+            expect.stringMatching(/required/i),
+            'error',
+        )
+    })
+})
+
+describe('DashboardConfigurePage — /dashboards/configure/:id', () => {
+    beforeEach(() => {
+        mockUseSidebarSection.mockReset()
+        mockGetDashboardWidgetData.mockReset()
+        mockGetDashboard.mockResolvedValue({
+            id: 77,
+            name: 'Existing Dashboard',
+            description: 'An existing one',
+            type: 'dashboard',
+            dashboardConfig: {
+                pages: [
+                    {
+                        id: 1,
+                        name: 'Overview',
+                        template: 'single',
+                        widgets: [],
+                        scrollEnabled: false,
+                        maxRows: 12,
+                        sections: null,
+                    },
+                ],
+                showMetadata: true,
+            },
+        })
+        mockUpdateDashboard.mockResolvedValue({ id: 77, name: 'Existing Dashboard', type: 'dashboard' })
+        mockGetDashboardWidgetData.mockResolvedValue({ type: 'metric', value: 128, label: 'Gross Premium' })
+        mockGetFieldMappings.mockImplementation((domain: string) => {
+            if (domain === 'submissions') {
+                return Promise.resolve([
+                    { key: 'status', label: 'Status', domain: 'Submissions', type: 'lookup', lookupValues: ['Open', 'Bound'] },
+                    { key: 'gross_premium', label: 'Gross Premium', domain: 'Submissions', type: 'number' },
+                ])
+            }
+            if (domain === 'quotes') {
+                return Promise.resolve([
+                    { key: 'broker_name', label: 'Broker Name', domain: 'Quotes', type: 'text' },
+                    { key: 'quoted_premium', label: 'Quoted Premium', domain: 'Quotes', type: 'number' },
+                ])
+            }
+            return Promise.resolve([])
+        })
+    })
+
+    afterEach(() => jest.clearAllMocks())
+
+    function renderDashboardConfigurePage(path = '/dashboards/configure/77') {
+        return render(
+            <MemoryRouter initialEntries={[path]}>
+                <Routes>
+                    <Route path="/dashboards/configure/:id" element={<DashboardConfigurePage />} />
+                </Routes>
+            </MemoryRouter>,
+        )
+    }
+
+    it('T-RPT-FE-F-R038 — dashboard configure page registers sidebar Save Widgets and renders no inline save/back buttons or helper copy', async () => {
+        renderDashboardConfigurePage()
+        expect(await screen.findByRole('heading', { name: /configure dashboard widgets/i })).toBeInTheDocument()
+        expect(mockUseSidebarSection).toHaveBeenCalledWith(expect.objectContaining({
+            items: expect.arrayContaining([
+                expect.objectContaining({ label: 'Save Widgets', event: 'dashboard:configure:save' }),
+            ]),
+        }))
+        expect(screen.queryByRole('button', { name: /save widgets/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /back to layout/i })).not.toBeInTheDocument()
+        expect(screen.queryByText(/use the sidebar save widgets action/i)).not.toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R039 — widget editor exposes chart-type-specific controls and cross-domain field options', async () => {
+        renderDashboardConfigurePage()
+        await screen.findByRole('heading', { name: /configure dashboard widgets/i })
+        await userEvent.click(screen.getByRole('button', { name: /add widget/i }))
+        await userEvent.selectOptions(screen.getByLabelText(/widget type/i), 'chart')
+        expect(screen.getByLabelText(/chart type/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/x-axis field/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/x-axis label/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/y-axis label/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/y-axis field/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/legend split by/i)).toBeInTheDocument()
+        expect(screen.getByText(/measures/i)).toBeInTheDocument()
+        expect(within(screen.getByLabelText(/x-axis field/i)).getByRole('option', { name: 'Broker Name (Quotes)' })).toBeInTheDocument()
+        expect(within(screen.getByLabelText(/x-axis field/i)).getByRole('option', { name: 'Gross Premium (Submissions)' })).toBeInTheDocument()
+        expect(screen.getByLabelText('Quoted Premium (Quotes)')).toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R039b — sidebar Save Widgets persists configured chart settings with cross-domain fields', async () => {
+        renderDashboardConfigurePage()
+        await screen.findByRole('heading', { name: /configure dashboard widgets/i })
+        await userEvent.click(screen.getByRole('button', { name: /add widget/i }))
+        await userEvent.type(screen.getByLabelText(/widget title/i), 'Premium by Status')
+        await userEvent.selectOptions(screen.getByLabelText(/widget type/i), 'chart')
+        await userEvent.selectOptions(screen.getByLabelText(/chart type/i), 'line')
+        await userEvent.selectOptions(screen.getByLabelText(/x-axis field/i), 'submissions::status')
+        await userEvent.type(screen.getByLabelText(/x-axis label/i), 'Status')
+        await userEvent.type(screen.getByLabelText(/y-axis label/i), 'Premium')
+        await userEvent.selectOptions(screen.getByLabelText(/y-axis field/i), 'quotes::broker_name')
+        await userEvent.selectOptions(screen.getByLabelText(/legend split by/i), 'submissions::status')
+        await userEvent.click(screen.getByLabelText('Gross Premium (Submissions)'))
+        await userEvent.click(screen.getByLabelText('Quoted Premium (Quotes)'))
+        await userEvent.click(screen.getByRole('button', { name: /save widget/i }))
+
+        await triggerSidebarEvent('dashboard:configure:save')
+
+        await waitFor(() => expect(mockUpdateDashboard).toHaveBeenCalledWith(
+            77,
+            expect.objectContaining({
+                config: expect.objectContaining({
+                    pages: expect.arrayContaining([
+                        expect.objectContaining({
+                            widgets: expect.arrayContaining([
+                                expect.objectContaining({
+                                    title: 'Premium by Status',
+                                    type: 'chart',
+                                    chartType: 'line',
+                                    attribute: 'submissions::status',
+                                    yAxisAttribute: 'quotes::broker_name',
+                                    legendAttribute: 'submissions::status',
+                                    xAxisLabel: 'Status',
+                                    yAxisLabel: 'Premium',
+                                    measures: ['submissions::gross_premium', 'quotes::quoted_premium'],
+                                }),
+                            ]),
+                        }),
+                    ]),
+                }),
+            }),
+        ))
+    })
+
+    it('T-RPT-FE-F-R039c — saving a widget replaces the empty slot placeholder with a configured preview', async () => {
+        renderDashboardConfigurePage()
+        await screen.findByRole('heading', { name: /configure dashboard widgets/i })
+        expect(screen.getByText(/no widget assigned/i)).toBeInTheDocument()
+
+        await userEvent.click(screen.getByRole('button', { name: /add widget/i }))
+        await userEvent.type(screen.getByLabelText(/widget title/i), 'Premium by Status')
+        await userEvent.selectOptions(screen.getByLabelText(/widget type/i), 'chart')
+        await userEvent.selectOptions(screen.getByLabelText(/chart type/i), 'line')
+        await userEvent.selectOptions(screen.getByLabelText(/x-axis field/i), 'submissions::status')
+        await userEvent.selectOptions(screen.getByLabelText(/y-axis field/i), 'submissions::gross_premium')
+        await userEvent.selectOptions(screen.getByLabelText(/legend split by/i), 'quotes::broker_name')
+        await userEvent.click(screen.getByLabelText('Gross Premium (Submissions)'))
+        await userEvent.click(screen.getByRole('button', { name: /save widget/i }))
+
+        expect(screen.queryByText(/no widget assigned/i)).not.toBeInTheDocument()
+        expect(screen.getByText(/line • status \(submissions\)/i)).toBeInTheDocument()
+        expect(screen.getByText(/legend broker name \(quotes\)/i)).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /edit widget/i })).toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R039d — a measure selected on the y-axis is persisted even without separately ticking it in the measures list', async () => {
+        renderDashboardConfigurePage()
+        await screen.findByRole('heading', { name: /configure dashboard widgets/i })
+        await userEvent.click(screen.getByRole('button', { name: /add widget/i }))
+        await userEvent.type(screen.getByLabelText(/widget title/i), 'Gross Written Premium by Inception Date')
+        await userEvent.selectOptions(screen.getByLabelText(/widget type/i), 'chart')
+        await userEvent.selectOptions(screen.getByLabelText(/chart type/i), 'line')
+        await userEvent.selectOptions(screen.getByLabelText(/x-axis field/i), 'submissions::status')
+        await userEvent.selectOptions(screen.getByLabelText(/y-axis field/i), 'submissions::gross_premium')
+        await userEvent.click(screen.getByRole('button', { name: /save widget/i }))
+
+        await triggerSidebarEvent('dashboard:configure:save')
+
+        await waitFor(() => expect(mockUpdateDashboard).toHaveBeenCalledWith(
+            77,
+            expect.objectContaining({
+                config: expect.objectContaining({
+                    pages: expect.arrayContaining([
+                        expect.objectContaining({
+                            widgets: expect.arrayContaining([
+                                expect.objectContaining({
+                                    title: 'Gross Written Premium by Inception Date',
+                                    attribute: 'submissions::status',
+                                    yAxisAttribute: 'submissions::gross_premium',
+                                    measures: ['submissions::gross_premium'],
+                                }),
+                            ]),
+                        }),
+                    ]),
+                }),
+            }),
+        ))
+    })
+
+    it('T-RPT-FE-F-R041 — saved widgets render live data in configure mode instead of a static preview summary', async () => {
+        mockGetDashboard.mockResolvedValue({
+            id: 77,
+            name: 'Existing Dashboard',
+            description: 'An existing one',
+            type: 'dashboard',
+            dashboardConfig: {
+                pages: [
+                    {
+                        id: 1,
+                        name: 'Overview',
+                        template: 'single',
+                        widgets: [
+                            {
+                                id: 'metric-1',
+                                slotId: 1,
+                                title: 'Gross Premium KPI',
+                                type: 'metric',
+                                metric: 'submissions::gross_premium',
+                                aggregation: 'sum',
+                            },
+                        ],
+                        scrollEnabled: false,
+                        maxRows: 12,
+                        sections: null,
+                    },
+                ],
+                showMetadata: true,
+            },
+        })
+        mockGetDashboardWidgetData.mockResolvedValue({ type: 'metric', value: 245000, label: 'Gross Premium KPI' })
+
+        renderDashboardConfigurePage()
+
+        expect(await screen.findByText('245,000')).toBeInTheDocument()
+        expect(mockGetDashboardWidgetData).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: 'metric',
+                metric: 'submissions::gross_premium',
+            }),
+            expect.any(Object),
+        )
+        expect(screen.getByRole('button', { name: /edit widget/i })).toBeInTheDocument()
+        expect(screen.queryByText(/sum aggregation/i)).not.toBeInTheDocument()
+    })
+})
+
+describe('DashboardViewPage — /dashboards/view/:reportId', () => {
+    beforeEach(() => {
+        mockGetDashboardWidgetData.mockReset()
+        mockGetDashboard.mockResolvedValue({
+            id: 77,
+            name: 'Executive Dashboard',
+            description: 'Configured widgets only',
+            type: 'dashboard',
+            created_by: 'Alice',
+            created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-10T00:00:00.000Z',
+            dashboardConfig: {
+                pages: [
+                    {
+                        id: 1,
+                        name: 'Overview',
+                        template: 'twoColumn',
+                        widgets: [
+                            {
+                                id: 'widget-1',
+                                slotId: 1,
+                                title: 'Premium by Status',
+                                type: 'chart',
+                                chartType: 'line',
+                                attribute: 'submissions::inceptionDate',
+                                yAxisAttribute: 'submissions::gross_premium',
+                                legendAttribute: 'submissions::status',
+                                measures: ['submissions::gross_premium'],
+                                xAxisLabel: 'Inception Date',
+                                yAxisLabel: 'Gross Premium',
+                            },
+                            {
+                                id: 'widget-2',
+                                slotId: 2,
+                                title: 'Broker Notes',
+                                type: 'text',
+                                note: 'Monitor broker concentration weekly.',
+                            },
+                        ],
+                        scrollEnabled: false,
+                        maxRows: 12,
+                        sections: null,
+                    },
+                    {
+                        id: 2,
+                        name: 'Detail',
+                        template: 'single',
+                        widgets: [],
+                        scrollEnabled: false,
+                        maxRows: 12,
+                        sections: null,
+                    },
+                ],
+                showMetadata: true,
+            },
+        })
+        mockGetDashboardWidgetData.mockResolvedValue({ type: 'chart', rows: [{ label: 'Open', values: { gross_premium: 120000 } }] })
+        mockGetFieldMappings.mockImplementation((domain: string) => {
+            if (domain === 'submissions') {
+                return Promise.resolve([
+                    { key: 'status', label: 'Status', domain: 'Submissions', type: 'lookup' },
+                    { key: 'inceptionDate', label: 'Inception Date', domain: 'Submissions', type: 'date' },
+                    { key: 'gross_premium', label: 'Gross Premium', domain: 'Submissions', type: 'number' },
+                ])
+            }
+            return Promise.resolve([])
+        })
+    })
+
+    afterEach(() => jest.clearAllMocks())
+
+    function renderDashboardViewPage(path = '/dashboards/view/77') {
+        return render(
+            <MemoryRouter initialEntries={[path]}>
+                <Routes>
+                    <Route path="/dashboards/view/:reportId" element={<DashboardViewPage />} />
+                </Routes>
+            </MemoryRouter>,
+        )
+    }
+
+    it('T-RPT-FE-F-R040 — dashboard view renders configured widgets and not the report runner UI', async () => {
+        renderDashboardViewPage()
+        expect(await screen.findByRole('heading', { name: /executive dashboard/i })).toBeInTheDocument()
+        expect(screen.getByText('Configured widgets only')).toBeInTheDocument()
+        expect(screen.getByText('Created By')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Overview' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Detail' })).toBeInTheDocument()
+        expect(screen.getByText('Premium by Status')).toBeInTheDocument()
+        expect(screen.getByText('Broker Notes')).toBeInTheDocument()
+        expect(screen.getByText('Monitor broker concentration weekly.')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /run report/i })).not.toBeInTheDocument()
+        expect(screen.queryByText(/click "run report" to see results/i)).not.toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R040b — switching dashboard pages shows that page\'s configured slots rather than report results', async () => {
+        renderDashboardViewPage()
+        await screen.findByText('Premium by Status')
+        await userEvent.click(screen.getByRole('button', { name: 'Detail' }))
+        expect(screen.getByText('No widget configured')).toBeInTheDocument()
+        expect(screen.queryByText('Premium by Status')).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /run report/i })).not.toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R042 — dashboard filters rerun live widget queries with the active filter state', async () => {
+        mockGetDashboardWidgetData
+            .mockResolvedValueOnce({ type: 'chart', rows: [{ label: 'Open', values: { gross_premium: 120000 } }] })
+            .mockResolvedValueOnce({ type: 'chart', rows: [{ label: 'Bound', values: { gross_premium: 98000 } }] })
+
+        renderDashboardViewPage()
+
+        expect(await screen.findByRole('button', { name: /dashboard filters/i })).toBeInTheDocument()
+        await userEvent.click(screen.getByRole('button', { name: /dashboard filters/i }))
+        await userEvent.selectOptions(screen.getByLabelText(/analysis basis/i), 'mtd')
+        await userEvent.selectOptions(screen.getByLabelText(/date basis/i), 'submissions::inceptionDate')
+        await userEvent.clear(screen.getByLabelText(/reporting date/i))
+        await userEvent.type(screen.getByLabelText(/reporting date/i), '2026-04-10')
+        await userEvent.click(screen.getByRole('button', { name: /apply filters/i }))
+
+        await waitFor(() => expect(mockGetDashboardWidgetData).toHaveBeenLastCalledWith(
+            expect.objectContaining({ title: 'Premium by Status' }),
+            expect.objectContaining({
+                analysisBasis: 'mtd',
+                dateBasis: 'submissions::inceptionDate',
+                reportingDate: '2026-04-10',
+            }),
+        ))
     })
 })
