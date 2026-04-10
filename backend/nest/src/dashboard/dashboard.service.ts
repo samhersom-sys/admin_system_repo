@@ -95,7 +95,7 @@ export class DashboardService {
         }
     }
 
-    // REQ-DASH-STUB-F-008 â€” real submissions + empty stubs for other types
+    // REQ-DASH-STUB-F-008 — org-scoped recent records across dashboard entity types
     async getRecentRecords(orgCode: string): Promise<any> {
         const submissionRows = await this.dataSource.query(
             `SELECT
@@ -109,7 +109,7 @@ export class DashboardService {
              FROM submission s
              LEFT JOIN party p ON p.id = NULLIF(s."insuredId", '')::integer
              WHERE s."createdByOrgCode" = $1
-             ORDER BY s."createdDate" DESC
+             ORDER BY COALESCE(s.last_opened_date, s."createdDate"::timestamp) DESC
              LIMIT 25`,
             [orgCode],
         )
@@ -120,11 +120,43 @@ export class DashboardService {
                  q.reference,
                  COALESCE(p.name, q.insured) AS "insuredName",
                  q.status,
+                 q.business_type AS "submissionType",
                  COALESCE(q.last_opened_date::timestamptz, q.created_date) AS "lastOpenedDate"
              FROM quotes q
              LEFT JOIN party p ON p.id = NULLIF(q.insured_id, '')::integer
              WHERE q.created_by_org_code = $1
-             ORDER BY q.created_date DESC
+               AND q.deleted_at IS NULL
+             ORDER BY COALESCE(q.last_opened_date::timestamptz, q.created_date) DESC
+             LIMIT 25`,
+            [orgCode],
+        ).catch(() => [])
+
+        const policyRows = await this.dataSource.query(
+            `SELECT
+                 policy.id,
+                 policy.reference,
+                 COALESCE(p.name, policy.insured) AS "insuredName",
+                 policy.status,
+                 COALESCE(policy.last_opened_date::timestamptz, policy.created_date) AS "lastOpenedDate"
+             FROM policies policy
+             LEFT JOIN party p ON p.id = NULLIF(policy.insured_id, '')::integer
+             WHERE policy.created_by_org_code = $1
+               AND policy.deleted_at IS NULL
+             ORDER BY COALESCE(policy.last_opened_date::timestamptz, policy.created_date) DESC
+             LIMIT 25`,
+            [orgCode],
+        ).catch(() => [])
+
+        const bindingAuthorityRows = await this.dataSource.query(
+            `SELECT
+                 ba.id,
+                 ba.reference,
+                 ba.status,
+                 COALESCE(ba.last_opened_date::timestamptz, ba.created_at) AS "lastOpenedDate"
+             FROM binding_authorities ba
+             WHERE ba.created_by_org_code = $1
+               AND ba.deleted_at IS NULL
+             ORDER BY COALESCE(ba.last_opened_date::timestamptz, ba.created_at) DESC
              LIMIT 25`,
             [orgCode],
         ).catch(() => [])
@@ -132,8 +164,8 @@ export class DashboardService {
         return {
             submissions: submissionRows,
             quotes: quoteRows,
-            policies: [],
-            bindingAuthorities: [],
+            policies: policyRows,
+            bindingAuthorities: bindingAuthorityRows,
         }
     }
 }

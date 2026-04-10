@@ -19,11 +19,21 @@ const pool = new Pool({
 async function run() {
     const client = await pool.connect()
     try {
-        await client.query('ALTER TABLE policy_coverages RENAME TO policy_section_coverages')
+        const { rows: [tables] } = await client.query(`
+            SELECT
+                to_regclass('public.policy_coverages') IS NOT NULL AS has_legacy_table,
+                to_regclass('public.policy_section_coverages') IS NOT NULL AS has_new_table
+        `)
 
-        await client.query('ALTER INDEX IF EXISTS idx_policy_coverages_section_id RENAME TO idx_policy_section_coverages_section_id')
-        await client.query('ALTER INDEX IF EXISTS idx_policy_coverages_policy_id RENAME TO idx_policy_section_coverages_policy_id')
-        await client.query('ALTER INDEX IF EXISTS idx_policy_coverages_deleted_at RENAME TO idx_policy_section_coverages_deleted_at')
+        if (tables.has_legacy_table && !tables.has_new_table) {
+            await client.query('ALTER TABLE policy_coverages RENAME TO policy_section_coverages')
+
+            await client.query('ALTER INDEX IF EXISTS idx_policy_coverages_section_id RENAME TO idx_policy_section_coverages_section_id')
+            await client.query('ALTER INDEX IF EXISTS idx_policy_coverages_policy_id RENAME TO idx_policy_section_coverages_policy_id')
+            await client.query('ALTER INDEX IF EXISTS idx_policy_coverages_deleted_at RENAME TO idx_policy_section_coverages_deleted_at')
+        } else if (!tables.has_new_table) {
+            throw new Error('Neither policy_coverages nor policy_section_coverages exists')
+        }
 
         await client.query(`
             ALTER TABLE policy_section_coverages
