@@ -827,7 +827,7 @@ router.post('/:id/sections/:sectionId/coverages', async (req, res) => {
                 excess_currency ?? null, excess_amount ?? null,
                 sum_insured_currency ?? null, sum_insured ?? null,
                 premium_currency ?? null, gross_premium ?? null, net_premium ?? null, tax_receivable ?? null,
-                payload ?? null,
+                payload ?? {},
             ]
         )
         res.status(201).json(inserted[0])
