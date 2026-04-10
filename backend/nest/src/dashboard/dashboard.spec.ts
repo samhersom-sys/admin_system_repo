@@ -82,30 +82,38 @@ describe('DashboardService', () => {
   // REQ-DASH-BE-NE-R02 — getRecentRecords
   // -------------------------------------------------------------------------
   describe('getRecentRecords', () => {
-    it('T-DASH-BE-NE-R02a: queries submissions, quotes, policies and binding authorities scoped to orgCode', async () => {
+    it('T-DASH-BE-NE-R02a: queries audit history first, then returns submissions, quotes, policies and binding authorities scoped to orgCode', async () => {
+      const auditRows = [
+        { entity_type: 'Submission', entity_id: 1, last_opened: '2026-04-10T12:00:00Z' },
+        { entity_type: 'Quote', entity_id: 2, last_opened: '2026-04-10T11:00:00Z' },
+        { entity_type: 'Policy', entity_id: 3, last_opened: '2026-04-10T10:00:00Z' },
+        { entity_type: 'BindingAuthority', entity_id: 4, last_opened: '2026-04-10T09:00:00Z' },
+      ]
       const submissions = [{ id: 1, reference: 'SUB-TST-001' }]
       const quotes = [{ id: 2, reference: 'QUO-TST-001' }]
       const policies = [{ id: 3, reference: 'POL-TST-001' }]
       const bindingAuthorities = [{ id: 4, reference: 'BA-TST-001' }]
       mockDataSource.query
+        .mockResolvedValueOnce(auditRows)   // audit query
         .mockResolvedValueOnce(submissions) // submissions query
         .mockResolvedValueOnce(quotes)      // quotes query
         .mockResolvedValueOnce(policies)    // policies query
         .mockResolvedValueOnce(bindingAuthorities) // binding authorities query
 
       const result = await service.getRecentRecords('TST')
-      expect(result.submissions).toEqual(submissions)
-      expect(result.quotes).toEqual(quotes)
-      expect(result.policies).toEqual(policies)
-      expect(result.bindingAuthorities).toEqual(bindingAuthorities)
+      expect(result.submissions[0]).toMatchObject({ id: 1, reference: 'SUB-TST-001', lastOpenedDate: '2026-04-10T12:00:00Z' })
+      expect(result.quotes[0]).toMatchObject({ id: 2, reference: 'QUO-TST-001', lastOpenedDate: '2026-04-10T11:00:00Z' })
+      expect(result.policies[0]).toMatchObject({ id: 3, reference: 'POL-TST-001', lastOpenedDate: '2026-04-10T10:00:00Z' })
+      expect(result.bindingAuthorities[0]).toMatchObject({ id: 4, reference: 'BA-TST-001', lastOpenedDate: '2026-04-10T09:00:00Z' })
     })
 
-    it('T-DASH-BE-NE-R02b: returns empty arrays for optional entity queries when they fail', async () => {
+    it('T-DASH-BE-NE-R02b: falls back to createdDate ordering when no audit history exists', async () => {
       mockDataSource.query
-        .mockResolvedValueOnce([]) // submissions
-        .mockResolvedValueOnce([]) // quotes
-        .mockRejectedValueOnce(new Error('policies failed'))
-        .mockRejectedValueOnce(new Error('binding authorities failed'))
+        .mockResolvedValueOnce([]) // audit query
+        .mockResolvedValueOnce([]) // submissions fallback
+        .mockResolvedValueOnce([]) // quotes fallback
+        .mockResolvedValueOnce([]) // policies fallback
+        .mockResolvedValueOnce([]) // binding authorities fallback
 
       const result = await service.getRecentRecords('TST')
       expect(result.policies).toEqual([])
@@ -118,14 +126,18 @@ describe('DashboardService', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
 
       await service.getRecentRecords('MYORG')
       const firstCall = mockDataSource.query.mock.calls[0]
-      expect(firstCall[1]).toEqual(['MYORG'])
+      const secondCall = mockDataSource.query.mock.calls[1]
+      expect(firstCall[0]).toContain('FROM public.audit_event')
+      expect(secondCall[1]).toEqual(['MYORG'])
     })
 
     it('T-DASH-BE-NE-R02d: returns empty quotes array when quotes query fails', async () => {
       mockDataSource.query
+        .mockResolvedValueOnce([]) // audit query
         .mockResolvedValueOnce([]) // submissions OK
         .mockRejectedValueOnce(new Error('DB error')) // quotes fail — caught by .catch(() => [])
         .mockResolvedValueOnce([]) // policies OK
@@ -135,16 +147,17 @@ describe('DashboardService', () => {
       expect(result.quotes).toEqual([])
     })
 
-    it('T-DASH-BE-NE-R02e: orders submissions by lastOpenedDate fallback rather than createdDate alone', async () => {
+    it('T-DASH-BE-NE-R02e: reads recent activity from audit_event before entity fallbacks', async () => {
       mockDataSource.query
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
 
       await service.getRecentRecords('TST')
-      const [submissionSql] = mockDataSource.query.mock.calls[0]
-      expect(submissionSql).toContain('ORDER BY COALESCE(s.last_opened_date, s."createdDate"::timestamp) DESC')
+      const [auditSql] = mockDataSource.query.mock.calls[0]
+      expect(auditSql).toContain('FROM public.audit_event')
     })
   })
 })
