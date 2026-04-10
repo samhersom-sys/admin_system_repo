@@ -7,6 +7,7 @@ import { DATA_SOURCES, getFieldMappings } from './field-mappings'
 
 type DashboardWidgetRequest = {
     type: 'metric' | 'chart' | 'table' | 'text'
+    source?: string | null
     metric?: string | null
     attribute?: string | null
     yAxisAttribute?: string | null
@@ -70,6 +71,10 @@ function parseCompositeField(value: string): { source: string; key: string } | n
     const [source, key] = value.split('::')
     if (!source || !key) return null
     return { source, key }
+}
+
+function unique<T>(values: T[]): T[] {
+    return Array.from(new Set(values))
 }
 
 function titleFromKey(value: string): string {
@@ -354,20 +359,21 @@ export class ReportingService {
             return { type: 'text' }
         }
 
-        const resolvedSource = this.resolveWidgetSource(widget)
-        const sourceConfig = DATA_SOURCES[resolvedSource]
-        if (!sourceConfig) {
-            throw new BadRequestException('Unsupported widget data source')
-        }
+        const sources = this.resolveWidgetSources(widget)
 
         if (widget.type === 'metric') {
+            const resolvedSource = sources[0]
+            const sourceConfig = DATA_SOURCES[resolvedSource]
+            if (!sourceConfig) {
+                throw new BadRequestException('Unsupported widget data source')
+            }
             return this.runMetricWidget(orgCode, sourceConfig, widget, filters)
         }
         if (widget.type === 'chart') {
-            return this.runChartWidget(orgCode, sourceConfig, widget, filters)
+            return this.runChartWidget(orgCode, sources, widget, filters)
         }
         if (widget.type === 'table') {
-            return this.runTableWidget(orgCode, sourceConfig, widget, filters)
+            return this.runTableWidget(orgCode, sources, widget, filters)
         }
 
         throw new BadRequestException('Unsupported widget type')
@@ -386,7 +392,7 @@ export class ReportingService {
         await this.historyRepo.save(h)
     }
 
-    private resolveWidgetSource(widget: DashboardWidgetRequest): string {
+    private resolveWidgetSources(widget: DashboardWidgetRequest): string[] {
         const values = [
             widget.metric,
             widget.attribute,
@@ -396,28 +402,42 @@ export class ReportingService {
             ...(widget.attributes ?? []),
         ].filter(Boolean) as string[]
 
-        const sources = Array.from(new Set(values.map((value) => parseCompositeField(value)?.source).filter(Boolean)))
+        const sources = unique(values.map((value) => parseCompositeField(value)?.source).filter(Boolean) as string[])
         if (sources.length === 0) {
+            if (widget.source && DATA_SOURCES[widget.source]) {
+                return [widget.source]
+            }
             throw new BadRequestException('Widget has no live data fields configured')
         }
-        if (sources.length > 1) {
-            throw new BadRequestException('Live widget queries support one data source per widget')
+        const unsupportedSource = sources.find((source) => !DATA_SOURCES[source])
+        if (unsupportedSource) {
+            throw new BadRequestException('Unsupported widget data source')
         }
-        return sources[0] as string
+        return sources
     }
 
-    private resolveFieldRef(source: string, compositeKey: string | null | undefined): ResolvedFieldRef {
+    private tryResolveFieldRef(
+        source: string,
+        compositeKey: string | null | undefined,
+        allowEquivalentKey = false,
+    ): ResolvedFieldRef | null {
         if (!compositeKey) {
             throw new BadRequestException('Widget field is required')
         }
         const parsed = parseCompositeField(compositeKey)
-        if (!parsed || parsed.source !== source) {
-            throw new BadRequestException('Widget field source does not match widget source')
+        if (!parsed) {
+            throw new BadRequestException('Widget field is required')
         }
         const sourceConfig = DATA_SOURCES[source]
-        const fieldDef = sourceConfig?.fields.find((field) => field.key === parsed.key)
+        if (!sourceConfig) {
+            throw new BadRequestException('Unsupported widget data source')
+        }
+        if (!allowEquivalentKey && parsed.source !== source) {
+            throw new BadRequestException('Widget field source does not match widget source')
+        }
+        const fieldDef = sourceConfig.fields.find((field) => field.key === parsed.key)
         if (!fieldDef) {
-            throw new BadRequestException(`Unsupported widget field: ${compositeKey}`)
+            return null
         }
         return {
             source,
@@ -428,30 +448,52 @@ export class ReportingService {
         }
     }
 
+    private resolveFieldRef(source: string, compositeKey: string | null | undefined): ResolvedFieldRef {
+        const field = this.tryResolveFieldRef(source, compositeKey, false)
+        if (!field) {
+            throw new BadRequestException(`Unsupported widget field: ${compositeKey}`)
+        }
+        return field
+    }
+
+    private resolveEquivalentFieldRef(source: string, compositeKey: string | null | undefined): ResolvedFieldRef | null {
+        return this.tryResolveFieldRef(source, compositeKey, true)
+    }
+
     private buildWidgetWhereClause(
         orgCode: string,
         source: string,
         filters?: DashboardFilterRequest,
+        allowEquivalentKeys = false,
     ): { clause: string; params: unknown[] } {
         const sourceConfig = DATA_SOURCES[source]
         const params: unknown[] = [orgCode]
         const wheres: string[] = [`${sourceConfig.orgCol} = $1`]
 
         if (filters?.dateBasis && filters.reportingDate) {
-            const dateField = this.resolveFieldRef(source, filters.dateBasis)
-            const window = computeAnalysisWindow(filters.analysisBasis, filters.reportingDate)
-            if (window.start) {
-                params.push(window.start)
-                wheres.push(`CAST(${dateField.col} AS date) >= $${params.length}`)
-            }
-            if (window.end) {
-                params.push(window.end)
-                wheres.push(`CAST(${dateField.col} AS date) <= $${params.length}`)
+            const dateField = allowEquivalentKeys
+                ? this.resolveEquivalentFieldRef(source, filters.dateBasis)
+                : this.resolveFieldRef(source, filters.dateBasis)
+            if (dateField) {
+                const window = computeAnalysisWindow(filters.analysisBasis, filters.reportingDate)
+                if (window.start) {
+                    params.push(window.start)
+                    wheres.push(`CAST(${dateField.col} AS date) >= $${params.length}`)
+                }
+                if (window.end) {
+                    params.push(window.end)
+                    wheres.push(`CAST(${dateField.col} AS date) <= $${params.length}`)
+                }
             }
         }
 
         for (const customFilter of filters?.customAttributes ?? []) {
-            const field = this.resolveFieldRef(source, customFilter.field)
+            const field = allowEquivalentKeys
+                ? this.resolveEquivalentFieldRef(source, customFilter.field)
+                : this.resolveFieldRef(source, customFilter.field)
+            if (!field) {
+                continue
+            }
             const operator = (customFilter.operator ?? 'equals').toLowerCase()
             if (operator === 'equals') {
                 params.push(customFilter.value)
@@ -484,6 +526,19 @@ export class ReportingService {
         return { clause: wheres.join(' AND '), params }
     }
 
+    private buildMeasureAlias(field: ResolvedFieldRef | null, aggregation: DashboardWidgetRequest['aggregation']): string {
+        const normalizedAggregation = aggregation ?? 'count'
+        if (!field) {
+            return 'value_count'
+        }
+        return `value_${normalizedAggregation}_${field.key}`
+    }
+
+    private normalizeMeasureAlias(alias: string): string {
+        if (alias === 'value_count') return 'count'
+        return alias.replace(/^value_[^_]+_?/, '') || 'count'
+    }
+
     private buildAggregateExpression(field: ResolvedFieldRef | null, aggregation: DashboardWidgetRequest['aggregation']): string {
         const normalizedAggregation = aggregation ?? 'count'
         if (normalizedAggregation === 'count' || !field) {
@@ -505,7 +560,7 @@ export class ReportingService {
         widget: DashboardWidgetRequest,
         filters?: DashboardFilterRequest,
     ): Promise<Record<string, unknown>> {
-        const source = this.resolveWidgetSource(widget)
+        const source = this.resolveWidgetSources(widget)[0]
         const metricField = widget.metric ? this.resolveFieldRef(source, widget.metric) : null
         const aggregateExpr = this.buildAggregateExpression(metricField, widget.aggregation)
         const where = this.buildWidgetWhereClause(orgCode, source, filters)
@@ -520,59 +575,117 @@ export class ReportingService {
 
     private async runChartWidget(
         orgCode: string,
-        sourceConfig: typeof DATA_SOURCES[string],
+        sources: string[],
         widget: DashboardWidgetRequest,
         filters?: DashboardFilterRequest,
     ): Promise<Record<string, unknown>> {
-        const source = this.resolveWidgetSource(widget)
-        const attribute = this.resolveFieldRef(source, widget.attribute)
-        const legend = widget.legendAttribute ? this.resolveFieldRef(source, widget.legendAttribute) : null
-
         const rawMeasures = Array.from(new Set([...(widget.measures ?? []), widget.yAxisAttribute].filter(Boolean))) as string[]
-        const measures = rawMeasures.length > 0
-            ? rawMeasures.map((measure) => this.resolveFieldRef(source, measure))
-            : []
+        const mergedRows = new Map<string, { label: string; series?: string; values: Record<string, number> }>()
 
-        const measureSelects = (measures.length > 0 ? measures : [null]).map((measure) => {
-            const alias = measure ? `value_${(widget.aggregation ?? 'count')}_${measure.key}` : 'value_count'
-            return `${this.buildAggregateExpression(measure, widget.aggregation)} AS "${alias}"`
-        })
+        for (const source of sources) {
+            const sourceConfig = DATA_SOURCES[source]
+            const attribute = this.resolveEquivalentFieldRef(source, widget.attribute)
+            if (!attribute) {
+                continue
+            }
+            const legend = widget.legendAttribute ? this.resolveEquivalentFieldRef(source, widget.legendAttribute) : null
+            const sourceMeasures = rawMeasures
+                .filter((measure) => parseCompositeField(measure)?.source === source)
+                .map((measure) => this.resolveFieldRef(source, measure))
 
-        const where = this.buildWidgetWhereClause(orgCode, source, filters)
-        const legendSelect = legend ? `, COALESCE(CAST(${legend.col} AS text), 'Unspecified') AS series` : ''
-        const legendGroup = legend ? `, ${legend.col}` : ''
-        const sql = `SELECT COALESCE(CAST(${attribute.col} AS text), 'N/A') AS label${legendSelect}, ${measureSelects.join(', ')} FROM ${sourceConfig.table} WHERE ${where.clause} GROUP BY ${attribute.col}${legendGroup} ORDER BY label ASC`
-        const rows = await this.dataSource.query(sql, where.params)
+            if (sourceMeasures.length === 0 && (widget.aggregation ?? 'count') !== 'count') {
+                continue
+            }
+
+            const measureSelects = (sourceMeasures.length > 0 ? sourceMeasures : [null]).map((measure) => {
+                const alias = this.buildMeasureAlias(measure, widget.aggregation)
+                return `${this.buildAggregateExpression(measure, widget.aggregation)} AS "${alias}"`
+            })
+
+            const where = this.buildWidgetWhereClause(orgCode, source, filters, sources.length > 1)
+            const legendSelect = legend ? `, COALESCE(CAST(${legend.col} AS text), 'Unspecified') AS series` : ''
+            const legendGroup = legend ? `, ${legend.col}` : ''
+            const sql = `SELECT COALESCE(CAST(${attribute.col} AS text), 'N/A') AS label${legendSelect}, ${measureSelects.join(', ')} FROM ${sourceConfig.table} WHERE ${where.clause} GROUP BY ${attribute.col}${legendGroup} ORDER BY label ASC`
+            const rows = await this.dataSource.query(sql, where.params)
+
+            for (const row of rows) {
+                const label = String(row.label ?? 'N/A')
+                const series = row.series ? String(row.series) : undefined
+                const key = `${label}::${series ?? ''}`
+                const existing = mergedRows.get(key) ?? { label, ...(series ? { series } : {}), values: {} }
+                for (const [fieldKey, value] of Object.entries(row)) {
+                    if (!fieldKey.startsWith('value_')) continue
+                    const normalizedKey = this.normalizeMeasureAlias(fieldKey)
+                    existing.values[normalizedKey] = (existing.values[normalizedKey] ?? 0) + Number(value ?? 0)
+                }
+                mergedRows.set(key, existing)
+            }
+        }
 
         return {
             type: 'chart',
-            rows: rows.map((row: Record<string, unknown>) => ({
-                label: String(row.label ?? 'N/A'),
-                ...(row.series ? { series: String(row.series) } : {}),
-                values: Object.fromEntries(
-                    Object.entries(row)
-                        .filter(([key]) => key.startsWith('value_'))
-                        .map(([key, value]) => [key.replace(/^value_[^_]+_?/, ''), Number(value ?? 0)]),
-                ),
-            })),
+            rows: Array.from(mergedRows.values()).sort((left, right) => left.label.localeCompare(right.label)),
         }
     }
 
     private async runTableWidget(
         orgCode: string,
-        sourceConfig: typeof DATA_SOURCES[string],
+        sources: string[],
         widget: DashboardWidgetRequest,
         filters?: DashboardFilterRequest,
     ): Promise<Record<string, unknown>> {
-        const source = this.resolveWidgetSource(widget)
         const attributes = Array.from(new Set(widget.attributes ?? []))
         if (attributes.length === 0) {
             throw new BadRequestException('Table widgets require attributes')
         }
-        const columns = attributes.map((attribute) => this.resolveFieldRef(source, attribute))
-        const where = this.buildWidgetWhereClause(orgCode, source, filters)
-        const sql = `SELECT ${columns.map((column) => `${column.col} AS "${column.key}"`).join(', ')} FROM ${sourceConfig.table} WHERE ${where.clause} LIMIT 100`
-        const rows = await this.dataSource.query(sql, where.params)
+
+        const groupedAttributes = new Map<string, string[]>()
+        for (const attribute of attributes) {
+            const parsed = parseCompositeField(attribute)
+            if (!parsed) {
+                throw new BadRequestException(`Unsupported widget field: ${attribute}`)
+            }
+            const bucket = groupedAttributes.get(parsed.source) ?? []
+            bucket.push(attribute)
+            groupedAttributes.set(parsed.source, bucket)
+        }
+
+        if (groupedAttributes.size === 1) {
+            const source = sources[0]
+            const sourceConfig = DATA_SOURCES[source]
+            const columns = attributes.map((attribute) => this.resolveFieldRef(source, attribute))
+            const where = this.buildWidgetWhereClause(orgCode, source, filters)
+            const sql = `SELECT ${columns.map((column) => `${column.col} AS "${column.key}"`).join(', ')} FROM ${sourceConfig.table} WHERE ${where.clause} LIMIT 100`
+            const rows = await this.dataSource.query(sql, where.params)
+            return {
+                type: 'table',
+                rows,
+            }
+        }
+
+        const requestedKeys = unique(attributes.map((attribute) => parseCompositeField(attribute)?.key).filter(Boolean) as string[])
+        const rows: Record<string, unknown>[] = []
+
+        for (const source of sources) {
+            const sourceConfig = DATA_SOURCES[source]
+            const sourceAttributes = groupedAttributes.get(source) ?? []
+            if (sourceAttributes.length === 0) continue
+            const columns = sourceAttributes.map((attribute) => this.resolveFieldRef(source, attribute))
+            const where = this.buildWidgetWhereClause(orgCode, source, filters, true)
+            const sql = `SELECT ${columns.map((column) => `${column.col} AS "${column.key}"`).join(', ')} FROM ${sourceConfig.table} WHERE ${where.clause} LIMIT 100`
+            const sourceRows = await this.dataSource.query(sql, where.params)
+            for (const sourceRow of sourceRows) {
+                const combinedRow: Record<string, unknown> = { source: titleFromKey(source) }
+                for (const key of requestedKeys) {
+                    combinedRow[key] = ''
+                }
+                for (const column of columns) {
+                    combinedRow[column.key] = sourceRow[column.key] ?? ''
+                }
+                rows.push(combinedRow)
+            }
+        }
+
         return {
             type: 'table',
             rows,

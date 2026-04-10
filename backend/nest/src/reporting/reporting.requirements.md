@@ -103,27 +103,28 @@ Error responses:
 The existing report template CRUD and report execution routes shall keep their current behaviour.
 
 ### R02 — Widget Data Route
-`POST /api/dashboards/widgets/data` shall accept a saved widget config and optional dashboard filter state, derive a single allowed data source from the composite field keys used by that widget, and return a live-data payload for that widget type.
+`POST /api/dashboards/widgets/data` shall accept a saved widget config and optional dashboard filter state, derive one or more allowed data sources from the composite field keys used by that widget, and return a live-data payload for that widget type.
 
 Acceptance criteria:
 - Queries use only allow-listed tables and columns from the reporting semantic layer.
 - The tenant/org filter is always enforced from the authenticated JWT context, never from the request body.
 - The endpoint returns HTTP `200` with an empty success shape when the query is valid but no rows match.
 
-### R03 — Mixed-Source Guard
-If one widget request references fields from more than one distinct data source, the endpoint shall reject the request with HTTP `400` and a clear error message instead of fabricating merged data.
+### R03 — Mixed-Source Widgets
+If one widget request references fields from more than one distinct data source, the endpoint shall execute each participating source through the allow-listed semantic layer and combine the results using a widget-type-specific merge strategy instead of rejecting the request.
 
 Acceptance criteria:
 - A metric widget with `metric: 'policies::grossWrittenPremium'` is valid.
-- A chart widget mixing `submissions::status` and `quotes::quotedPremium` is rejected with `400`.
+- A chart widget mixing `submissions::status` and `policies::grossWrittenPremium` returns a combined chart response by reusing the shared logical field key where available.
+- A table widget mixing `submissions::reference` and `parties::name` returns rows from both sources with an explicit `source` column rather than a fake joined record.
 
 ### R04 — Dashboard Filters
-The widget-data endpoint shall apply dashboard-level filter state to the widget query when the filter field belongs to the widget's single resolved source.
+The widget-data endpoint shall apply dashboard-level filter state to each participating source query when the filter field belongs to that source or can be matched by logical field key on that source.
 
 Acceptance criteria:
 - `dateBasis + reportingDate + analysisBasis` narrow the query window before aggregation.
 - `customAttributes` apply allow-listed operators only.
-- Filters targeting another source are rejected with `400`.
+- Filters that do not map onto a given source are skipped for that source without breaking the rest of the widget query.
 
 ### R05 — Response Shapes
 The endpoint shall return stable type-specific JSON shapes so the frontend can distinguish metric, chart, table, and text widgets without parsing ad hoc structures.
