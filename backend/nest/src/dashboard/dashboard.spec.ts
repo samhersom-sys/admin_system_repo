@@ -171,5 +171,26 @@ describe('DashboardService', () => {
       const [auditSql] = mockDataSource.query.mock.calls[0]
       expect(auditSql).toContain('FROM public.audit_event')
     })
+
+    it('T-DASH-BE-NE-R02f: guards party joins against non-numeric insured ids', async () => {
+      mockDataSource.query
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+
+      await service.getRecentRecords('TST')
+
+      const [, submissionSql] = mockDataSource.query.mock.calls[1]
+      void submissionSql
+      const [submissionQuery] = mockDataSource.query.mock.calls[1]
+      const [quoteQuery] = mockDataSource.query.mock.calls[2]
+      const [policyQuery] = mockDataSource.query.mock.calls[3]
+
+      expect(submissionQuery).toContain("COALESCE(s.\"insuredId\", '') ~ '^[0-9]+$'")
+      expect(quoteQuery).toContain("COALESCE(q.insured_id, '') ~ '^[0-9]+$'")
+      expect(policyQuery).toContain("COALESCE(policy.insured_id, '') ~ '^[0-9]+$'")
+    })
   })
 })
