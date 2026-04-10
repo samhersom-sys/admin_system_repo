@@ -219,6 +219,26 @@ export default function SubmissionViewPage() {
         }
     }, [submission?.id, isCascadeLocked, addNotification])
 
+    useEffect(() => {
+        if (!submission?.id) return
+
+        post('/api/audit/event', {
+            entityType: 'Submission',
+            entityId: submission.id,
+            action: 'Submission Opened',
+            details: {},
+        }).catch(() => { })
+
+        return () => {
+            void post('/api/audit/event', {
+                entityType: 'Submission',
+                entityId: submission.id,
+                action: 'Submission Closed',
+                details: {},
+            }).catch(() => { })
+        }
+    }, [submission?.id])
+
     // ── submission:save event ─────────────────────────────────────────────
     useEffect(() => {
         const handleSave = async () => {

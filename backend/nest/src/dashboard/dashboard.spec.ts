@@ -147,6 +147,18 @@ describe('DashboardService', () => {
       expect(result.quotes).toEqual([])
     })
 
+    it('T-DASH-BE-NE-R02da: returns empty submissions array when submissions query fails', async () => {
+      mockDataSource.query
+        .mockResolvedValueOnce([]) // audit query
+        .mockRejectedValueOnce(new Error('DB error')) // submissions fail — caught by .catch(() => [])
+        .mockResolvedValueOnce([]) // quotes OK
+        .mockResolvedValueOnce([]) // policies OK
+        .mockResolvedValueOnce([]) // binding authorities OK
+
+      const result = await service.getRecentRecords('TST')
+      expect(result.submissions).toEqual([])
+    })
+
     it('T-DASH-BE-NE-R02e: reads recent activity from audit_event before entity fallbacks', async () => {
       mockDataSource.query
         .mockResolvedValueOnce([])
