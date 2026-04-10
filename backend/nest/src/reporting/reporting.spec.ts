@@ -368,12 +368,25 @@ describe('ReportingService', () => {
             expect(mockDataSource.query).not.toHaveBeenCalled()
         })
 
-        it('rejects mixed-source widgets', async () => {
-            await expect(service.getDashboardWidgetData('TST', {
+        it('supports mixed-source chart widgets by querying each source and merging rows by label', async () => {
+            mockDataSource.query
+                .mockResolvedValueOnce([{ label: 'Active', value_sum_grossWrittenPremium: '1000.00' }])
+
+            const result = await service.getDashboardWidgetData('TST', {
                 type: 'chart',
                 attribute: 'submissions::status',
                 measures: ['policies::grossWrittenPremium'],
-            }, undefined)).rejects.toThrow(BadRequestException)
+                aggregation: 'sum',
+            }, undefined)
+
+            expect(result).toEqual({
+                type: 'chart',
+                rows: [{ label: 'Active', values: { grossWrittenPremium: 1000 } }],
+            })
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('FROM policies'),
+                expect.arrayContaining(['TST']),
+            )
         })
 
         it('executes a metric query for a single-source widget', async () => {
@@ -411,6 +424,25 @@ describe('ReportingService', () => {
                 expect.stringContaining('inception_date'),
                 expect.arrayContaining(['TST']),
             )
+        })
+
+        it('supports mixed-source table widgets by returning rows for each source with an explicit source column', async () => {
+            mockDataSource.query
+                .mockResolvedValueOnce([{ reference: 'SUB-1' }])
+                .mockResolvedValueOnce([{ name: 'Demo Brokers Ltd' }])
+
+            const result = await service.getDashboardWidgetData('TST', {
+                type: 'table',
+                attributes: ['submissions::reference', 'parties::name'],
+            }, undefined)
+
+            expect(result).toEqual({
+                type: 'table',
+                rows: [
+                    { source: 'Submissions', reference: 'SUB-1', name: '' },
+                    { source: 'Parties', reference: '', name: 'Demo Brokers Ltd' },
+                ],
+            })
         })
     })
 })
