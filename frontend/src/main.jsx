@@ -35,11 +35,15 @@ import TrialBalancePage from '@/finance/TrialBalancePage/TrialBalancePage'
 import ReportsListPage from '@/reporting/ReportsListPage/ReportsListPage'
 import ReportCreatePage from '@/reporting/ReportCreatePage/ReportCreatePage'
 import ReportRunPage from '@/reporting/ReportRunPage/ReportRunPage'
+import DashboardCreatePage from '@/reporting/DashboardCreatePage/DashboardCreatePage'
+import DashboardConfigurePage from '@/reporting/DashboardConfigurePage/DashboardConfigurePage'
+import DashboardViewPage from '@/reporting/DashboardViewPage/DashboardViewPage'
 // Binding Authorities
 import BAListPage from '@/binding-authorities/BAListPage/BAListPage'
 import NewBAPage from '@/binding-authorities/NewBAPage/NewBAPage'
 import BAViewPage from '@/binding-authorities/BAViewPage/BAViewPage'
 import BASectionViewPage from '@/binding-authorities/BASectionViewPage/BASectionViewPage'
+import BADocumentsPage from '@/binding-authorities/BADocumentsPage/BADocumentsPage'
 import SettingsPage from '@/settings/index'
 import CompanyListPage from '@/settings/ModuleLicensing/CompanyListPage'
 import CompanyConfigPage from '@/settings/ModuleLicensing/CompanyConfigPage'
@@ -55,6 +59,7 @@ import PartyViewPage from '@/parties/PartyViewPage/PartyViewPage'
 // Claims
 import ClaimsListPage from '@/claims/ClaimsListPage/ClaimsListPage'
 import ClaimViewPage from '@/claims/ClaimViewPage/ClaimViewPage'
+import ClaimCreatePage from '@/claims/ClaimCreatePage/ClaimCreatePage'
 // App shell features
 import HomePage from './home/index'
 // Workflow
@@ -122,11 +127,16 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/binding-authorities/new"                      element={<NewBAPage />} />
           <Route path="/binding-authorities/:id"                      element={<BAViewPage />} />
           <Route path="/binding-authorities/:id/sections/:sectionId" element={<BASectionViewPage />} />
+          <Route path="/binding-authorities/:id/documents"           element={<BADocumentsPage />} />
           {/* Reporting */}
           <Route path="/reports"               element={<ReportsListPage />} />
           <Route path="/reports/create"        element={<ReportCreatePage />} />
           <Route path="/reports/edit/:id"      element={<ReportCreatePage />} />
           <Route path="/reports/run/:reportId" element={<ReportRunPage />} />
+          <Route path="/dashboards/view/:reportId" element={<DashboardViewPage />} />
+          <Route path="/dashboards/create"     element={<DashboardCreatePage />} />
+          <Route path="/dashboards/edit/:id"   element={<DashboardCreatePage />} />
+          <Route path="/dashboards/configure/:id" element={<DashboardConfigurePage />} />
           {/* Finance */}
           <Route path="/finance"                      element={<FinanceHubPage />} />
           <Route path="/finance/cash-batching"        element={<CashBatchingPage />} />
@@ -156,6 +166,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/parties/:id"           element={<PartyViewPage />} />
           {/* Claims */}
           <Route path="/claims"                element={<ClaimsListPage />} />
+          <Route path="/claims/create"         element={<ClaimCreatePage />} />
           <Route path="/claims/:id"            element={<ClaimViewPage />} />
           <Route path="/search"               element={<SearchPage />} />
           <Route path="/profile"              element={<ProfilePage />} />

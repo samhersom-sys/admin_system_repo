@@ -22,7 +22,7 @@ describe('DashboardService', () => {
 
   beforeEach(async () => {
     mockDataSource = {
-      query: jest.fn(),
+      query: jest.fn().mockResolvedValue([]),
     }
 
     const module: TestingModule = await Test.createTestingModule({
@@ -49,16 +49,18 @@ describe('DashboardService', () => {
       expect(service.getPolicies()).toEqual([])
     })
 
-    it('T-DASH-BE-NE-R01c: getPoliciesGwpMonthly returns series stub shape', () => {
-      expect(service.getPoliciesGwpMonthly()).toHaveProperty('series')
+    it('T-DASH-BE-NE-R01c: getPoliciesGwpMonthly returns series stub shape', async () => {
+      const result = await service.getPoliciesGwpMonthly('DEMO')
+      expect(result).toHaveProperty('series')
     })
 
-    it('T-DASH-BE-NE-R01d: getPoliciesGwpCumulative returns series stub shape', () => {
-      expect(service.getPoliciesGwpCumulative()).toHaveProperty('series')
+    it('T-DASH-BE-NE-R01d: getPoliciesGwpCumulative returns series stub shape', async () => {
+      const result = await service.getPoliciesGwpCumulative('DEMO')
+      expect(result).toHaveProperty('series')
     })
 
-    it('T-DASH-BE-NE-R01e: getPoliciesGwpSummary returns orgTotal and userTotal', () => {
-      const result = service.getPoliciesGwpSummary()
+    it('T-DASH-BE-NE-R01e: getPoliciesGwpSummary returns orgTotal and userTotal', async () => {
+      const result = await service.getPoliciesGwpSummary('DEMO', 'admin')
       expect(result).toHaveProperty('orgTotal')
       expect(result).toHaveProperty('userTotal')
     })

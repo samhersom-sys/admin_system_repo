@@ -8,7 +8,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class DashboardController {
-    constructor(private readonly dashboardService: DashboardService) {}
+    constructor(private readonly dashboardService: DashboardService) { }
 
     // REQ-DASH-STUB-F-001
     @Get('quotes')
@@ -20,15 +20,21 @@ export class DashboardController {
 
     // REQ-DASH-STUB-F-003
     @Get('policies/gwp-monthly')
-    getPoliciesGwpMonthly() { return this.dashboardService.getPoliciesGwpMonthly() }
+    getPoliciesGwpMonthly(@Req() req: any) {
+        return this.dashboardService.getPoliciesGwpMonthly(req.user.orgCode)
+    }
 
     // REQ-DASH-STUB-F-004
     @Get('policies/gwp-cumulative')
-    getPoliciesGwpCumulative() { return this.dashboardService.getPoliciesGwpCumulative() }
+    getPoliciesGwpCumulative(@Req() req: any) {
+        return this.dashboardService.getPoliciesGwpCumulative(req.user.orgCode)
+    }
 
     // REQ-DASH-STUB-F-005
     @Get('policies/gwp-summary')
-    getPoliciesGwpSummary() { return this.dashboardService.getPoliciesGwpSummary() }
+    getPoliciesGwpSummary(@Req() req: any) {
+        return this.dashboardService.getPoliciesGwpSummary(req.user.orgCode, req.user.username)
+    }
 
     // REQ-DASH-STUB-F-006
     @Get('binding-authorities')

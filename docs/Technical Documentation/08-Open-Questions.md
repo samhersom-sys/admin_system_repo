@@ -532,6 +532,31 @@ Invoicing components (`InvoiceLineItems`, `InvoiceSummary`) are shared and may b
 
 ---
 
+## OQ-048: policy_coverages — Rename Table or Fix Service?
+
+- **Raised:** 2026-04-09
+- **Status:** Answered — 2026-04-09
+- **Context:** Migration 014 created a table named `policy_coverages`. The NestJS `PoliciesService` already queried it as `policy_section_coverages` — a name mismatch causing a 500 on the policy coverages GET endpoint.
+- **Question:** Should a new migration rename `policy_coverages` → `policy_section_coverages` (consistent with the new `quote_section_coverages` pattern), or should the service be updated to query `policy_coverages`?
+- **Options:**
+  - **A — Rename table:** New migration renames `policy_coverages` → `policy_section_coverages`. Zero-risk (table was empty in all environments).
+  - **B — Fix service:** Change `policy_section_coverages` references in `policies.service.ts` to `policy_coverages`.
+- **Recommendation:** Option A — consistent naming across both domains (`quote_section_coverages` / `policy_section_coverages`).
+- **Answer:** Option A confirmed. Migration 099 renames `policy_coverages` to `policy_section_coverages` and adds the `days_on_cover` column. Applied to local and UAT databases.
+
+---
+
+## OQ-049: Coverage columns — `coverage` or `coverage_name`?
+
+- **Raised:** 2026-04-09
+- **Status:** Answered — 2026-04-09
+- **Context:** Frontend files used `coverage_name` as the field name for the coverage description column. The database column convention in `policy_coverages` / `policy_section_coverages` used `coverage`. These needed to be reconciled.
+- **Question:** Should the column be named `coverage` or `coverage_name`?
+- **Why it matters:** Inconsistency between frontend TypeScript types and database column names causes runtime field mapping errors.
+- **Answer:** Use `coverage` — the field name is self-explanatory in context. All frontend files updated (`coverage_name` → `coverage`) across `quotes.service.ts`, `QuoteSectionViewPage.tsx`, `QuoteCoverageDetailPage.tsx`, `QuoteCoverageSubDetailPage.tsx`, and `quotes.test.tsx`. The `quote_section_coverages` table (migration 100) was created with `coverage TEXT` from the outset.
+
+---
+
 ## OQ-QUO-BE-NE-003: `findOne` — 403 ForbiddenException for org mismatch
 
 - **Raised:** 2026-03-25

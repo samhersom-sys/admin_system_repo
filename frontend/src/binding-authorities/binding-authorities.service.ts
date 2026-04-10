@@ -205,3 +205,28 @@ export async function updateBATransaction(
 export async function getPoliciesForBA(baId: number): Promise<unknown[]> {
     return get<unknown[]>(`/api/policies?binding_authority_id=${baId}`)
 }
+
+// ---------------------------------------------------------------------------
+// API — Coverholder Search (local proxy to avoid cross-domain import)
+// ---------------------------------------------------------------------------
+
+export interface CoverholderParty {
+    id: number
+    name: string
+    type: string
+    orgCode: string
+    reference?: string
+    email?: string
+    phone?: string
+    city?: string
+    [key: string]: unknown
+}
+
+export async function listCoverholders(filters?: { type?: string; search?: string }): Promise<CoverholderParty[]> {
+    const qs = new URLSearchParams()
+    if (filters?.type) qs.set('type', filters.type)
+    if (filters?.search) qs.set('search', filters.search)
+    const query = qs.toString()
+    const url = query ? `/api/parties?${query}` : '/api/parties'
+    return get<CoverholderParty[]>(url)
+}

@@ -360,6 +360,36 @@ describe('PartyViewPage — Classification Fields (read-only)', () => {
     })
 })
 
+describe('PartyViewPage — Classification Fields (editable)', () => {
+    it('T-PAR-VIEW-R044b: SIC fields become editable in edit mode', async () => {
+        renderPage()
+        await waitForPageLoad()
+        act(() => { window.dispatchEvent(new Event('party:edit')) })
+        await waitFor(() => {
+            expect(screen.getByDisplayValue('65120')).toBeInTheDocument()
+            expect(screen.getByDisplayValue('Non-life insurance')).toBeInTheDocument()
+            // SIC Standard becomes a select with current value selected
+            const sicSelect = screen.getByDisplayValue('UK SIC (2007)')
+            expect(sicSelect.tagName).toBe('SELECT')
+        })
+    })
+
+    it('T-PAR-VIEW-R044c: SIC Standard toggles between US and UK options', async () => {
+        renderPage()
+        await waitForPageLoad()
+        act(() => { window.dispatchEvent(new Event('party:edit')) })
+        await waitFor(() => {
+            const sicSelect = screen.getByDisplayValue('UK SIC (2007)')
+            expect(sicSelect).toBeInTheDocument()
+        })
+        const sicSelect = screen.getByDisplayValue('UK SIC (2007)')
+        fireEvent.change(sicSelect, { target: { value: 'US SIC', name: 'sicStandard' } })
+        await waitFor(() => {
+            expect(screen.getByDisplayValue('US SIC (1987)')).toBeInTheDocument()
+        })
+    })
+})
+
 // ═══════════════════════════════════════════════════════════════════════════
 // F-045: Workforce & Financials fields
 // ═══════════════════════════════════════════════════════════════════════════

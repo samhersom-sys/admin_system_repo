@@ -1024,7 +1024,7 @@ export default function QuoteSectionViewPage() {
                             storageKey="table-widths-section-coverages"
                             columns={[
                                 { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 120 },
-                                { key: 'coverage_name', label: 'Coverage Name', sortable: true, defaultWidth: 200 },
+                                { key: 'coverage', label: 'Coverage', sortable: true, defaultWidth: 200 },
                                 { key: 'effective_date', label: 'Effective Date', sortable: true, defaultWidth: 130 },
                                 { key: 'expiry_date', label: 'Expiry Date', defaultWidth: 130 },
                                 { key: 'annual_gross_premium', label: 'Annual Gross Premium', defaultWidth: 170 },
@@ -1045,7 +1045,7 @@ export default function QuoteSectionViewPage() {
                                                         id: Date.now(),
                                                         section_id: Number(sectionId),
                                                         reference: '',
-                                                        coverage_name: '',
+                                                        coverage: '',
                                                         effective_date: null,
                                                         expiry_date: null,
                                                         annual_gross_premium: null,
@@ -1081,7 +1081,7 @@ export default function QuoteSectionViewPage() {
                             renderCell={(key, row) => {
                                 const cov = row as Coverage
                                 if (key === 'reference') return cov.reference || '—'
-                                if (key === 'coverage_name') return cov.coverage_name ?? '—'
+                                if (key === 'coverage') return cov.coverage ?? '—'
                                 if (key === 'effective_date') return cov.effective_date ?? '—'
                                 if (key === 'expiry_date') return cov.expiry_date ?? '—'
                                 if (key === 'annual_gross_premium') return cov.annual_gross_premium?.toLocaleString() ?? '—'

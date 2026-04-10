@@ -10,9 +10,11 @@
 
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { FiSearch } from 'react-icons/fi'
 import { getPolicies } from '@/policies/policies.service'
 import type { Policy } from '@/policies/policies.service'
 import { useNotifications } from '@/shell/NotificationDock'
+import { brandClasses } from '@/shared/lib/design-tokens/brandClasses'
 import ResizableGrid from '@/shared/components/ResizableGrid/ResizableGrid'
 import type { Column, SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
 import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
@@ -39,6 +41,7 @@ const GRID_COLUMNS: Column[] = [
     { key: 'policy_currency', label: 'Currency', sortable: false, defaultWidth: 90 },
     { key: 'gross_premium', label: 'Gross Premium', sortable: true, defaultWidth: 130 },
     { key: 'net_premium', label: 'Net Premium', sortable: true, defaultWidth: 120 },
+    { key: '_action', label: '', sortable: false, defaultWidth: 44 },
 ]
 
 // ---------------------------------------------------------------------------
@@ -83,12 +86,16 @@ export default function PoliciesListPage() {
     function renderCell(key: string, row: unknown): React.ReactNode {
         const p = row as Policy
         if (key === 'reference') {
+            return <span className="font-medium">{p.reference}</span>
+        }
+        if (key === '_action') {
             return (
                 <Link
                     to={`/policies/${p.id}`}
-                    className="text-brand-600 hover:text-brand-800 hover:underline font-medium"
+                    className={`inline-flex items-center justify-center ${brandClasses.icon.actionOpen}`}
+                    aria-label="View record"
                 >
-                    {p.reference}
+                    <FiSearch size={15} aria-hidden="true" />
                 </Link>
             )
         }

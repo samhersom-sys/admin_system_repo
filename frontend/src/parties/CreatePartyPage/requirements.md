@@ -35,9 +35,10 @@ The Create Party Page provides a dedicated full-page form for creating a new par
 
 ### R00 — Sidebar section (Guideline 14, RULE 9)
 
-**REQ-PAR-CREATE-R00a:** The page shall register a contextual sidebar section titled `"Party"` containing two items:
-- **Back** — a navigate item that navigates to `/parties`
+**REQ-PAR-CREATE-R00a:** The page shall register a contextual sidebar section titled `"Party"` containing **one** item:
 - **Save** — an event item that dispatches the `party:save` DOM custom event
+
+> **Note (§14 compliance):** A "Back" item is **not** included in this section. The global sidebar Back button (present on all non-home pages) handles back navigation. Adding a domain-specific Back item would create a duplicate per issue #11 fix (2025-01-xx). See `Sidebar.tsx`: the global Back is rendered for `location.pathname !== '/app-home'`.
 
 ---
 

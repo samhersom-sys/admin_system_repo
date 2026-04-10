@@ -76,7 +76,7 @@ The following NestJS endpoints are covered by this requirements file. All endpoi
 
 **REQ-QUO-BE-NE-F-008:** The `QuotesService.getAudit` method shall delegate to `AuditService.getHistory('Quote', id)`, which returns all `audit_event` rows for the quote mapped to `{ action, user, userId, date, details, changes }` ordered oldest-first. It shall throw `NotFoundException` when the quote does not exist. It shall throw `ForbiddenException` when `orgCode` does not match. No direct `DataSource.query` call shall be made in this method (see OQ-QUO-BE-NE-006).
 
-**REQ-QUO-BE-NE-F-009:** The `QuotesService.postAudit` method shall delegate to `AuditService.writeEvent(body, user)` to write a single audit event for the quote (`entity_type = 'Quote'`, `entity_id = :id`). It shall return `{ success: true, audit, otherUsersOpen }` where `audit` is the full audit history returned by `AuditService.getHistory` and `otherUsersOpen` is the result of concurrent-user detection (see REQ-QUO-BE-NE-F-014). It shall throw `BadRequestException` when `action` is absent or not a string. It shall throw `NotFoundException` when the quote does not exist. It shall throw `ForbiddenException` when `orgCode` does not match. No direct `DataSource.query` call shall be made in this method (see OQ-QUO-BE-NE-006).
+**REQ-QUO-BE-NE-F-009:** The `QuotesService.postAudit` method shall delegate to `AuditService.writeEvent(body, user)` to write a single audit event for the quote (`entityType = 'Quote'`, `entityId = :id`). It shall return the created audit event as `{ id, action, entity_type, entity_id, created_at, otherUsersOpen }` with HTTP status 201. `otherUsersOpen` shall be populated from the `writeEvent` result when the action contains `"Opened"`, and shall be an empty array `[]` otherwise. It shall throw `BadRequestException` when `action` is absent or not a string. It shall throw `NotFoundException` when the quote does not exist. It shall throw `ForbiddenException` when `orgCode` does not match. No direct `DataSource.query` call shall be made in this method. No `getHistory` call is required — the response is the created event, not the full audit history (updated 2026-04-09 — previous shape `{ success, audit, otherUsersOpen }` superseded by RESTful created-resource response).
 
 **REQ-QUO-BE-NE-F-014:** When the `action` in a `POST /api/quotes/:id/audit` request contains the word `"Opened"`, the `postAudit` method shall include `otherUsersOpen: string[]` in the response, populated by `AuditService.detectConcurrentUsers('Quote', id, userName)`. When `action` does not contain `"Opened"`, `otherUsersOpen` shall be an empty array `[]` in the response. (See OQ-AUDIT-001 for rationale.)
 
@@ -91,6 +91,16 @@ The following NestJS endpoints are covered by this requirements file. All endpoi
 **REQ-QUO-BE-NE-F-012:** The `QuotesService.createSection` method shall insert a new row into `quote_sections` with an auto-generated reference derived from the parent quote reference and the next available sequence number (e.g. `{quoteRef}-S01`). It shall throw `BadRequestException` when the parent quote status is `'Bound'` or `'Declined'`. It shall throw `NotFoundException` when the parent quote does not exist. It shall throw `ForbiddenException` when `orgCode` does not match. The response shall be the newly created section row and the HTTP status shall be 201.
 
 **REQ-QUO-BE-NE-F-013:** The `QuotesService.deleteSection` method shall soft-delete the section record by setting `deleted_at = NOW()`. It shall throw `NotFoundException` when the section does not exist for the given `id` and `sectionId`, or has already been soft-deleted. It shall throw `ForbiddenException` when the parent quote's `orgCode` does not match. The response shall be `{ message: 'Section deleted' }`.
+
+### Coverages
+
+**REQ-QUO-BE-NE-F-041:** The `QuotesService.getCoverages` method shall return all `quote_section_coverages` rows where `section_id = :sectionId` and `deleted_at IS NULL`, ordered by `id` ascending. It shall throw `NotFoundException` when the parent quote does not exist for the given `id` and `orgCode`. It shall throw `ForbiddenException` when `orgCode` does not match. **Prerequisite:** migration 100 creates the `quote_section_coverages` table.
+
+**REQ-QUO-BE-NE-F-042:** The `QuotesService.createCoverage` method shall insert a new row into `quote_section_coverages` with an auto-generated `reference` of the form `{sectionRef}-COV-{NNN}` where `NNN` is a 3-digit zero-padded count of existing non-deleted coverages for that section plus one. It shall throw `NotFoundException` when the parent quote does not exist. It shall throw `ForbiddenException` when `orgCode` does not match. The response shall be the created coverage row and the HTTP status shall be 201.
+
+**REQ-QUO-BE-NE-F-043:** The `QuotesService.updateCoverage` method shall apply only the mutable fields from the request body to the identified `quote_section_coverages` row and return the updated record. When both `effective_date` and `expiry_date` are present and non-null in the request body, the server shall compute and persist `days_on_cover = Math.max(0, Math.ceil((new Date(expiry_date) - new Date(effective_date)) / 86400000))`. It shall throw `NotFoundException` when the coverage does not exist for the given `coverageId` and `sectionId`. It shall throw `ForbiddenException` when `orgCode` does not match.
+
+**REQ-QUO-BE-NE-F-044:** The `QuotesService.deleteCoverage` method shall soft-delete the coverage row by setting `deleted_at = NOW()`. It shall throw `NotFoundException` when the coverage does not exist. It shall throw `ForbiddenException` when `orgCode` does not match. The HTTP response status shall be 204 with no body.
 
 ### Security
 
@@ -128,6 +138,10 @@ The following NestJS endpoints are covered by this requirements file. All endpoi
 | REQ-QUO-BE-NE-F-008 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R08a, R08b |
 | REQ-QUO-BE-NE-F-009 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R09a, R09b |
 | REQ-QUO-BE-NE-F-014 | `backend/nest/src/quotes/quotes.spec.ts` | pending — Stage 2 |
+| REQ-QUO-BE-NE-F-041 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R41a, R41b, R41c |
+| REQ-QUO-BE-NE-F-042 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R42a, R42b, R42c, R42d |
+| REQ-QUO-BE-NE-F-043 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R43a, R43b, R43c, R43d |
+| REQ-QUO-BE-NE-F-044 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R44a, R44b, R44c |
 | REQ-QUO-BE-NE-F-010 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R10a, R10b, R10c |
 | REQ-QUO-BE-NE-F-011 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R11a, R11b |
 | REQ-QUO-BE-NE-F-012 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R12a, R12b, R12c |

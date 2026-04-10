@@ -7,8 +7,9 @@
 
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { FiPlus } from 'react-icons/fi'
+import { FiPlus, FiSearch } from 'react-icons/fi'
 import { useNotifications } from '@/shell/NotificationDock'
+import { brandClasses } from '@/shared/lib/design-tokens/brandClasses'
 import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
 import { getBindingAuthorities, type BindingAuthority, type BAStatus } from '../binding-authorities.service'
 
@@ -70,26 +71,20 @@ export default function BAListPage() {
                                 <th className="px-4 py-3 font-medium text-gray-600">Inception Date</th>
                                 <th className="px-4 py-3 font-medium text-gray-600">Expiry Date</th>
                                 <th className="px-4 py-3 font-medium text-gray-600">Year of Account</th>
+                                <th className="px-4 py-3" />
                             </tr>
                         </thead>
                         <tbody>
                             {bas.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                                         No binding authorities found.
                                     </td>
                                 </tr>
                             ) : (
                                 bas.map((ba) => (
                                     <tr key={ba.id} className="border-t border-gray-100 hover:bg-gray-100">
-                                        <td className="px-4 py-3">
-                                            <Link
-                                                to={`/binding-authorities/${ba.id}`}
-                                                className="text-brand-600 hover:underline font-medium"
-                                            >
-                                                {ba.reference}
-                                            </Link>
-                                        </td>
+                                        <td className="px-4 py-3 font-medium">{ba.reference}</td>
                                         <td className="px-4 py-3">{ba.coverholder ?? '—'}</td>
                                         <td className="px-4 py-3">
                                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_CLASSES[ba.status]}`}>
@@ -99,6 +94,15 @@ export default function BAListPage() {
                                         <td className="px-4 py-3">{ba.inception_date ?? '—'}</td>
                                         <td className="px-4 py-3">{ba.expiry_date ?? '—'}</td>
                                         <td className="px-4 py-3">{ba.year_of_account ?? '—'}</td>
+                                        <td className="px-4 py-3">
+                                            <Link
+                                                to={`/binding-authorities/${ba.id}`}
+                                                className={`inline-flex items-center justify-center ${brandClasses.icon.actionOpen}`}
+                                                aria-label="View record"
+                                            >
+                                                <FiSearch size={15} aria-hidden="true" />
+                                            </Link>
+                                        </td>
                                     </tr>
                                 ))
                             )}

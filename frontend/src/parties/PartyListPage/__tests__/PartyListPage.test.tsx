@@ -134,3 +134,18 @@ describe('R04 � Create party navigation', () => {
         expect(mockNavigate).toHaveBeenCalledWith('/parties/new')
     })
 })
+// ---------------------------------------------------------------------------
+// R05 — Action icon navigation (REQ-PAR-FE-F-027)
+// ---------------------------------------------------------------------------
+describe('R05 — Action icon navigation', () => {
+    it('T-PAR-LIST-R05a: action icon links to /parties/:id', async () => {
+        mockListParties.mockResolvedValue([
+            { id: 42, name: 'Test Party', type: 'Insured', orgCode: 'DEMO', city: 'London', country: 'UK' },
+        ])
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByText('Test Party')).toBeInTheDocument()
+        })
+        expect(document.querySelector('a[href="/parties/42"]')).not.toBeNull()
+    })
+})

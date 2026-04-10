@@ -11,6 +11,7 @@ import React, { useMemo, useState } from 'react'
 import { FiSearch } from 'react-icons/fi'
 import ResizableGrid from '@/shared/components/ResizableGrid/ResizableGrid'
 import type { Column, SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
+import { brandClasses } from '@/shared/lib/design-tokens/brandClasses'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -42,8 +43,8 @@ function recordUrl(record: SearchRecord): string | null {
   switch (record.entityType) {
     case 'Submission': return `/submissions/${id}`
     case 'Quote': return `/quotes/${id}`
-    case 'Policy': return null
-    case 'BindingAuthority': return null
+    case 'Policy': return `/policies/${id}`
+    case 'BindingAuthority': return `/binding-authorities/${id}`
     case 'Party': return `/parties/${id}`
     case 'Claim': return null
   }
@@ -134,14 +135,7 @@ export default function SearchResults({ records }: SearchResultsProps) {
     const record = row as SearchRecord
     const href = recordUrl(record)
     if (key === 'reference') {
-      if (!href) {
-        return <span>{record.reference ?? '—'}</span>
-      }
-      return (
-        <a href={href} className="text-brand-600 hover:text-brand-800 font-medium">
-          {record.reference ?? '—'}
-        </a>
-      )
+      return <span>{record.reference ?? '—'}</span>
     }
     if (key === '_action') {
       if (!href) {
@@ -150,7 +144,7 @@ export default function SearchResults({ records }: SearchResultsProps) {
       return (
         <a
           href={href}
-          className="inline-flex items-center justify-center text-brand-600 hover:text-brand-800"
+          className={`inline-flex items-center justify-center ${brandClasses.icon.actionOpen}`}
           aria-label="View record"
         >
           <FiSearch size={15} aria-hidden="true" />

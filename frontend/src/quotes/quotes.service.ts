@@ -271,7 +271,7 @@ export interface Coverage {
     id: number
     section_id: number
     reference: string
-    coverage_name: string | null
+    coverage: string | null
     effective_date: string | null
     expiry_date: string | null
     annual_gross_premium: number | null
@@ -281,7 +281,7 @@ export interface Coverage {
 }
 
 export interface CreateCoverageInput {
-    coverage_name?: string
+    coverage?: string
     effective_date?: string
     expiry_date?: string
     annual_gross_premium?: number

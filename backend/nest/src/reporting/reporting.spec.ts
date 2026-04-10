@@ -356,4 +356,61 @@ describe('ReportingService', () => {
             expect(fields.some((f) => f.key === 'name')).toBe(true)
         })
     })
+
+    describe('getDashboardWidgetData', () => {
+        it('returns a noop response for text widgets', async () => {
+            const result = await service.getDashboardWidgetData('TST', {
+                type: 'text',
+                note: 'Commentary',
+            }, undefined)
+
+            expect(result).toEqual({ type: 'text' })
+            expect(mockDataSource.query).not.toHaveBeenCalled()
+        })
+
+        it('rejects mixed-source widgets', async () => {
+            await expect(service.getDashboardWidgetData('TST', {
+                type: 'chart',
+                attribute: 'submissions::status',
+                measures: ['policies::grossWrittenPremium'],
+            }, undefined)).rejects.toThrow(BadRequestException)
+        })
+
+        it('executes a metric query for a single-source widget', async () => {
+            mockDataSource.query.mockResolvedValue([{ value: '245000.50' }])
+
+            const result = await service.getDashboardWidgetData('TST', {
+                type: 'metric',
+                metric: 'policies::grossWrittenPremium',
+                aggregation: 'sum',
+            }, undefined)
+
+            expect(result).toEqual({ type: 'metric', value: 245000.5, label: 'Gross Written Premium' })
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('FROM policies'),
+                expect.arrayContaining(['TST']),
+            )
+        })
+
+        it('applies date filters to chart widget queries', async () => {
+            mockDataSource.query.mockResolvedValue([{ label: 'Active', value_sum_gross_written_premium: '1000.00' }])
+
+            await service.getDashboardWidgetData('TST', {
+                type: 'chart',
+                attribute: 'policies::status',
+                measures: ['policies::grossWrittenPremium'],
+                aggregation: 'sum',
+            }, {
+                analysisBasis: 'mtd',
+                dateBasis: 'policies::inceptionDate',
+                reportingDate: '2026-04-10',
+                customAttributes: [],
+            })
+
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('inception_date'),
+                expect.arrayContaining(['TST']),
+            )
+        })
+    })
 })

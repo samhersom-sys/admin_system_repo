@@ -339,7 +339,39 @@ export default function BASectionViewPage() {
 
             {/* GPI Monitoring tab */}
             {activeTab === 'gpi' && (
-                <p className="text-sm text-gray-400">GPI Monitoring — progress bars coming soon.</p>
+                <div className="flex flex-col gap-4">
+                    {!section.written_premium_limit ? (
+                        <p className="text-sm text-gray-400">
+                            No GPI limit configured for this section. Set a Written Premium Limit on the Coverage tab to enable GPI monitoring.
+                        </p>
+                    ) : (
+                        <div className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col gap-4">
+                            <h3 className="text-sm font-semibold text-gray-700">GPI Limit Monitoring</h3>
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <p className="text-xs text-gray-400">GPI Limit ({section.currency ?? 'GBP'})</p>
+                                    <p className="text-lg font-semibold text-gray-900 mt-0.5">
+                                        {section.written_premium_limit.toLocaleString()}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400">Actual Gross Premium</p>
+                                    <p className="text-lg font-semibold text-gray-900 mt-0.5">—</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">Populated from bordereau data</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400">Usage</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                                            <div className="h-full bg-green-500 rounded-full" style={{ width: '0%' }} />
+                                        </div>
+                                        <span className="text-sm text-gray-500">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             )}
         </div>
     )

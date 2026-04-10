@@ -590,15 +590,47 @@ export default function PartyViewPage() {
                         <div className="grid grid-cols-3 gap-4">
                             <div>
                                 <label className="text-xs font-medium text-gray-600">SIC Standard</label>
-                                <p className="text-sm text-gray-900">{(party.sicStandard as string) || '\u2014'}</p>
+                                {isEditing ? (
+                                    <select
+                                        name="sicStandard"
+                                        value={form.sicStandard}
+                                        onChange={handleFieldChange}
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                                    >
+                                        <option value="US SIC">US SIC (1987)</option>
+                                        <option value="UK SIC">UK SIC (2007)</option>
+                                    </select>
+                                ) : (
+                                    <p className="text-sm text-gray-900">{(party.sicStandard as string) || '\u2014'}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-xs font-medium text-gray-600">SIC Code</label>
-                                <p className="text-sm text-gray-900">{(party.sicCode as string) || '\u2014'}</p>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        name="sicCode"
+                                        value={form.sicCode}
+                                        onChange={handleFieldChange}
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                                    />
+                                ) : (
+                                    <p className="text-sm text-gray-900">{(party.sicCode as string) || '\u2014'}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-xs font-medium text-gray-600">SIC Description</label>
-                                <p className="text-sm text-gray-900">{(party.sicDescription as string) || '\u2014'}</p>
+                                {isEditing ? (
+                                    <input
+                                        type="text"
+                                        name="sicDescription"
+                                        value={form.sicDescription}
+                                        onChange={handleFieldChange}
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                                    />
+                                ) : (
+                                    <p className="text-sm text-gray-900">{(party.sicDescription as string) || '\u2014'}</p>
+                                )}
                             </div>
                         </div>
                     </FieldGroup>

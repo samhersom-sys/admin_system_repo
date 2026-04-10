@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiPlus, FiFileText, FiEdit2, FiTrash2 } from 'react-icons/fi'
+import { FiFileText, FiEdit2, FiTrash2 } from 'react-icons/fi'
 import { FaSearch } from 'react-icons/fa'
 import { useNotifications } from '@/shell/NotificationDock'
 import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
@@ -98,17 +98,7 @@ export default function ReportsListPage() {
 
     return (
         <div className="p-6 flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-800">Report Library</h2>
-                <button
-                    type="button"
-                    onClick={() => navigate('/reports/create')}
-                    className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700"
-                >
-                    <FiPlus />
-                    Create Report
-                </button>
-            </div>
+            <h2 className="text-xl font-semibold text-gray-800">Report Library</h2>
 
             {loading ? (
                 <LoadingSpinner />
@@ -147,10 +137,9 @@ export default function ReportsListPage() {
                                         return (
                                             <button
                                                 type="button"
-                                                onClick={() => { if (t.id > 0) navigate(`/reports/run/${t.id}`) }}
-                                                disabled={t.id <= 0}
-                                                title={t.id <= 0 ? 'Run from the Reports menu once seeded' : 'Run Report'}
-                                                className="p-2 text-gray-600 hover:bg-gray-50 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                                                onClick={() => navigate(`/reports/run/${t.data_source}`)}
+                                                title="Run Report"
+                                                className="p-2 text-brand-500 hover:text-brand-700 hover:bg-brand-50 rounded"
                                             >
                                                 <FaSearch size={14} />
                                             </button>
@@ -191,7 +180,8 @@ export default function ReportsListPage() {
                                         }
                                         if (key === 'description') return <span className="text-gray-600 text-sm">{t.description || '—'}</span>
                                         if (key === 'type') {
-                                            return <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">Report</span>
+                                            const label = t.type === 'dashboard' ? 'Dashboard' : 'Report'
+                                            return <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">{label}</span>
                                         }
                                         if (key === 'created_by') return <span className="text-sm text-gray-600">{t.created_by || '—'}</span>
                                         if (key === 'created_at') {
@@ -202,20 +192,22 @@ export default function ReportsListPage() {
                                             )
                                         }
                                         if (key === 'actions') {
+                                            const primaryActionLabel = t.type === 'dashboard' ? 'View Dashboard' : 'Run Report'
+                                            const primaryActionPath = t.type === 'dashboard' ? `/dashboards/view/${t.id}` : `/reports/run/${t.id}`
                                             return (
                                                 <div className="inline-flex items-center gap-2">
                                                     <button
                                                         type="button"
-                                                        onClick={() => navigate(`/reports/run/${t.id}`)}
-                                                        className="p-2 text-gray-600 hover:bg-gray-50 rounded"
-                                                        title="Run Report"
+                                                        onClick={() => navigate(primaryActionPath)}
+                                                        className="p-2 text-brand-500 hover:text-brand-700 hover:bg-brand-50 rounded"
+                                                        title={primaryActionLabel}
                                                     >
                                                         <FaSearch size={14} />
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => navigate(`/reports/edit/${t.id}`)}
-                                                        className="p-2 text-gray-600 hover:bg-gray-50 rounded"
+                                                        onClick={() => navigate(t.type === 'dashboard' ? `/dashboards/edit/${t.id}` : `/reports/edit/${t.id}`)}
+                                                        className="p-2 text-brand-500 hover:text-brand-700 hover:bg-brand-50 rounded"
                                                         title="Edit Report"
                                                     >
                                                         <FiEdit2 size={14} />
@@ -223,7 +215,7 @@ export default function ReportsListPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleDelete(t)}
-                                                        className="p-2 text-gray-600 hover:bg-gray-50 rounded"
+                                                        className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                                                         title="Delete Report"
                                                     >
                                                         <FiTrash2 size={14} />

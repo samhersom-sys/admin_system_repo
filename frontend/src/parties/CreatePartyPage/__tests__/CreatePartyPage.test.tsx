@@ -46,11 +46,11 @@ beforeEach(() => {
 // R00 � Sidebar section (RULE 9)
 // ---------------------------------------------------------------------------
 describe('R00 � Sidebar section', () => {
-    it('T-PAR-CREATE-R00a: registers sidebar section with Back and Save items', () => {
+    it('T-PAR-CREATE-R00a: registers sidebar section with Save only (§14 — global Back handles all back navigation)', () => {
         renderPage()
         const section = mockUseSidebarSection.mock.calls[0]?.[0]
         expect(section.title).toBe('Party')
-        expect(section.items).toContainEqual(expect.objectContaining({ label: 'Back', to: '/parties' }))
+        expect(section.items).not.toContainEqual(expect.objectContaining({ label: 'Back' }))
         expect(section.items).toContainEqual(expect.objectContaining({ label: 'Save', event: 'party:save' }))
     })
 })

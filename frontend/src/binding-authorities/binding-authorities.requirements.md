@@ -189,6 +189,9 @@ Sources read from `policy-forge-chat (BackUp)/`:
 - `Save` action — visible when status is `"Draft"`
 - `Issue BA` action — visible when status is `"Draft"`, transitions status to `"Active"`
 - `Create Amendment` action — visible when status is `"Active"` or `"Bound"`
+- `Documents` link — always visible, navigates to `/binding-authorities/:id/documents`
+- `Create Party` link — always visible, navigates to `/parties/new` (§14 — cross-domain party creation from BA context)
+- `Renew BA Contract` link — always visible, fires `ba:renew` event; handler navigates to `/binding-authorities/new` to create a renewal (BackUp: FiRepeat icon)
 - `Back to Submission` link — visible when `submission_id` is set
 
 **REQ-BA-FE-F-021:** The BA view page shall render an inline error message on load failure (404 or network error).
@@ -215,9 +218,9 @@ Sources read from `policy-forge-chat (BackUp)/`:
 
 ### 4.4 BAViewPage — Sections Tab
 
-**REQ-BA-FE-F-031:** The Sections tab shall load section data via `GET /api/binding-authorities/:id/sections` on page mount (not gated by tab selection) and render the returned records in an `app-table` table wrapped in `table-wrapper`. The table shall display the following columns: Reference (linked to `/binding-authorities/:id/sections/:sectionId` per §14.7 RULE 9), Class of Business, Effective Date, Expiry Date, Days on Cover (computed), Limit Currency, Limit Amount, Excess Currency, Excess Amount, Sum Insured Currency, Sum Insured, Premium Currency, Time Basis. The `<thead>` shall always be rendered (per §14.7 RULE 8). When the array is empty, the `<tbody>` shall render a single colspan row with `"No sections found."`.
+**REQ-BA-FE-F-031:** The Sections tab shall load section data via `GET /api/binding-authorities/:id/sections` on page mount (not gated by tab selection) and render the returned records in an `app-table` table wrapped in `table-wrapper`. The table shall display the following columns (using current BASection data model fields): Reference (linked to `/binding-authorities/:id/sections/:sectionId` per §14.7 RULE 9), Class of Business, Inception Date, Expiry Date, Time Basis (`time_basis` field), Maximum Period of Insurance (days) (`days_on_cover` field), Settlement Premium Currency (`currency` field), Gross Premium Income Limit (`written_premium_limit` field). Deferred columns (not in current data model — Block 3): Effective Date, financial view Gross Premium / Net Premium / Limit Amount / Sum Insured (Whole/Market/Line toggle), GPI Limit Currency. The `<thead>` shall always be rendered (per §14.7 RULE 8). When the array is empty, the `<tbody>` shall render a single colspan row with `"No sections found."`.
 
-**REQ-BA-FE-F-032:** When the BA status is `"Draft"`, the Sections tab shall render an `"+ Add Section"` button that calls `POST /api/binding-authorities/:id/sections`. On a 201 response the returned section shall be prepended to the grid. Each section row shall have a delete button that calls `DELETE /api/binding-authority-sections/:sectionId`; on a 204 response the row shall be removed. Both actions shall be hidden when the BA is not `"Draft"`.
+**REQ-BA-FE-F-032:** When the BA status is `"Draft"`, the Sections table `<thead>` actions column shall render a `FiPlus` icon button (`title="Add Section"`) that triggers an inline add row. When clicked, a new inline edit row shall appear in the table body. Confirming calls `POST /api/binding-authorities/:id/sections`; on a 201 response the returned section shall be prepended to the grid. Each section row shall have a delete button that calls `DELETE /api/binding-authority-sections/:sectionId`; on a 204 response the row shall be removed. Both actions shall be hidden when the BA is not `"Draft"`. The FiPlus trigger is hidden when an inline add row is already open.
 
 **REQ-BA-FE-F-033:** While sections are loading, a loading indicator shall be visible above the table. On load failure, an inline error message with a Retry button shall be shown.
 
@@ -333,7 +336,7 @@ All editable fields shall be inputs when the parent BA status is `"Draft"` and r
 
 #### 4.11.4 Section GPI Monitoring Tab
 
-**REQ-BA-FE-F-086:** The Section GPI Monitoring tab shall display a single progress bar for this section showing `actualGrossPremium / grossPremiumIncomeLimit × 100%`. The colour rules from REQ-BA-FE-F-057 apply. When no GPI limit is set for this section, the tab shall render `"No GPI limit configured for this section."`.
+**REQ-BA-FE-F-086:** The Section GPI Monitoring tab shall display the section's GPI Limit (`written_premium_limit`) with currency, Actual Gross Premium (populated from bordereau data when available), and a colour-coded usage percentage progress bar. The colour rules from REQ-BA-FE-F-057 apply (green below 80%, amber 80–100%, red above 100%). When no GPI limit is set for this section (`written_premium_limit` is null), the tab shall render `"No GPI limit configured for this section. Set a Written Premium Limit on the Coverage tab to enable GPI monitoring."`. **[Block 3 — actual premium aggregation from bordereau data is deferred; placeholder 0 is shown until that integration is built.]**
 
 ### 4.12 BASearchModal — Reusable BA Search and Link Modal
 

@@ -308,13 +308,13 @@ describe('QuotesListPage', () => {
     })
 
     // REQ-QUO-FE-F-005
-    test('T-quotes-list-R05 — reference is a navigation link to /quotes/:id', async () => {
+    test('T-quotes-list-R05 — reference is plain text and action icon links to /quotes/:id', async () => {
         mockListQuotes.mockResolvedValue([makeQuote()])
         render(<MemoryRouter><QuotesListPage /></MemoryRouter>)
         await waitFor(() => {
-            const link = screen.getByRole('link', { name: 'QUO-DEMO-20260601-001' })
-            expect(link).toBeInTheDocument()
-            expect(link).toHaveAttribute('href', '/quotes/1')
+            expect(screen.getByText('QUO-DEMO-20260601-001')).toBeInTheDocument()
+            expect(screen.queryByRole('link', { name: 'QUO-DEMO-20260601-001' })).not.toBeInTheDocument()
+            expect(document.querySelector('a[href="/quotes/1"]')).not.toBeNull()
         })
     })
 
@@ -1454,7 +1454,7 @@ describe('QuoteCoverageDetailPage', () => {
         mockGetQuote.mockResolvedValue(makeQuote())
         mockListSections.mockResolvedValue([makeSection()])
         mockListCoverages.mockResolvedValue([{
-            id: 1, section_id: 1, reference: 'COV-001', coverage_name: 'All Risks',
+            id: 1, section_id: 1, reference: 'COV-001', coverage: 'All Risks',
             effective_date: '2026-06-01', expiry_date: '2027-06-01',
             annual_gross_premium: 50000, annual_net_premium: 45000,
             limit_currency: 'USD', limit_amount: 1000000,
@@ -1579,7 +1579,7 @@ describe('QuoteCoverageSubDetailPage', () => {
         mockGetQuote.mockResolvedValue(makeQuote())
         mockListSections.mockResolvedValue([makeSection()])
         mockListCoverages.mockResolvedValue([{
-            id: 1, section_id: 1, reference: 'COV-001', coverage_name: 'All Risks',
+            id: 1, section_id: 1, reference: 'COV-001', coverage: 'All Risks',
             effective_date: '2026-06-01', expiry_date: '2027-06-01',
             annual_gross_premium: 50000, annual_net_premium: 45000,
             limit_currency: 'USD', limit_amount: 1000000,
@@ -1710,7 +1710,7 @@ describe('QuoteSearchModal', () => {
 
     // REQ-QUO-FE-F-067 — loading indicator
     test('T-QUO-FE-F-R067 — shows loading text while fetching quotes', async () => {
-        mockListQuotes.mockReturnValue(new Promise(() => {})) // never resolves
+        mockListQuotes.mockReturnValue(new Promise(() => { })) // never resolves
         render(<QuoteSearchModal isOpen={true} onClose={mockOnClose} onSelect={mockOnSelect} />)
         expect(screen.getByText(/loading quotes/i)).toBeInTheDocument()
     })

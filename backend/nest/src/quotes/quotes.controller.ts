@@ -172,4 +172,58 @@ export class QuotesController {
     ) {
         return this.quotesService.getLocations(id, req.user.orgCode)
     }
+
+    // REQ-QUO-BE-F-041 — GET /api/quotes/:id/sections/:sectionId/coverages
+    @Get(':id/sections/:sectionId/coverages')
+    getCoverages(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Req() req: any,
+    ) {
+        return this.quotesService.getCoverages(id, sectionId, req.user.orgCode)
+    }
+
+    // REQ-QUO-BE-F-042 — POST /api/quotes/:id/sections/:sectionId/coverages
+    @Post(':id/sections/:sectionId/coverages')
+    createCoverage(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Body() body: Record<string, unknown>,
+        @Req() req: any,
+    ) {
+        return this.quotesService.createCoverage(
+            id, sectionId, req.user.orgCode, body,
+            req.user.name ?? req.user.username ?? null,
+        )
+    }
+
+    // REQ-QUO-BE-F-043 — PUT /api/quotes/:id/sections/:sectionId/coverages/:coverageId
+    @Put(':id/sections/:sectionId/coverages/:coverageId')
+    updateCoverage(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Param('coverageId', ParseIntPipe) coverageId: number,
+        @Body() body: Record<string, unknown>,
+        @Req() req: any,
+    ) {
+        return this.quotesService.updateCoverage(
+            id, sectionId, coverageId, req.user.orgCode, body,
+            req.user.name ?? req.user.username ?? null,
+        )
+    }
+
+    // REQ-QUO-BE-F-044 — DELETE /api/quotes/:id/sections/:sectionId/coverages/:coverageId
+    @Delete(':id/sections/:sectionId/coverages/:coverageId')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    deleteCoverage(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Param('coverageId', ParseIntPipe) coverageId: number,
+        @Req() req: any,
+    ) {
+        return this.quotesService.deleteCoverage(
+            id, sectionId, coverageId, req.user.orgCode,
+            req.user.name ?? req.user.username ?? null,
+        )
+    }
 }

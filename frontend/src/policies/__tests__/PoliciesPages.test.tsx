@@ -356,13 +356,13 @@ describe('PoliciesListPage', () => {
     })
 
     // REQ-POL-FE-F-002
-    test('T-POL-FE-F-R002 — Reference cell links to /policies/:id', async () => {
+    test('T-POL-FE-F-R002 — Reference is plain text and action icon links to /policies/:id', async () => {
         mockGetPolicies.mockResolvedValue([makePolicy()])
         renderPoliciesListPage()
         await waitFor(() => {
-            const link = screen.getByRole('link', { name: 'POL-1' })
-            expect(link).toBeInTheDocument()
-            expect(link).toHaveAttribute('href', '/policies/1')
+            expect(screen.getByText('POL-1')).toBeInTheDocument()
+            expect(screen.queryByRole('link', { name: 'POL-1' })).not.toBeInTheDocument()
+            expect(document.querySelector('a[href="/policies/1"]')).not.toBeNull()
         })
     })
 
@@ -490,6 +490,13 @@ describe('PolicyViewPage', () => {
         await waitFor(() => expect(mockGetPolicySections).toHaveBeenCalled())
         await waitFor(() => {
             expect(screen.getByRole('columnheader', { name: /reference/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /class of business/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /inception date/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /expiry date/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /limit currency/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /sum insured currency/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /annual rated gross premium/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /annual rated net premium/i })).toBeInTheDocument()
             expect(screen.getByText('POL-1-S01')).toBeInTheDocument()
         })
     })
