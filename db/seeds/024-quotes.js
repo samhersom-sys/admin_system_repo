@@ -32,8 +32,8 @@ const pool = new Pool({ connectionString: DB_URL })
 // Test quote data
 //
 // Status coverage (required — do not remove any status):
-//   Draft     — QUO-2024-001, QUO-2025-001
-//   Quoted    — QUO-2024-002
+//   Draft     — QUO-2024-001, QUO-2025-001, QUO-2025-D01
+//   Quoted    — QUO-2024-002, QUO-2025-D02
 //   Bound     — QUO-2024-003
 //   Declined  — QUO-2024-004
 // ---------------------------------------------------------------------------
@@ -103,6 +103,32 @@ const QUOTES = [
         contractType: 'Policy Contract',
         createdBy: 'broker.emma',
         createdByOrgCode: 'WTW',
+    },
+    {
+        reference: 'QUO-2025-D01',
+        insured: 'Demo Manufacturing Co',
+        insuredId: 'PTY-INS-D01',
+        status: 'Draft',
+        businessType: 'Property',
+        inceptionDate: '2025-06-01',
+        expiryDate: '2026-05-31',
+        quoteCurrency: 'GBP',
+        contractType: 'Policy Contract',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
+    },
+    {
+        reference: 'QUO-2025-D02',
+        insured: 'Demo Logistics Ltd',
+        insuredId: 'PTY-INS-D02',
+        status: 'Quoted',
+        businessType: 'Liability',
+        inceptionDate: '2025-07-01',
+        expiryDate: '2026-06-30',
+        quoteCurrency: 'GBP',
+        contractType: 'Policy Contract',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
     },
 ]
 

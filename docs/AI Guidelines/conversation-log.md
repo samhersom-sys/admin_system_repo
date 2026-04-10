@@ -4,6 +4,36 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-04-10] — UAT Dashboard Visibility And DEMO Seed Alignment
+
+**Request:**
+User asked to address the remaining UAT issues after branch promotion and manual bootstrap: recent records not updating in UAT, UAT appearing to have less seed data than local, and the need to carry the fixes through for UAT promotion.
+
+**Root Causes:**
+- The live Nest dashboard endpoint returned only submissions and quotes, while DEMO users in UAT primarily had DEMO-owned policies and no DEMO submissions/quotes in the seed baseline.
+- The recent-records submissions query ordered by `createdDate` instead of the `last_opened_date` fallback, so reopening records would not move them to the top reliably.
+- The deployment runbook validation section still implied the SPA always resolved API traffic to `api.thepolicyforge.com`, which is inaccurate for UAT because the frontend derives `api.` from the current `app.` hostname.
+
+**Outcome:**
+Expanded the Nest dashboard recent-records service to include policies and binding authorities and to sort by `last_opened_date` fallback. Added DEMO-owned submissions, quotes, and a binding authority to the seed baseline so DEMO-scoped UAT users see materially richer data after seeding. Updated the runbook to describe host-derived API resolution correctly for both production and UAT. Verified the Nest dashboard spec passes and verified the live UAT health endpoint responds from the cleaned Nest backend.
+
+**Files Changed:**
+- `backend/nest/src/dashboard/dashboard.service.ts` — recent records now include policies and binding authorities; ordering uses `last_opened_date` fallback
+- `backend/nest/src/dashboard/dashboard.spec.ts` — updated recent-records coverage for expanded entity set and ordering assertion
+- `db/seeds/003-submissions.js` — added DEMO-owned submissions (`SUB-2025-D01`, `SUB-2025-D02`, `SUB-2026-D01`)
+- `db/seeds/024-quotes.js` — added DEMO-owned quotes (`QUO-2025-D01`, `QUO-2025-D02`)
+- `db/seeds/026-binding-authorities.js` — added DEMO-owned binding authority (`BA-2026-D01`)
+- `docs/Technical Documentation/14-Deployment-Runbook.md` — corrected UAT/production API host resolution wording
+- `docs/AI Guidelines/conversation-log.md` — this entry added
+
+**Validation:**
+- `cd backend/nest && npm test -- --runInBand src/dashboard/dashboard.spec.ts` — PASS 13/13
+- `https://api.uat.thepolicyforge.com/api/health` — responded with `{ "status": "ok", "server": "cleaned-nest", ... }`
+
+**Open Questions / Deferred:**
+- UAT deployment of the code changes still requires the normal branch-promotion/push flow from the local repository; no git commit or push was performed in this session.
+- UAT reseeding must continue to use the Railway **public** Postgres URL from a local shell, not the `railway.internal` hostname.
+
 ### [2026-04-09] — Batch D: Fix pre-existing Layer 2 failures (R08c, R09a–R09d)
 
 **Request:**

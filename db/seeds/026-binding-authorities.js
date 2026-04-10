@@ -38,7 +38,7 @@ const pool = new Pool({
 //
 // Status coverage (required — do not remove any status):
 //   Draft    — BA-2024-001
-//   Active   — BA-2024-002, BA-2025-001
+//   Active   — BA-2024-002, BA-2025-001, BA-2026-D01
 //   Expired  — BA-2023-001
 //   Declined — BA-2024-003
 // ---------------------------------------------------------------------------
@@ -108,6 +108,19 @@ const BINDING_AUTHORITIES = [
         createdByOrgCode: 'WTW',
         coverholder: 'Atlantic Underwriters',
         coverholderRef: 'PTY-CVH-002',
+    },
+    {
+        reference: 'BA-2026-D01',
+        submissionRef: 'SUB-2026-D01',
+        status: 'Active',
+        inceptionDate: '2026-01-01',
+        expiryDate: '2026-12-31',
+        yearOfAccount: 2026,
+        isMultiYear: false,
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
+        coverholder: 'Global Coverholder Ltd',
+        coverholderRef: 'PTY-CVH-001',
     },
 ]
 

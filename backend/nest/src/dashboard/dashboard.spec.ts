@@ -5,7 +5,7 @@
  *
  * Coverage:
  *   R01 — sync stub methods (no DB interaction)
- *   R02 — getRecentRecords (queries submissions + quotes by orgCode)
+ *   R02 — getRecentRecords (queries org-scoped dashboard entities)
  */
 
 import { Test, TestingModule } from '@nestjs/testing'
@@ -82,22 +82,30 @@ describe('DashboardService', () => {
   // REQ-DASH-BE-NE-R02 — getRecentRecords
   // -------------------------------------------------------------------------
   describe('getRecentRecords', () => {
-    it('T-DASH-BE-NE-R02a: queries submissions and quotes scoped to orgCode', async () => {
+    it('T-DASH-BE-NE-R02a: queries submissions, quotes, policies and binding authorities scoped to orgCode', async () => {
       const submissions = [{ id: 1, reference: 'SUB-TST-001' }]
       const quotes = [{ id: 2, reference: 'QUO-TST-001' }]
+      const policies = [{ id: 3, reference: 'POL-TST-001' }]
+      const bindingAuthorities = [{ id: 4, reference: 'BA-TST-001' }]
       mockDataSource.query
         .mockResolvedValueOnce(submissions) // submissions query
         .mockResolvedValueOnce(quotes)      // quotes query
+        .mockResolvedValueOnce(policies)    // policies query
+        .mockResolvedValueOnce(bindingAuthorities) // binding authorities query
 
       const result = await service.getRecentRecords('TST')
       expect(result.submissions).toEqual(submissions)
       expect(result.quotes).toEqual(quotes)
+      expect(result.policies).toEqual(policies)
+      expect(result.bindingAuthorities).toEqual(bindingAuthorities)
     })
 
-    it('T-DASH-BE-NE-R02b: returns empty arrays for policies and bindingAuthorities', async () => {
+    it('T-DASH-BE-NE-R02b: returns empty arrays for optional entity queries when they fail', async () => {
       mockDataSource.query
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]) // submissions
+        .mockResolvedValueOnce([]) // quotes
+        .mockRejectedValueOnce(new Error('policies failed'))
+        .mockRejectedValueOnce(new Error('binding authorities failed'))
 
       const result = await service.getRecentRecords('TST')
       expect(result.policies).toEqual([])
@@ -106,6 +114,8 @@ describe('DashboardService', () => {
 
     it('T-DASH-BE-NE-R02c: passes orgCode to submissions query', async () => {
       mockDataSource.query
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
 
@@ -118,9 +128,23 @@ describe('DashboardService', () => {
       mockDataSource.query
         .mockResolvedValueOnce([]) // submissions OK
         .mockRejectedValueOnce(new Error('DB error')) // quotes fail — caught by .catch(() => [])
+        .mockResolvedValueOnce([]) // policies OK
+        .mockResolvedValueOnce([]) // binding authorities OK
 
       const result = await service.getRecentRecords('TST')
       expect(result.quotes).toEqual([])
+    })
+
+    it('T-DASH-BE-NE-R02e: orders submissions by lastOpenedDate fallback rather than createdDate alone', async () => {
+      mockDataSource.query
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+
+      await service.getRecentRecords('TST')
+      const [submissionSql] = mockDataSource.query.mock.calls[0]
+      expect(submissionSql).toContain('ORDER BY COALESCE(s.last_opened_date, s."createdDate"::timestamp) DESC')
     })
   })
 })
