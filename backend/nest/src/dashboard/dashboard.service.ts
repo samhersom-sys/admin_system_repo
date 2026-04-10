@@ -97,7 +97,40 @@ export class DashboardService {
 
     // REQ-DASH-STUB-F-008 — org-scoped recent records across dashboard entity types
     async getRecentRecords(orgCode: string): Promise<any> {
-        const submissionRows = await this.dataSource.query(
+        const auditRows = await this.dataSource.query(
+            `SELECT ae.entity_type, ae.entity_id, MAX(ae.created_at) AS last_opened
+             FROM public.audit_event ae
+             WHERE ae.entity_type IN ('Submission', 'Quote', 'Policy', 'BindingAuthority')
+               AND (ae.action ILIKE '%Opened%' OR ae.action ILIKE '%Updated%')
+             GROUP BY ae.entity_type, ae.entity_id
+             ORDER BY last_opened DESC
+             LIMIT 120`,
+        ).catch(() => [])
+
+        const auditByType: Record<string, Array<{ id: number; lastOpenedDate: string }>> = {}
+        for (const row of auditRows) {
+            if (!auditByType[row.entity_type]) auditByType[row.entity_type] = []
+            auditByType[row.entity_type].push({ id: Number(row.entity_id), lastOpenedDate: row.last_opened })
+        }
+
+        const submissionRows = await this.fetchWithAuditOrFallback(
+            auditByType['Submission'],
+            (ids) => this.dataSource.query(
+                `SELECT
+                     s.id,
+                     s.reference,
+                     s."submissionType"     AS "submissionType",
+                     COALESCE(p.name, s.insured) AS "insuredName",
+                     s."placingBroker"      AS "broker",
+                     s.status,
+                     s."createdDate"::timestamp AS "createdDate"
+                 FROM submission s
+                 LEFT JOIN party p ON p.id = NULLIF(s."insuredId", '')::integer
+                 WHERE s.id = ANY($1)
+                   AND s."createdByOrgCode" = $2`,
+                [ids, orgCode],
+            ),
+            () => this.dataSource.query(
             `SELECT
                  s.id,
                  s.reference,
@@ -105,60 +138,111 @@ export class DashboardService {
                  COALESCE(p.name, s.insured) AS "insuredName",
                  s."placingBroker"      AS "broker",
                  s.status,
-                 COALESCE(s.last_opened_date, s."createdDate"::timestamp) AS "lastOpenedDate"
+                 s."createdDate"::timestamp AS "createdDate"
              FROM submission s
              LEFT JOIN party p ON p.id = NULLIF(s."insuredId", '')::integer
              WHERE s."createdByOrgCode" = $1
-             ORDER BY COALESCE(s.last_opened_date, s."createdDate"::timestamp) DESC
+             ORDER BY s."createdDate" DESC
              LIMIT 25`,
             [orgCode],
+            ),
         )
 
-        const quoteRows = await this.dataSource.query(
+        const quoteRows = await this.fetchWithAuditOrFallback(
+            auditByType['Quote'],
+            (ids) => this.dataSource.query(
+                `SELECT
+                     q.id,
+                     q.reference,
+                     COALESCE(p.name, q.insured) AS "insuredName",
+                     q.status,
+                     q.business_type AS "submissionType",
+                     q.created_date AS "createdDate"
+                 FROM quotes q
+                 LEFT JOIN party p ON p.id = NULLIF(q.insured_id, '')::integer
+                 WHERE q.id = ANY($1)
+                   AND q.created_by_org_code = $2
+                   AND q.deleted_at IS NULL`,
+                [ids, orgCode],
+            ),
+            () => this.dataSource.query(
             `SELECT
                  q.id,
                  q.reference,
                  COALESCE(p.name, q.insured) AS "insuredName",
                  q.status,
                  q.business_type AS "submissionType",
-                 COALESCE(q.last_opened_date::timestamptz, q.created_date) AS "lastOpenedDate"
+                 q.created_date AS "createdDate"
              FROM quotes q
              LEFT JOIN party p ON p.id = NULLIF(q.insured_id, '')::integer
              WHERE q.created_by_org_code = $1
                AND q.deleted_at IS NULL
-             ORDER BY COALESCE(q.last_opened_date::timestamptz, q.created_date) DESC
+             ORDER BY q.created_date DESC
              LIMIT 25`,
             [orgCode],
+            ),
         ).catch(() => [])
 
-        const policyRows = await this.dataSource.query(
+        const policyRows = await this.fetchWithAuditOrFallback(
+            auditByType['Policy'],
+            (ids) => this.dataSource.query(
+                `SELECT
+                     policy.id,
+                     policy.reference,
+                     COALESCE(p.name, policy.insured) AS "insuredName",
+                     policy.status,
+                     policy.created_date AS "createdDate"
+                 FROM policies policy
+                 LEFT JOIN party p ON p.id = NULLIF(policy.insured_id, '')::integer
+                 WHERE policy.id = ANY($1)
+                   AND policy.created_by_org_code = $2
+                   AND policy.deleted_at IS NULL`,
+                [ids, orgCode],
+            ),
+            () => this.dataSource.query(
             `SELECT
                  policy.id,
                  policy.reference,
                  COALESCE(p.name, policy.insured) AS "insuredName",
                  policy.status,
-                 COALESCE(policy.last_opened_date::timestamptz, policy.created_date) AS "lastOpenedDate"
+                 policy.created_date AS "createdDate"
              FROM policies policy
              LEFT JOIN party p ON p.id = NULLIF(policy.insured_id, '')::integer
              WHERE policy.created_by_org_code = $1
                AND policy.deleted_at IS NULL
-             ORDER BY COALESCE(policy.last_opened_date::timestamptz, policy.created_date) DESC
+             ORDER BY policy.created_date DESC
              LIMIT 25`,
             [orgCode],
+            ),
         ).catch(() => [])
 
-        const bindingAuthorityRows = await this.dataSource.query(
+        const bindingAuthorityRows = await this.fetchWithAuditOrFallback(
+            auditByType['BindingAuthority'],
+            (ids) => this.dataSource.query(
+                `SELECT
+                     ba.id,
+                     ba.reference,
+                     ba.status,
+                     ba.created_at AS "createdDate"
+                 FROM binding_authorities ba
+                 WHERE ba.id = ANY($1)
+                   AND ba.created_by_org_code = $2
+                   AND ba.deleted_at IS NULL`,
+                [ids, orgCode],
+            ),
+            () => this.dataSource.query(
             `SELECT
                  ba.id,
                  ba.reference,
                  ba.status,
-                 COALESCE(ba.last_opened_date::timestamptz, ba.created_at) AS "lastOpenedDate"
+                 ba.created_at AS "createdDate"
              FROM binding_authorities ba
              WHERE ba.created_by_org_code = $1
                AND ba.deleted_at IS NULL
-             ORDER BY COALESCE(ba.last_opened_date::timestamptz, ba.created_at) DESC
+             ORDER BY ba.created_at DESC
              LIMIT 25`,
             [orgCode],
+            ),
         ).catch(() => [])
 
         return {
@@ -167,5 +251,30 @@ export class DashboardService {
             policies: policyRows,
             bindingAuthorities: bindingAuthorityRows,
         }
+    }
+
+    private async fetchWithAuditOrFallback(
+        auditEntries: Array<{ id: number; lastOpenedDate: string }> | undefined,
+        fetchByIds: (ids: number[]) => Promise<any[]>,
+        fetchFallback: () => Promise<any[]>,
+    ): Promise<any[]> {
+        const entries = Array.isArray(auditEntries) ? auditEntries.slice(0, 25) : []
+
+        if (entries.length > 0) {
+            const ids = entries.map((entry) => entry.id)
+            const rows = await fetchByIds(ids)
+            const rowMap = new Map(rows.map((row) => [Number(row.id), row]))
+
+            return entries
+                .map((entry) => {
+                    const row = rowMap.get(entry.id)
+                    if (!row) return null
+                    return { ...row, lastOpenedDate: entry.lastOpenedDate }
+                })
+                .filter(Boolean)
+        }
+
+        const fallbackRows = await fetchFallback()
+        return fallbackRows.map((row) => ({ ...row, lastOpenedDate: row.createdDate ?? null }))
     }
 }
