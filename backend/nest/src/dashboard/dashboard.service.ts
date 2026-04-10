@@ -125,7 +125,10 @@ export class DashboardService {
                      s.status,
                      s."createdDate"::timestamp AS "createdDate"
                  FROM submission s
-                 LEFT JOIN party p ON p.id = NULLIF(s."insuredId", '')::integer
+                 LEFT JOIN party p ON p.id = CASE
+                     WHEN COALESCE(s."insuredId", '') ~ '^[0-9]+$' THEN s."insuredId"::integer
+                     ELSE NULL
+                 END
                  WHERE s.id = ANY($1)
                    AND s."createdByOrgCode" = $2`,
                 [ids, orgCode],
@@ -140,7 +143,10 @@ export class DashboardService {
                  s.status,
                  s."createdDate"::timestamp AS "createdDate"
              FROM submission s
-             LEFT JOIN party p ON p.id = NULLIF(s."insuredId", '')::integer
+             LEFT JOIN party p ON p.id = CASE
+                 WHEN COALESCE(s."insuredId", '') ~ '^[0-9]+$' THEN s."insuredId"::integer
+                 ELSE NULL
+             END
              WHERE s."createdByOrgCode" = $1
              ORDER BY s."createdDate" DESC
              LIMIT 25`,
@@ -159,7 +165,10 @@ export class DashboardService {
                      q.business_type AS "submissionType",
                      q.created_date AS "createdDate"
                  FROM quotes q
-                 LEFT JOIN party p ON p.id = NULLIF(q.insured_id, '')::integer
+                 LEFT JOIN party p ON p.id = CASE
+                     WHEN COALESCE(q.insured_id, '') ~ '^[0-9]+$' THEN q.insured_id::integer
+                     ELSE NULL
+                 END
                  WHERE q.id = ANY($1)
                    AND q.created_by_org_code = $2
                    AND q.deleted_at IS NULL`,
@@ -174,7 +183,10 @@ export class DashboardService {
                  q.business_type AS "submissionType",
                  q.created_date AS "createdDate"
              FROM quotes q
-             LEFT JOIN party p ON p.id = NULLIF(q.insured_id, '')::integer
+             LEFT JOIN party p ON p.id = CASE
+                 WHEN COALESCE(q.insured_id, '') ~ '^[0-9]+$' THEN q.insured_id::integer
+                 ELSE NULL
+             END
              WHERE q.created_by_org_code = $1
                AND q.deleted_at IS NULL
              ORDER BY q.created_date DESC
@@ -193,7 +205,10 @@ export class DashboardService {
                      policy.status,
                      policy.created_date AS "createdDate"
                  FROM policies policy
-                 LEFT JOIN party p ON p.id = NULLIF(policy.insured_id, '')::integer
+                 LEFT JOIN party p ON p.id = CASE
+                     WHEN COALESCE(policy.insured_id, '') ~ '^[0-9]+$' THEN policy.insured_id::integer
+                     ELSE NULL
+                 END
                  WHERE policy.id = ANY($1)
                    AND policy.created_by_org_code = $2
                    AND policy.deleted_at IS NULL`,
@@ -207,7 +222,10 @@ export class DashboardService {
                  policy.status,
                  policy.created_date AS "createdDate"
              FROM policies policy
-             LEFT JOIN party p ON p.id = NULLIF(policy.insured_id, '')::integer
+             LEFT JOIN party p ON p.id = CASE
+                 WHEN COALESCE(policy.insured_id, '') ~ '^[0-9]+$' THEN policy.insured_id::integer
+                 ELSE NULL
+             END
              WHERE policy.created_by_org_code = $1
                AND policy.deleted_at IS NULL
              ORDER BY policy.created_date DESC
