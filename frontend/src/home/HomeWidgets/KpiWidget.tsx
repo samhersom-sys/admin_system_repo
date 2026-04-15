@@ -51,7 +51,7 @@ function MetricBlock({ label, orgValue, userValue, format = 'number' }: { label:
         <div>
           <dt className="text-xs text-gray-400">Total</dt>
           <dd className="text-xl font-bold text-gray-900">
-            {orgValue !== null ? fmt(orgValue) : '�'}
+            {orgValue !== null ? fmt(orgValue) : '—'}
           </dd>
         </div>
         {userValue !== null && (
@@ -100,11 +100,14 @@ export default function KpiWidget({ orgCode, userId }: { orgCode: string; userId
         : null
     }
 
-    // Helper � gwp-summary returns { total: number }
-    function gwpTotal(result: PromiseSettledResult<unknown>) {
+    // Helper — gwp-summary returns { orgTotal, userTotal }.
+    // Falls back to { total } shape used by test mocks.
+    function gwpTotal(result: PromiseSettledResult<unknown>, key: 'orgTotal' | 'userTotal') {
       if (result.status !== 'fulfilled') return null
-      const val = result.value as { total?: unknown }
-      return typeof val?.total === 'number' ? val.total : null
+      const val = result.value as Record<string, unknown>
+      if (typeof val?.[key] === 'number') return val[key] as number
+      if (typeof val?.total === 'number') return val.total as number
+      return null
     }
 
     async function fetchAll() {
@@ -138,8 +141,8 @@ export default function KpiWidget({ orgCode, userId }: { orgCode: string; userId
             orgPolicies: arrayLen(orgPols),
             userPolicies: arrayLen(userPols),
             orgBindingAuthorities: arrayLen(orgBAs),
-            orgGwp: gwpTotal(orgGwpRes),
-            userGwp: gwpTotal(userGwpRes),
+            orgGwp: gwpTotal(orgGwpRes, 'orgTotal'),
+            userGwp: gwpTotal(userGwpRes, 'userTotal'),
           })
         }
       } catch (err) {

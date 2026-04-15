@@ -186,7 +186,11 @@ export async function createEndorsement(
     policyId: string | number,
     input: CreateEndorsementInput
 ): Promise<PolicyTransaction> {
-    return post<PolicyTransaction>(`/api/policies/${policyId}/endorsements`, input)
+    return post<PolicyTransaction>(`/api/policies/${policyId}/endorsements`, {
+        endorsement_type: input.transactionType,
+        effective_date: input.effectiveDate,
+        description: input.description,
+    })
 }
 
 /** Issue (finalise) an endorsement, transitioning it to Endorsed status. */

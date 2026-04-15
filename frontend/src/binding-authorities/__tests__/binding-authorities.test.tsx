@@ -88,6 +88,15 @@ jest.mock('@/shared/lib/hooks/useAudit', () => ({
         getAudit: jest.fn(),
     }),
 }))
+jest.mock('../BordereauImportModal/BordereauImportModal', () => ({
+    __esModule: true,
+    default: () => null,
+}))
+jest.mock('../BordereauCreateModal/BordereauCreateModal', () => ({
+    __esModule: true,
+    default: () => null,
+}))
+
 jest.mock('../CoverholderSearchModal/CoverholderSearchModal', () => ({
     __esModule: true,
     default: ({ isOpen, onSelect, onClose }: { isOpen: boolean; onSelect: (p: { id: number; name: string }) => void; onClose: () => void }) => {
@@ -373,43 +382,44 @@ describe('BAViewPage â€” /binding-authorities/:id (header & loading)', () =
     })
 
     // REQ-BA-FE-F-018
-    it('T-BA-FE-F-R018 â€” status select is editable for Draft; no locked banner', async () => {
+    it('T-BA-FE-F-R018 â€” status displayed as badge (not select); no locked banner for any status', async () => {
         renderBAViewPage('1')
         await screen.findByRole('heading', { name: /ba-2026-001/i })
-        // Draft BA: status select is present and no locked banner
-        expect(screen.getByRole('combobox')).toBeInTheDocument()
+        // Status is now always a badge, never a select
+        expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
         expect(screen.queryByText(/changes require an amendment/i)).not.toBeInTheDocument()
     })
 
-    it('T-BA-FE-F-R018b â€” locked banner shown when status is Active', async () => {
+    it('T-BA-FE-F-R018b â€” no locked banner shown when status is Active (banner removed)', async () => {
         mockGetBindingAuthority.mockResolvedValue(SAMPLE_ACTIVE_BA)
         renderBAViewPage('2')
         await screen.findByRole('heading', { name: /ba-2026-002/i })
-        // Non-Draft: locked banner appears
-        expect(screen.getByText(/changes require an amendment/i)).toBeInTheDocument()
+        // Banner was removed per Defect 8
+        expect(screen.queryByText(/changes require an amendment/i)).not.toBeInTheDocument()
     })
 
-    it('T-BA-FE-F-R018c â€” Status select is rendered', async () => {
+    it('T-BA-FE-F-R018c â€” Status badge shows current status text', async () => {
         renderBAViewPage('1')
         await screen.findByRole('heading', { name: /ba-2026-001/i })
-        expect(screen.getByDisplayValue('Draft')).toBeInTheDocument()
+        const draftEls = screen.getAllByText('Draft')
+        const badge = draftEls.find(el => el.className.includes('rounded-full'))
+        expect(badge).toBeTruthy()
     })
 
     // REQ-BA-FE-F-019
-    it('T-BA-FE-F-R019 â€” calls updateBindingAuthority when status select changes', async () => {
+    it('T-BA-FE-F-R019 â€” no status select to change (status is read-only badge)', async () => {
         renderBAViewPage('1')
         await screen.findByRole('heading', { name: /ba-2026-001/i })
-        const statusSelect = screen.getByDisplayValue('Draft')
-        await userEvent.selectOptions(statusSelect, 'Active')
-        await waitFor(() => expect(mockUpdateBindingAuthority).toHaveBeenCalledWith(1, { status: 'Active' }))
+        // Status dropdown removed per Defect 6
+        expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     })
 
     // REQ-BA-FE-F-020
-    it('T-BA-FE-F-R020 â€” Issue BA button rendered for Draft BA', async () => {
+    it('T-BA-FE-F-R020 â€” Issue BA button NOT in header for Draft BA (only in sidebar)', async () => {
         renderBAViewPage('1')
         await screen.findByRole('heading', { name: /ba-2026-001/i })
-        // BAViewPage shows Issue BA for Draft (promotes status to Active)
-        expect(screen.getByRole('button', { name: /issue ba/i })).toBeInTheDocument()
+        // Issue BA removed from header per Defect 5
+        expect(screen.queryByRole('button', { name: /issue ba/i })).not.toBeInTheDocument()
     })
 
     it('T-BA-FE-F-R020b â€” Status badge (not select) shown for non-Draft BA', async () => {
@@ -421,21 +431,27 @@ describe('BAViewPage â€” /binding-authorities/:id (header & loading)', () =
         expect(screen.queryByRole('button', { name: /issue ba/i })).not.toBeInTheDocument()
     })
 
-    it('T-BA-FE-F-R020c â€” Issue BA and status select NOT shown for Active status', async () => {
+    it('T-BA-FE-F-R020c â€” sidebar includes Endorse Binding Authority item for Active status', async () => {
         mockGetBindingAuthority.mockResolvedValue(SAMPLE_ACTIVE_BA)
         renderBAViewPage('2')
         await screen.findByRole('heading', { name: /ba-2026-002/i })
-        expect(screen.queryByRole('button', { name: /issue ba/i })).not.toBeInTheDocument()
+        const mockUseSidebar = useSidebarSection as jest.Mock
+        const lastCall = mockUseSidebar.mock.calls[mockUseSidebar.mock.calls.length - 1][0]
+        expect(lastCall.items).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ label: 'Endorse Binding Authority' }),
+            ])
+        )
     })
 
-    it('T-BA-FE-F-R020d - useSidebarSection registered with a Renew BA Contract item', async () => {
+    it('T-BA-FE-F-R020d - useSidebarSection registered with Import Bordereaux item', async () => {
         renderBAViewPage('1')
         await screen.findByRole('heading', { name: /ba-2026-001/i })
         const mockUseSidebar = useSidebarSection as jest.Mock
         const lastCall = mockUseSidebar.mock.calls[mockUseSidebar.mock.calls.length - 1][0]
         expect(lastCall.items).toEqual(
             expect.arrayContaining([
-                expect.objectContaining({ label: 'Renew BA Contract' }),
+                expect.objectContaining({ label: 'Import Bordereaux' }),
             ])
         )
     })
@@ -551,26 +567,31 @@ describe('BAViewPage â€” /binding-authorities/:id (header & loading)', () =
     })
 
     // REQ-BA-FE-F-029
-    it('T-BA-FE-F-R029 â€” status select allows changing status from Draft', async () => {
+    it('T-BA-FE-F-R029 â€” status is displayed as read-only badge (no select)', async () => {
         renderBAViewPage('1')
         await screen.findByRole('heading', { name: /ba-2026-001/i })
-        const statusSelect = screen.getByRole('combobox')
-        expect(statusSelect).toBeInTheDocument()
+        // Status is now a badge, not a combobox
+        expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+        const draftEls = screen.getAllByText('Draft')
+        const badge = draftEls.find(el => el.className.includes('rounded-full'))
+        expect(badge).toBeTruthy()
     })
 
-    it('T-BA-FE-F-R029b â€” status select shows Draft as initial value', async () => {
-        renderBAViewPage('1')
-        await screen.findByRole('heading', { name: /ba-2026-001/i })
-        const statusSelect = screen.getByRole('combobox') as HTMLSelectElement
-        expect(statusSelect.value).toBe('Draft')
-    })
-
-    // REQ-BA-FE-F-030
-    it('T-BA-FE-F-R030 â€” locked banner text shown when status is Active', async () => {
+    it('T-BA-FE-F-R029b â€” status badge shows Active for Active BA', async () => {
         mockGetBindingAuthority.mockResolvedValue(SAMPLE_ACTIVE_BA)
         renderBAViewPage('2')
-        // Banner: "This binding authority is Active — changes require an amendment."
-        expect(await screen.findByText(/changes require an amendment/i)).toBeInTheDocument()
+        await screen.findByRole('heading', { name: /ba-2026-002/i })
+        const activeEls = screen.getAllByText('Active')
+        const badge029b = activeEls.find(el => el.className.includes('rounded-full'))
+        expect(badge029b).toBeTruthy()
+    })
+
+    // REQ-BA-FE-F-030 (REMOVED)
+    it('T-BA-FE-F-R030 â€” locked banner NOT shown for any status (removed per Defect 8)', async () => {
+        mockGetBindingAuthority.mockResolvedValue(SAMPLE_ACTIVE_BA)
+        renderBAViewPage('2')
+        await screen.findByRole('heading', { name: /ba-2026-002/i })
+        expect(screen.queryByText(/changes require an amendment/i)).not.toBeInTheDocument()
     })
 })
 
@@ -617,7 +638,7 @@ describe('BAViewPage â€” Sections Tab', () => {
         expect(screen.getByText('Time Basis')).toBeInTheDocument()
         expect(screen.getByText('Settlement Premium Currency')).toBeInTheDocument()
         expect(screen.getByText('Gross Premium Income Limit')).toBeInTheDocument()
-        expect(screen.getByText('Maximum Period of Insurance (days)')).toBeInTheDocument()
+        expect(screen.getByText('Max Period of Insurance (days)')).toBeInTheDocument()
         // Verify legacy labels are gone
         expect(screen.queryByText('Premium Limit')).not.toBeInTheDocument()
     })

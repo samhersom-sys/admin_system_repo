@@ -8,6 +8,7 @@ import { BASectionAuthorizedRisk } from '../entities/ba-section-authorized-risk.
 import { BADocument } from '../entities/ba-document.entity'
 import { BindingAuthoritiesService } from './binding-authorities.service'
 import { BindingAuthoritiesController } from './binding-authorities.controller'
+import { BordereauxController } from './bordereaux.controller'
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { BindingAuthoritiesController } from './binding-authorities.controller'
       BADocument,
     ]),
   ],
-  controllers: [BindingAuthoritiesController],
+  controllers: [BindingAuthoritiesController, BordereauxController],
   providers: [BindingAuthoritiesService],
   exports: [BindingAuthoritiesService],
 })

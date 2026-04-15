@@ -62,9 +62,17 @@ export class QuotesService {
     }
 
     // ---------------------------------------------------------------------------
-    // R01 â€” GET /api/quotes
+    // R01 — GET /api/quotes
+    // date_basis: 'inception' | 'expiry' | 'created'
     // ---------------------------------------------------------------------------
-    async findAll(orgCode: string, submissionId?: string, status?: string): Promise<Quote[]> {
+    async findAll(
+        orgCode: string,
+        submissionId?: string,
+        status?: string,
+        dateBasis?: string,
+        dateFrom?: string,
+        dateTo?: string,
+    ): Promise<Quote[]> {
         const qb = this.quoteRepo
             .createQueryBuilder('q')
             .where('q.createdByOrgCode = :orgCode', { orgCode })
@@ -75,6 +83,17 @@ export class QuotesService {
         }
         if (status) {
             qb.andWhere('q.status = :status', { status })
+        }
+
+        if (dateBasis && (dateFrom || dateTo)) {
+            const colMap: Record<string, string> = {
+                inception: 'q.inceptionDate',
+                expiry:    'q.expiryDate',
+                created:   'q.createdDate',
+            }
+            const col = colMap[dateBasis] ?? 'q.createdDate'
+            if (dateFrom) qb.andWhere(`${col} >= :dateFrom`, { dateFrom })
+            if (dateTo)   qb.andWhere(`${col} <= :dateTo`,   { dateTo })
         }
 
         return qb.getMany()
@@ -178,25 +197,26 @@ export class QuotesService {
         if (body.insured_id !== undefined) mutable.insuredId = body.insured_id
         if (body.submission_id !== undefined) mutable.submissionId = body.submission_id
         if (body.business_type !== undefined) mutable.businessType = body.business_type
-        if (body.inception_date !== undefined) mutable.inceptionDate = body.inception_date
-        if (body.expiry_date !== undefined) mutable.expiryDate = body.expiry_date
-        if (body.inception_time !== undefined) mutable.inceptionTime = body.inception_time
-        if (body.expiry_time !== undefined) mutable.expiryTime = body.expiry_time
+        if (body.inception_date !== undefined) mutable.inceptionDate = body.inception_date || null
+        if (body.expiry_date !== undefined) mutable.expiryDate = body.expiry_date || null
+        if (body.inception_time !== undefined) mutable.inceptionTime = body.inception_time || null
+        if (body.expiry_time !== undefined) mutable.expiryTime = body.expiry_time || null
         if (body.quote_currency !== undefined) mutable.quoteCurrency = body.quote_currency
         if (body.payload !== undefined) mutable.payload = body.payload
         // Block 2 fields (migration 093) -- REQ-QUO-BE-NE-F-004 / OQ-QUO-BE-NE-002 resolved
         if (body.year_of_account !== undefined) mutable.yearOfAccount = body.year_of_account
         if (body.lta_applicable !== undefined) mutable.ltaApplicable = body.lta_applicable
-        if (body.lta_start_date !== undefined) mutable.ltaStartDate = body.lta_start_date
-        if (body.lta_start_time !== undefined) mutable.ltaStartTime = body.lta_start_time
-        if (body.lta_expiry_date !== undefined) mutable.ltaExpiryDate = body.lta_expiry_date
-        if (body.lta_expiry_time !== undefined) mutable.ltaExpiryTime = body.lta_expiry_time
+        if (body.lta_start_date !== undefined) mutable.ltaStartDate = body.lta_start_date || null
+        if (body.lta_start_time !== undefined) mutable.ltaStartTime = body.lta_start_time || null
+        if (body.lta_expiry_date !== undefined) mutable.ltaExpiryDate = body.lta_expiry_date || null
+        if (body.lta_expiry_time !== undefined) mutable.ltaExpiryTime = body.lta_expiry_time || null
         if (body.contract_type !== undefined) mutable.contractType = body.contract_type
         if (body.method_of_placement !== undefined) mutable.methodOfPlacement = body.method_of_placement
         if (body.unique_market_reference !== undefined) mutable.uniqueMarketReference = body.unique_market_reference
         if (body.renewable_indicator !== undefined) mutable.renewableIndicator = body.renewable_indicator
-        if (body.renewal_date !== undefined) mutable.renewalDate = body.renewal_date
+        if (body.renewal_date !== undefined) mutable.renewalDate = body.renewal_date || null
         if (body.renewal_status !== undefined) mutable.renewalStatus = body.renewal_status
+        if (body.renewal_time !== undefined) mutable.renewalTime = body.renewal_time || null
 
         if (Object.keys(mutable).length === 0) return quote
 
@@ -337,9 +357,24 @@ export class QuotesService {
         try {
             if (body.class_of_business !== undefined) section.classOfBusiness = body.class_of_business
             if (body.inception_date !== undefined) section.inceptionDate = body.inception_date
+            if (body.effective_date !== undefined) section.effectiveDate = body.effective_date
             if (body.expiry_date !== undefined) section.expiryDate = body.expiry_date
             if (body.inception_time !== undefined) section.inceptionTime = body.inception_time
+            if (body.effective_time !== undefined) section.effectiveTime = body.effective_time
             if (body.expiry_time !== undefined) section.expiryTime = body.expiry_time
+            // Auto-compute days_on_cover from inception_date and expiry_date when either changes
+            {
+                const inc = body.inception_date !== undefined ? body.inception_date : section.inceptionDate
+                const exp = body.expiry_date !== undefined ? body.expiry_date : section.expiryDate
+                if (inc && exp) {
+                    const msPerDay = 86_400_000
+                    const days = Math.round((new Date(exp).getTime() - new Date(inc).getTime()) / msPerDay) + 1
+                    section.daysOnCover = days > 0 ? days : null
+                } else {
+                    section.daysOnCover = null
+                }
+            }
+            if (body.tax_receivable !== undefined) section.taxReceivable = body.tax_receivable
             if (body.limit_currency !== undefined) section.limitCurrency = body.limit_currency
             if (body.limit_amount !== undefined) section.limitAmount = body.limit_amount
             if (body.limit_loss_qualifier !== undefined) section.limitLossQualifier = body.limit_loss_qualifier
@@ -350,11 +385,19 @@ export class QuotesService {
             if (body.sum_insured_amount !== undefined) section.sumInsured = body.sum_insured_amount
             if (body.premium_currency !== undefined) section.premiumCurrency = body.premium_currency
             if (body.gross_premium !== undefined) section.grossPremium = body.gross_premium
-            // Merge payload fields (written_order, signed_order, annual premiums stored in payload)
+            // Added by migrations 102-104 — REQ-QUO-BE-NE-F-020c
+            if (body.time_basis !== undefined) section.timeBasis = body.time_basis
+            if (body.written_order_basis !== undefined) section.writtenOrderBasis = body.written_order_basis
+            if (body.signed_order_basis !== undefined) section.signedOrderBasis = body.signed_order_basis
+            if (body.written_line_total !== undefined) section.writtenLineTotal = body.written_line_total
+            if (body.signed_line_total !== undefined) section.signedLineTotal = body.signed_line_total
+            if (body.annual_gross_premium !== undefined) section.annualGrossPremium = body.annual_gross_premium
+            if (body.annual_net_premium !== undefined) section.annualNetPremium = body.annual_net_premium
+            if (body.delegated_authority_ref !== undefined) section.delegatedAuthorityRef = body.delegated_authority_ref
+            if (body.delegated_authority_section_ref !== undefined) section.delegatedAuthoritySectionRef = body.delegated_authority_section_ref
+            // Merge payload fields  (written_order, signed_order stored in payload)
             const existingPayload = (section.payload as Record<string, unknown>) ?? {}
             const payloadPatch: Record<string, unknown> = {}
-            if (body.annual_gross_premium !== undefined) payloadPatch.annual_gross_premium = body.annual_gross_premium
-            if (body.annual_net_premium !== undefined) payloadPatch.annual_net_premium = body.annual_net_premium
             // Apply body.payload first, then override with explicit top-level fields so they take precedence
             if (body.payload !== undefined) Object.assign(payloadPatch, body.payload)
             if (body.written_order !== undefined) payloadPatch.written_order = body.written_order

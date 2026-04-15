@@ -588,3 +588,43 @@ describe('Layer 2: /api/quotes (section coverages)', () => {
         expect(found).toBeUndefined()
     })
 })
+
+// ===========================================================================
+// Layer 2 — Date range filtering
+// GET /api/quotes?date_basis=...&date_from=...&date_to=...  (R47)
+// ===========================================================================
+
+describe('Layer 2: /api/quotes — date range filtering (R47)', () => {
+    let token
+
+    beforeAll(async () => {
+        token = await getAuthToken()
+    })
+
+    test('T-BE-quotes-R47a — filters by Created Date range and returns 200', async () => {
+        const res = await agent
+            .get('/api/quotes?date_basis=Created%20Date&date_from=2020-01-01&date_to=2099-12-31')
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(200)
+        expect(Array.isArray(res.body)).toBe(true)
+    })
+
+    test('T-BE-quotes-R47b — returns empty array for date range with no records', async () => {
+        const res = await agent
+            .get('/api/quotes?date_basis=Created%20Date&date_from=1900-01-01&date_to=1900-01-02')
+            .set('Authorization', `Bearer ${token}`)
+        expect(res.status).toBe(200)
+        expect(res.body).toEqual([])
+    })
+
+    test('T-BE-quotes-R47c — ignores invalid date_basis and returns all records', async () => {
+        const allRes = await agent
+            .get('/api/quotes')
+            .set('Authorization', `Bearer ${token}`)
+        const filteredRes = await agent
+            .get('/api/quotes?date_basis=Invalid%20Column&date_from=2020-01-01&date_to=2099-12-31')
+            .set('Authorization', `Bearer ${token}`)
+        expect(filteredRes.status).toBe(200)
+        expect(filteredRes.body.length).toBe(allRes.body.length)
+    })
+})

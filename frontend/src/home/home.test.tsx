@@ -524,3 +524,275 @@ describe('Architecture compliance', () => {
         })
     })
 })
+
+// ---------------------------------------------------------------------------
+// T-HOME-PAGE — HomePage wrapper (navigation reset)   REQ-HOME-F-018
+// ---------------------------------------------------------------------------
+
+describe('HomePage — navigation reset (REQ-HOME-F-018)', () => {
+    beforeEach(() => {
+        jest.clearAllMocks()
+        setupMocks()
+        // When the Dashboard tab is clicked, HomeEmbeddedDashboard renders
+        // and calls reporting.service functions — they must return Promises.
+        mockGetReportTemplates.mockResolvedValue([])
+        mockGetDashboard.mockResolvedValue(null)
+        mockGetDashboardWidgetData.mockResolvedValue(null)
+        mockGetFieldMappings.mockResolvedValue([])
+    })
+
+    function renderHomePage(initialEntries = ['/app-home']) {
+        const { default: HomePage } = require('./index')
+        return render(
+            <MemoryRouter initialEntries={initialEntries}>
+                <Routes>
+                    <Route path="/app-home" element={<HomePage />} />
+                </Routes>
+            </MemoryRouter>
+        )
+    }
+
+    it('T-HOME-PAGE-R18a: renders with Overview tab selected by default', async () => {
+        renderHomePage()
+        await waitFor(() => {
+            const overviewTab = screen.getByRole('tab', { name: 'Overview' })
+            expect(overviewTab).toHaveAttribute('aria-selected', 'true')
+        })
+    })
+
+    it('T-HOME-PAGE-R18b: renders both Overview and Dashboard tabs', async () => {
+        renderHomePage()
+        await waitFor(() => {
+            expect(screen.getByRole('tab', { name: 'Overview' })).toBeInTheDocument()
+            expect(screen.getByRole('tab', { name: 'Dashboard' })).toBeInTheDocument()
+        })
+    })
+
+    it('T-HOME-PAGE-R18c: clicking Dashboard tab switches away from Overview', async () => {
+        renderHomePage()
+        const user = userEvent.setup()
+
+        await waitFor(() => {
+            expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+        })
+
+        await user.click(screen.getByRole('tab', { name: 'Dashboard' }))
+
+        expect(screen.getByRole('tab', { name: 'Dashboard' })).toHaveAttribute('aria-selected', 'true')
+        expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'false')
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Mocks for HomeEmbeddedDashboard
+// ---------------------------------------------------------------------------
+
+const mockGetReportTemplates = jest.fn()
+const mockGetDashboard = jest.fn()
+const mockGetDashboardWidgetData = jest.fn()
+const mockGetFieldMappings = jest.fn()
+
+jest.mock('@/reporting/reporting.service', () => ({
+    getReportTemplates: (...a: unknown[]) => mockGetReportTemplates(...a),
+    getDashboard: (...a: unknown[]) => mockGetDashboard(...a),
+    getDashboardWidgetData: (...a: unknown[]) => mockGetDashboardWidgetData(...a),
+    getFieldMappings: (...a: unknown[]) => mockGetFieldMappings(...a),
+}))
+
+jest.mock('@/reporting/DashboardCreatePage/DashboardTemplates', () => ({
+    DASHBOARD_TEMPLATES: {},
+}))
+
+jest.mock('@/reporting/dashboardWidgets', () => ({
+    DASHBOARD_DATA_SOURCES: [],
+    DashboardLiveWidget: () => <div data-testid="dashboard-live-widget" />,
+    createDefaultDashboardFilters: () => ({}),
+    makeCompositeKey: (source: string, key: string) => `${source}.${key}`,
+    normalizeDashboardWidget: (w: unknown) => w,
+}))
+
+jest.mock('@/shared/LoadingSpinner/LoadingSpinner', () => () => (
+    <div data-testid="loading-spinner" />
+))
+
+// Helper fixtures
+function makePinnedTemplate(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 1,
+        name: 'My Dashboard',
+        type: 'dashboard',
+        fields: { showOnHomepage: true },
+        dashboardConfig: {
+            pages: [{ id: 1, name: 'Page 1', widgets: [], sections: [], template: null }],
+            showOnHomepage: true,
+        },
+        ...overrides,
+    }
+}
+
+function renderEmbeddedDashboard() {
+    const { default: HomeEmbeddedDashboard } = require('./HomeEmbeddedDashboard')
+    return render(
+        <MemoryRouter>
+            <HomeEmbeddedDashboard />
+        </MemoryRouter>,
+    )
+}
+
+// ---------------------------------------------------------------------------
+// T-HOME-DASH — HomeEmbeddedDashboard
+// Requirements: home.requirements.md §12
+// ---------------------------------------------------------------------------
+
+describe('HomeEmbeddedDashboard', () => {
+    beforeEach(() => {
+        jest.clearAllMocks()
+        mockGetReportTemplates.mockReset()
+        mockGetDashboard.mockReset()
+        mockGetDashboardWidgetData.mockReset()
+        mockGetFieldMappings.mockReturnValue(Promise.resolve([]))
+    })
+
+    it('T-HOME-DASH-R01a: excludes dashboards without showOnHomepage flag', async () => {
+        const unpinned = makePinnedTemplate({ id: 2, name: 'Unpinned', fields: { showOnHomepage: false } })
+        mockGetReportTemplates.mockResolvedValue([unpinned])
+
+        renderEmbeddedDashboard()
+
+        await waitFor(() => {
+            expect(screen.getByText(/No dashboards are pinned/i)).toBeInTheDocument()
+        })
+        expect(mockGetDashboard).not.toHaveBeenCalled()
+    })
+
+    it('T-HOME-DASH-R01b: includes only dashboards with showOnHomepage === true', async () => {
+        const pinned = makePinnedTemplate({ id: 1, name: 'Pinned Only' })
+        const unpinned = makePinnedTemplate({ id: 2, name: 'Unpinned', fields: { showOnHomepage: false } })
+        mockGetReportTemplates.mockResolvedValue([pinned, unpinned])
+        mockGetDashboard.mockResolvedValue({ ...pinned, dashboardConfig: pinned.dashboardConfig })
+
+        renderEmbeddedDashboard()
+
+        await waitFor(() => {
+            expect(screen.getByText('Pinned Only')).toBeInTheDocument()
+        })
+        expect(screen.queryByText('Unpinned')).not.toBeInTheDocument()
+    })
+
+    it('T-HOME-DASH-R02a: shows empty state message when no dashboards are pinned', async () => {
+        mockGetReportTemplates.mockResolvedValue([])
+
+        renderEmbeddedDashboard()
+
+        await waitFor(() => {
+            expect(screen.getByText(/No dashboards are pinned to the homepage/i)).toBeInTheDocument()
+        })
+    })
+
+    it('T-HOME-DASH-R02b: does not call getDashboard when list is empty', async () => {
+        mockGetReportTemplates.mockResolvedValue([])
+
+        renderEmbeddedDashboard()
+
+        await waitFor(() => {
+            expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument()
+        })
+        expect(mockGetDashboard).not.toHaveBeenCalled()
+    })
+
+    it('T-HOME-DASH-R03a: renders no pagination dots when only 1 pinned dashboard', async () => {
+        const single = makePinnedTemplate({ id: 1, name: 'Solo Dashboard' })
+        mockGetReportTemplates.mockResolvedValue([single])
+        mockGetDashboard.mockResolvedValue({ ...single, dashboardConfig: single.dashboardConfig })
+
+        renderEmbeddedDashboard()
+
+        await waitFor(() => {
+            expect(screen.getByText('Solo Dashboard')).toBeInTheDocument()
+        })
+        expect(screen.queryByRole('tablist', { name: /Dashboard pagination/i })).not.toBeInTheDocument()
+    })
+
+    it('T-HOME-DASH-R03b: renders exactly N dots for N pinned dashboards (N=2)', async () => {
+        const dash1 = makePinnedTemplate({ id: 1, name: 'Dash A' })
+        const dash2 = makePinnedTemplate({ id: 2, name: 'Dash B' })
+        mockGetReportTemplates.mockResolvedValue([dash1, dash2])
+        mockGetDashboard.mockResolvedValue({ ...dash1, dashboardConfig: dash1.dashboardConfig })
+
+        renderEmbeddedDashboard()
+
+        await waitFor(() => {
+            expect(screen.getByRole('tablist', { name: /Dashboard pagination/i })).toBeInTheDocument()
+        })
+        const tabs = screen.getAllByRole('tab')
+        expect(tabs).toHaveLength(2)
+    })
+
+    it('T-HOME-DASH-R03c: each pagination dot has aria-label equal to the dashboard name', async () => {
+        const dash1 = makePinnedTemplate({ id: 1, name: 'Alpha' })
+        const dash2 = makePinnedTemplate({ id: 2, name: 'Beta' })
+        mockGetReportTemplates.mockResolvedValue([dash1, dash2])
+        mockGetDashboard.mockResolvedValue({ ...dash1, dashboardConfig: dash1.dashboardConfig })
+
+        renderEmbeddedDashboard()
+
+        await waitFor(() => {
+            expect(screen.getByRole('tab', { name: 'Alpha' })).toBeInTheDocument()
+        })
+        expect(screen.getByRole('tab', { name: 'Beta' })).toBeInTheDocument()
+    })
+
+    it('T-HOME-DASH-R03d: clicking a pagination dot changes active selection', async () => {
+        const dash1 = makePinnedTemplate({ id: 1, name: 'First' })
+        const dash2 = makePinnedTemplate({ id: 2, name: 'Second' })
+        mockGetReportTemplates.mockResolvedValue([dash1, dash2])
+        mockGetDashboard.mockResolvedValue({ ...dash1, dashboardConfig: dash1.dashboardConfig })
+
+        const user = userEvent.setup()
+        renderEmbeddedDashboard()
+
+        await waitFor(() => {
+            expect(screen.getByRole('tab', { name: 'First' })).toBeInTheDocument()
+        })
+
+        const firstTab = screen.getByRole('tab', { name: 'First' })
+        const secondTab = screen.getByRole('tab', { name: 'Second' })
+        expect(firstTab).toHaveAttribute('aria-selected', 'true')
+        expect(secondTab).toHaveAttribute('aria-selected', 'false')
+
+        mockGetDashboard.mockResolvedValue({ ...dash2, dashboardConfig: dash2.dashboardConfig })
+        await user.click(secondTab)
+
+        await waitFor(() => {
+            expect(secondTab).toHaveAttribute('aria-selected', 'true')
+        })
+        expect(firstTab).toHaveAttribute('aria-selected', 'false')
+    })
+
+    it('T-HOME-DASH-R04a: renders dashboard title as h2 when loaded', async () => {
+        const pinned = makePinnedTemplate({ id: 1, name: 'My Dashboard Title' })
+        mockGetReportTemplates.mockResolvedValue([pinned])
+        mockGetDashboard.mockResolvedValue({ ...pinned, dashboardConfig: pinned.dashboardConfig })
+
+        renderEmbeddedDashboard()
+
+        await waitFor(() => {
+            expect(screen.getByRole('heading', { level: 2, name: 'My Dashboard Title' })).toBeInTheDocument()
+        })
+    })
+
+    it('T-HOME-DASH-R04b: shows error message when getDashboard rejects', async () => {
+        const pinned = makePinnedTemplate()
+        mockGetReportTemplates.mockResolvedValue([pinned])
+        mockGetDashboard.mockRejectedValue(new Error('Network error'))
+
+        renderEmbeddedDashboard()
+
+        await waitFor(() => {
+            expect(screen.getByText(/Could not load dashboard/i)).toBeInTheDocument()
+        })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Mocks for HomeEmbeddedDashboard

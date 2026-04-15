@@ -360,6 +360,10 @@ Each organisation sees only the data relevant to them.  The widget layout and st
 
 **REQ-HOME-F-017:** The `TasksWidget` shall include a "View all" link that navigates to `/my-work-items`.
 
+### 10.8 Navigation Reset
+
+**REQ-HOME-F-018:** When the user navigates to `/app-home` (including re-clicking the Home link while already on the home page), the active page/tab state shall reset to `'overview'`. This ensures the user always lands on the Overview tab regardless of which sub-tab was previously selected. Implementation shall use React Router's `location.key` change to detect navigation events.
+
 ---
 
 ## 11. Traceability
@@ -390,7 +394,95 @@ Each organisation sees only the data relevant to them.  The widget layout and st
 
 ---
 
-## 12. Change Log
+## 12. HomeEmbeddedDashboard — Pinned Dashboard Tab (Block 2 addition)
+
+This section covers the `HomeEmbeddedDashboard` component rendered inside the **Dashboard** tab of the home page. It allows users to view full reporting dashboards without leaving the home screen.
+
+### REQ-HOME-DASH-F-001 — Filter by `showOnHomepage` flag
+
+The `HomeEmbeddedDashboard` component shall call `getReportTemplates()` on mount and filter the results to only those templates whose `type === 'dashboard'` **and** whose `fields.showOnHomepage === true`. The filtered list is known as the **pinned dashboards** list.
+
+Acceptance criteria:
+- Only dashboards with `showOnHomepage: true` appear in the pinned list.
+- A dashboard with `showOnHomepage: false` (or the property absent) is excluded from the list.
+
+### REQ-HOME-DASH-F-002 — Empty state when no dashboards are pinned
+
+When the pinned dashboards list is empty, the component shall render a message: `"No dashboards are pinned to the homepage. Enable Show on Homepage on any dashboard to display it here."` No error state shall be shown; this is an expected user-configuration state.
+
+Acceptance criteria:
+- The message is visible when no templates have `showOnHomepage: true`.
+- No `LoadingSpinner` is shown after the fetch resolves to an empty list.
+- `getDashboard()` is NOT called when the list is empty.
+
+### REQ-HOME-DASH-F-003 — Pagination dots for multiple pinned dashboards
+
+When there is more than one pinned dashboard, the component shall render a row of pagination dots (`role="tablist"`) containing one dot per pinned dashboard. The currently selected dot shall have width `w-6` and height `h-3` (pill shape) styled `bg-brand-600`; unselected dots shall be `w-3 h-3 bg-brand-200`. Clicking an unselected dot shall update `selectedIndex` to that dot's index, which triggers loading of the corresponding dashboard.
+
+Acceptance criteria:
+- With exactly 1 pinned dashboard, no pagination dot row is rendered.
+- With 2+ pinned dashboards, exactly N dots are rendered.
+- Each dot has `role="tab"` and `aria-label` equal to the dashboard's name.
+- The active dot has `aria-selected="true"`; all others have `aria-selected="false"`.
+- Clicking a dot updates the active selection (the clicked dot becomes the active pill).
+
+### REQ-HOME-DASH-F-004 — Load and display selected dashboard
+
+When a dashboard is selected (by index), the component shall: call `getDashboard(id)`, display a `LoadingSpinner` during the request, then render the dashboard title, page tabs (if multi-page), and widget grid. The widget grid must use the `DashboardLiveWidget` component and the live slot/section layout from the dashboard's `dashboardConfig`.
+
+Acceptance criteria:
+- The dashboard name appears as an `<h2>` heading above the content.
+- If the dashboard has multiple pages, page-selector pills are rendered.
+- An error message ("Could not load dashboard.") is shown when `getDashboard()` rejects.
+
+### REQ-HOME-DASH-F-005 — `DashboardCreatePage` showOnHomepage checkbox
+
+The `DashboardCreatePage` component shall include a **"Show on Homepage"** checkbox in its create/edit form. When checked, the value `showOnHomepage: true` shall be stored in the dashboard's `dashboardConfig` payload. When unchecked, the value shall be `false`. On load, the form shall initialise the checkbox state from the existing dashboard's `dashboardConfig.showOnHomepage` value.
+
+Acceptance criteria:
+- The checkbox renders with an accessible label.
+- Saving with the checkbox checked persists `showOnHomepage: true` in the dashboard config.
+- Saving with the checkbox unchecked persists `showOnHomepage: false`.
+- Loading an existing dashboard with `showOnHomepage: true` pre-checks the box.
+- Loading an existing dashboard with `showOnHomepage: false` (or absent) leaves the box unchecked.
+
+---
+
+## 11. Traceability (updated)
+
+| Requirement ID | Test file | Test ID(s) |
+|----------------|-----------|------------|
+| REQ-HOME-F-001 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-002 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-003 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-004 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-005 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-C-001 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-C-002 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-C-003 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-006 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-007 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-008 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-009 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-010 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-C-004 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-011 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-012 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-013 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-014 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-015 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-016 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-017 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-018 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-DASH-F-001 | `frontend/src/home/__tests__/home.test.tsx` | T-HOME-DASH-R01a, R01b |
+| REQ-HOME-DASH-F-002 | `frontend/src/home/__tests__/home.test.tsx` | T-HOME-DASH-R02a, R02b |
+| REQ-HOME-DASH-F-003 | `frontend/src/home/__tests__/home.test.tsx` | T-HOME-DASH-R03a, R03b, R03c, R03d |
+| REQ-HOME-DASH-F-004 | `frontend/src/home/__tests__/home.test.tsx` | T-HOME-DASH-R04a, R04b |
+| REQ-HOME-DASH-F-005 | `frontend/src/reporting/__tests__/DashboardCreatePage.test.tsx` | T-RPT-DASH-CREATE-R05a, R05b, R05c |
+
+---
+
+## 13. Change Log
 
 | Date | Change |
 |------|--------|
@@ -398,3 +490,5 @@ Each organisation sees only the data relevant to them.  The widget layout and st
 | 2026-03-11 | Formal REQ-HOME-{TYPE}-{NNN} statements added per Guideline 13 |
 | 2026-03-25 | §5.4 RecentActivityWidget data source amended — widget now shows current user's own recently opened records (audit-event based, `userId`-filtered) rather than org-level last-opened. API updated to `GET /api/activity/recent?userId={userId}&limit=10`. Scope note updated. (OQ-QUO-FE-001) |
 | 2026-04-05 | Added Impact Analysis (§1a): 6 UI components, 9 API endpoints, 6 DB tables, 6 dependencies |
+| 2026-05-22 | §12 added — HomeEmbeddedDashboard requirements (REQ-HOME-DASH-F-001 to F-005) covering pinned dashboard filtering, empty state, pagination dots, live widget rendering, and showOnHomepage checkbox. Retroactive compliance with Three-Artifact Rule — code was written before requirements; acknowledged. Traceability table updated. Open questions OQ-034 raised. |
+| 2026-05-22 | REQ-HOME-F-018 added — Navigation reset: Home page always resets to Overview tab on navigation (Defect 3). §10.8 added. Traceability table updated. |

@@ -1,10 +1,10 @@
-/**
- * Submissions Route — /api/submissions
+﻿/**
+ * Submissions Route â€” /api/submissions
  *
  * Requirements: submissions.requirements.md
  *
  * All routes require a valid JWT.  Data is scoped by createdByOrgCode
- * from the JWT payload (multi-tenant isolation — §05-Multi-Tenant-Rules.md).
+ * from the JWT payload (multi-tenant isolation â€” Â§05-Multi-Tenant-Rules.md).
  */
 
 'use strict'
@@ -20,7 +20,7 @@ const EDIT_LOCK_TTL_SECONDS = 90
 router.use(authenticateToken)
 
 // ---------------------------------------------------------------------------
-// Error logger — writes to error_log table (§16-Error-Handling-Standards.md)
+// Error logger â€” writes to error_log table (Â§16-Error-Handling-Standards.md)
 // ---------------------------------------------------------------------------
 
 async function logError(req, source, errorCode, description, context = {}) {
@@ -123,13 +123,13 @@ async function ensureCurrentUserHoldsEditLock(submissionId, user) {
 }
 
 // ---------------------------------------------------------------------------
-// R01 — GET /api/submissions
+// R01 â€” GET /api/submissions
 // Returns submissions scoped to the caller's org.
 // ---------------------------------------------------------------------------
 
 router.get('/', async (req, res) => {
     const orgCode = req.user.orgCode
-    const { status } = req.query
+    const { status, date_basis, date_from, date_to } = req.query
 
     try {
         // Join party to derive createdByOrgType from the creating org's party record
@@ -142,8 +142,22 @@ router.get('/', async (req, res) => {
         const params = [orgCode]
 
         if (status) {
-            sql += ` AND s.status = $2`
+            sql += ` AND s.status = $${params.length + 1}`
             params.push(status)
+        }
+
+        // Date range filtering â€” maps date_basis label to a column name
+        if (date_basis && date_from && date_to) {
+            const DATE_COLUMN_MAP = {
+                'Created Date': '"createdDate"',
+                'Inception Date': '"inceptionDate"',
+                'Expiry Date': '"expiryDate"',
+            }
+            const col = DATE_COLUMN_MAP[date_basis]
+            if (col) {
+                sql += ` AND s.${col}::date >= $${params.length + 1}::date AND s.${col}::date <= $${params.length + 2}::date`
+                params.push(date_from, date_to)
+            }
         }
 
         sql += ` ORDER BY s."createdDate" DESC`
@@ -169,12 +183,12 @@ router.get('/', async (req, res) => {
     } catch (err) {
         console.error('[GET /api/submissions] Error:', err.message)
         await logError(req, 'GET /api/submissions', 'ERR_SUB_FETCH_500', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R02 — POST /api/submissions
+// R02 â€” POST /api/submissions
 // Creates a new submission. Forces status and createdByOrgCode from JWT.
 // Generates the reference server-side (SUB-{ORG}-{YYYYMMDD}-{NNN}).
 // Applies default expiry of inception + 1 year when not supplied.
@@ -200,11 +214,11 @@ router.post('/', async (req, res) => {
     // R02: insured name is required
     if (!insured) {
         await logError(req, 'POST /api/submissions', 'ERR_SUB_CREATE_MISSING_INSURED', 'insured is required')
-        return res.status(400).json({ error: 'insured (insured name) is required' })
+        return res.status(400).json({ message: 'insured (insured name) is required' })
     }
 
     try {
-        // R02a: Generate reference server-side — SUB-{ORG}-{YYYYMMDD}-{NNN}
+        // R02a: Generate reference server-side â€” SUB-{ORG}-{YYYYMMDD}-{NNN}
         // Note: COUNT + INSERT is not atomic; a sequence column per org+date
         // (OQ-044) would fully eliminate collisions under high concurrency.
         const today = new Date()
@@ -261,25 +275,25 @@ router.post('/', async (req, res) => {
                 'Created',          // R02: always 'Created'
                 createdDate ?? new Date().toISOString(),
                 createdBy ?? null,
-                orgCode,            // R02: always from JWT — ignores caller value
+                orgCode,            // R02: always from JWT â€” ignores caller value
             ]
         )
 
         if (!rows || rows.length === 0) {
             await logError(req, 'POST /api/submissions', 'ERR_SUB_CREATE_500', 'Insert returned no rows')
-            return res.status(500).json({ error: 'Insert returned no rows' })
+            return res.status(500).json({ message: 'Insert returned no rows' })
         }
 
         res.status(201).json(rows[0])
     } catch (err) {
         console.error('[POST /api/submissions] Error:', err.message)
         await logError(req, 'POST /api/submissions', 'ERR_SUB_CREATE_500', err.message)
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R03 — GET /api/submissions/:id
+// R03 â€” GET /api/submissions/:id
 // ---------------------------------------------------------------------------
 
 router.get('/:id', async (req, res) => {
@@ -298,7 +312,7 @@ router.get('/:id', async (req, res) => {
 
         if (!rows || rows.length === 0) {
             await logError(req, 'GET /api/submissions/:id', 'ERR_SUB_NOT_FOUND', 'Submission not found', { id })
-            return res.status(404).json({ error: 'Submission not found' })
+            return res.status(404).json({ message: 'Submission not found' })
         }
 
         const submission = rows[0]
@@ -306,7 +320,7 @@ router.get('/:id', async (req, res) => {
         // R03: 403 if belongs to different org
         if (submission.createdByOrgCode !== orgCode) {
             await logError(req, 'GET /api/submissions/:id', 'ERR_SUB_FORBIDDEN', 'Access denied', { id })
-            return res.status(403).json({ error: 'Access denied' })
+            return res.status(403).json({ message: 'Access denied' })
         }
 
         // TODO: replace with real subqueries when quote and policy tables exist
@@ -317,12 +331,12 @@ router.get('/:id', async (req, res) => {
     } catch (err) {
         console.error('[GET /api/submissions/:id] Error:', err.message)
         await logError(req, 'GET /api/submissions/:id', 'ERR_SUB_FETCH_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R04 — PUT /api/submissions/:id
+// R04 â€” PUT /api/submissions/:id
 // Updates editable fields only. Strips protected fields.
 // ---------------------------------------------------------------------------
 
@@ -381,12 +395,12 @@ router.put('/:id', async (req, res) => {
     } catch (err) {
         console.error('[PUT /api/submissions/:id] Error:', err.message)
         await logError(req, 'PUT /api/submissions/:id', 'ERR_SUB_UPDATE_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R10 — POST /api/submissions/:id/edit-lock
+// R10 â€” POST /api/submissions/:id/edit-lock
 // Acquire or refresh the edit lock for the current user.
 // ---------------------------------------------------------------------------
 
@@ -451,12 +465,12 @@ router.post('/:id/edit-lock', async (req, res) => {
         })
     } catch (err) {
         console.error('[POST /api/submissions/:id/edit-lock] Error:', err.message)
-        return res.status(500).json({ error: err.message })
+        return res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R10 — DELETE /api/submissions/:id/edit-lock
+// R10 â€” DELETE /api/submissions/:id/edit-lock
 // Release the current user's edit lock if they hold it.
 // ---------------------------------------------------------------------------
 
@@ -480,12 +494,12 @@ router.delete('/:id/edit-lock', async (req, res) => {
         return res.status(204).send()
     } catch (err) {
         console.error('[DELETE /api/submissions/:id/edit-lock] Error:', err.message)
-        return res.status(500).json({ error: err.message })
+        return res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R05 — POST /api/submissions/:id/submit
+// R05 â€” POST /api/submissions/:id/submit
 // Transitions status from any state to 'In Review'.
 // ---------------------------------------------------------------------------
 
@@ -513,12 +527,12 @@ router.post('/:id/submit', async (req, res) => {
     } catch (err) {
         console.error('[POST /api/submissions/:id/submit] Error:', err.message)
         await logError(req, 'POST /api/submissions/:id/submit', 'ERR_SUB_SUBMIT_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R06 — POST /api/submissions/:id/decline
+// R06 â€” POST /api/submissions/:id/decline
 // Transitions status to 'Declined'. Accepts { reasonCode, reasonText }.
 // Reason is stored as an audit event. Dedicated decline_reason column
 // is deferred until the schema extension milestone.
@@ -531,7 +545,7 @@ router.post('/:id/decline', async (req, res) => {
 
     if (!reasonCode) {
         await logError(req, 'POST /api/submissions/:id/decline', 'ERR_SUB_DECLINE_MISSING_REASON', 'reasonCode is required', { id })
-        return res.status(400).json({ error: 'reasonCode is required' })
+        return res.status(400).json({ message: 'reasonCode is required' })
     }
 
     try {
@@ -551,7 +565,7 @@ router.post('/:id/decline', async (req, res) => {
             [id]
         )
 
-        // Best-effort audit entry — failure does not affect the decline outcome
+        // Best-effort audit entry â€” failure does not affect the decline outcome
         try {
             await runCommand(
                 `INSERT INTO public.audit_event (entity_type, entity_id, action, details, created_by, user_id, user_name)
@@ -565,12 +579,12 @@ router.post('/:id/decline', async (req, res) => {
     } catch (err) {
         console.error('[POST /api/submissions/:id/decline] Error:', err.message)
         await logError(req, 'POST /api/submissions/:id/decline', 'ERR_SUB_DECLINE_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R09 — GET /api/submissions/:id/related
+// R09 â€” GET /api/submissions/:id/related
 // Returns all submissions linked to the parent submission.
 // ---------------------------------------------------------------------------
 
@@ -582,11 +596,11 @@ router.get('/:id/related', async (req, res) => {
         const parentRows = await runQuery(`SELECT * FROM submission WHERE id = $1`, [id])
         if (!parentRows || parentRows.length === 0) {
             await logError(req, 'GET /api/submissions/:id/related', 'ERR_SUB_NOT_FOUND', 'Submission not found', { id })
-            return res.status(404).json({ error: 'Submission not found' })
+            return res.status(404).json({ message: 'Submission not found' })
         }
         if (parentRows[0].createdByOrgCode !== orgCode) {
             await logError(req, 'GET /api/submissions/:id/related', 'ERR_SUB_FORBIDDEN', 'Access denied', { id })
-            return res.status(403).json({ error: 'Access denied' })
+            return res.status(403).json({ message: 'Access denied' })
         }
 
         const rows = await runQuery(
@@ -606,12 +620,12 @@ router.get('/:id/related', async (req, res) => {
     } catch (err) {
         console.error('[GET /api/submissions/:id/related] Error:', err.message)
         await logError(req, 'GET /api/submissions/:id/related', 'ERR_SUB_RELATED_FETCH_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R09 — POST /api/submissions/:id/related
+// R09 â€” POST /api/submissions/:id/related
 // Creates a related-submission link.
 // ---------------------------------------------------------------------------
 
@@ -622,33 +636,33 @@ router.post('/:id/related', async (req, res) => {
 
     if (!req.body.relatedSubmissionId) {
         await logError(req, 'POST /api/submissions/:id/related', 'ERR_SUB_RELATED_MISSING_ID', 'relatedSubmissionId is required', { id })
-        return res.status(400).json({ error: 'relatedSubmissionId is required' })
+        return res.status(400).json({ message: 'relatedSubmissionId is required' })
     }
 
     if (id === relatedSubmissionId) {
         await logError(req, 'POST /api/submissions/:id/related', 'ERR_SUB_RELATED_SELF_LINK', 'A submission cannot be linked to itself', { id, relatedSubmissionId })
-        return res.status(400).json({ error: 'A submission cannot be linked to itself' })
+        return res.status(400).json({ message: 'A submission cannot be linked to itself' })
     }
 
     try {
         const parentRows = await runQuery(`SELECT * FROM submission WHERE id = $1`, [id])
         if (!parentRows || parentRows.length === 0) {
             await logError(req, 'POST /api/submissions/:id/related', 'ERR_SUB_NOT_FOUND', 'Submission not found', { id })
-            return res.status(404).json({ error: 'Submission not found' })
+            return res.status(404).json({ message: 'Submission not found' })
         }
         if (parentRows[0].createdByOrgCode !== orgCode) {
             await logError(req, 'POST /api/submissions/:id/related', 'ERR_SUB_FORBIDDEN', 'Access denied', { id })
-            return res.status(403).json({ error: 'Access denied' })
+            return res.status(403).json({ message: 'Access denied' })
         }
 
         const relatedRows = await runQuery(`SELECT * FROM submission WHERE id = $1`, [relatedSubmissionId])
         if (!relatedRows || relatedRows.length === 0) {
             await logError(req, 'POST /api/submissions/:id/related', 'ERR_SUB_RELATED_NOT_FOUND', 'Related submission not found', { id, relatedSubmissionId })
-            return res.status(404).json({ error: 'Related submission not found' })
+            return res.status(404).json({ message: 'Related submission not found' })
         }
         if (relatedRows[0].createdByOrgCode !== orgCode) {
             await logError(req, 'POST /api/submissions/:id/related', 'ERR_SUB_FORBIDDEN', 'Access denied', { id, relatedSubmissionId })
-            return res.status(403).json({ error: 'Access denied' })
+            return res.status(403).json({ message: 'Access denied' })
         }
 
         const leftId = Math.min(id, relatedSubmissionId)
@@ -665,12 +679,12 @@ router.post('/:id/related', async (req, res) => {
     } catch (err) {
         console.error('[POST /api/submissions/:id/related] Error:', err.message)
         await logError(req, 'POST /api/submissions/:id/related', 'ERR_SUB_RELATED_CREATE_500', err.message, { id, relatedSubmissionId })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R09 — DELETE /api/submissions/:id/related/:relatedId
+// R09 â€” DELETE /api/submissions/:id/related/:relatedId
 // Removes a related-submission link.
 // ---------------------------------------------------------------------------
 
@@ -683,11 +697,11 @@ router.delete('/:id/related/:relatedId', async (req, res) => {
         const parentRows = await runQuery(`SELECT * FROM submission WHERE id = $1`, [id])
         if (!parentRows || parentRows.length === 0) {
             await logError(req, 'DELETE /api/submissions/:id/related/:relatedId', 'ERR_SUB_NOT_FOUND', 'Submission not found', { id, relatedId })
-            return res.status(404).json({ error: 'Submission not found' })
+            return res.status(404).json({ message: 'Submission not found' })
         }
         if (parentRows[0].createdByOrgCode !== orgCode) {
             await logError(req, 'DELETE /api/submissions/:id/related/:relatedId', 'ERR_SUB_FORBIDDEN', 'Access denied', { id, relatedId })
-            return res.status(403).json({ error: 'Access denied' })
+            return res.status(403).json({ message: 'Access denied' })
         }
 
         const deletedRows = await runCommand(
@@ -700,14 +714,14 @@ router.delete('/:id/related/:relatedId', async (req, res) => {
 
         if (!deletedRows || deletedRows.length === 0) {
             await logError(req, 'DELETE /api/submissions/:id/related/:relatedId', 'ERR_SUB_RELATED_NOT_FOUND', 'Related submission link not found', { id, relatedId })
-            return res.status(404).json({ error: 'Related submission link not found' })
+            return res.status(404).json({ message: 'Related submission link not found' })
         }
 
         res.status(204).send()
     } catch (err) {
         console.error('[DELETE /api/submissions/:id/related/:relatedId] Error:', err.message)
         await logError(req, 'DELETE /api/submissions/:id/related/:relatedId', 'ERR_SUB_RELATED_DELETE_500', err.message, { id, relatedId })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 

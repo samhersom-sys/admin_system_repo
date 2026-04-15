@@ -51,7 +51,7 @@ function flattenResponse(resp: SearchResponse): SearchRecord[] {
     ...resp.submissions.map(r => toSearchRecord(r, 'Submission')),
     ...resp.quotes.map(r => toSearchRecord(r, 'Quote')),
     ...resp.policies.map(r => toSearchRecord(r, 'Policy')),
-    ...resp.bindingAuthorities.map(r => toSearchRecord(r, 'BindingAuthority')),
+    ...resp.bindingAuthorities.map(r => toSearchRecord(r, 'Binding Authority')),
     ...resp.parties.map(r => toSearchRecord(r, 'Party')),
     ...resp.claims.map(r => toSearchRecord(r, 'Claim')),
   ]
@@ -87,7 +87,7 @@ export default function SearchPage() {
 
   // REQ-SEARCH-FE-F-003 — initialise types from URL param (supports legacy ?type= and new ?types=)
   const initialFilters = useMemo<SearchFilters>(() => {
-    const ALL_TYPES: RecordType[] = ['Submission', 'Quote', 'Policy', 'BindingAuthority', 'Party', 'Claim']
+    const ALL_TYPES: RecordType[] = ['Submission', 'Quote', 'Policy', 'Binding Authority', 'Party', 'Claim']
     const typesParam = searchParams.get('types') ?? ''
     const typeParam = searchParams.get('type') ?? ''
     let preSelected: RecordType[] = []

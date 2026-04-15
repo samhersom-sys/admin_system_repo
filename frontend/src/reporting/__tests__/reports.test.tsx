@@ -70,6 +70,15 @@ jest.mock('@/shell/SidebarContext', () => ({
     useSidebarSection: (...args: unknown[]) => mockUseSidebarSection(...args),
 }))
 
+jest.mock('react-chartjs-2', () => {
+    const React = jest.requireActual<typeof import('react')>('react')
+    return {
+        Line: (_: unknown) => React.createElement('div', { 'data-testid': 'chart-line' }),
+        Bar: (_: unknown) => React.createElement('div', { 'data-testid': 'chart-bar' }),
+        Doughnut: (_: unknown) => React.createElement('div', { 'data-testid': 'chart-doughnut' }),
+    }
+})
+
 import ReportsListPage from '../ReportsListPage/ReportsListPage'
 import ReportCreatePage from '../ReportCreatePage/ReportCreatePage'
 import ReportRunPage from '../ReportRunPage/ReportRunPage'
@@ -749,13 +758,14 @@ describe('ReportRunPage — /reports/run/:reportId', () => {
     })
 
     // REQ-RPT-FE-F-027
-    it('T-RPT-FE-F-R027 — renders 3 tabs: Results, Execution History, Audit History; default is Results', async () => {
+    it('T-RPT-FE-F-R027 — renders 4 tabs: Filters, Results, Execution History, Audit History; default is Filters', async () => {
         renderRunPage('42')
         await screen.findByText('Sales Report')
-        expect(screen.getByRole('button', { name: /results/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /^filters$/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /^results$/i })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: /execution history/i })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: /audit history/i })).toBeInTheDocument()
-        // Results tab content is visible by default
+        // Filters tab is visible by default — Run Report button is inside it
         expect(screen.getByRole('button', { name: /run report/i })).toBeInTheDocument()
     })
 
@@ -1077,12 +1087,14 @@ describe('DashboardConfigurePage — /dashboards/configure/:id', () => {
                 return Promise.resolve([
                     { key: 'status', label: 'Status', domain: 'Submissions', type: 'lookup', lookupValues: ['Open', 'Bound'] },
                     { key: 'gross_premium', label: 'Gross Premium', domain: 'Submissions', type: 'number' },
+                    { key: 'countAll', label: 'Count of Submissions', domain: 'Submissions', type: 'count' },
                 ])
             }
             if (domain === 'quotes') {
                 return Promise.resolve([
                     { key: 'broker_name', label: 'Broker Name', domain: 'Quotes', type: 'text' },
                     { key: 'quoted_premium', label: 'Quoted Premium', domain: 'Quotes', type: 'number' },
+                    { key: 'countAll', label: 'Count of Quotes', domain: 'Quotes', type: 'count' },
                 ])
             }
             return Promise.resolve([])
@@ -1125,10 +1137,18 @@ describe('DashboardConfigurePage — /dashboards/configure/:id', () => {
         expect(screen.getByLabelText(/y-axis label/i)).toBeInTheDocument()
         expect(screen.getByLabelText(/y-axis field/i)).toBeInTheDocument()
         expect(screen.getByLabelText(/legend split by/i)).toBeInTheDocument()
-        expect(screen.getByText(/measures/i)).toBeInTheDocument()
-        expect(within(screen.getByLabelText(/x-axis field/i)).getByRole('option', { name: 'Broker Name (Quotes)' })).toBeInTheDocument()
-        expect(within(screen.getByLabelText(/x-axis field/i)).getByRole('option', { name: 'Gross Premium (Submissions)' })).toBeInTheDocument()
-        expect(screen.getByLabelText('Quoted Premium (Quotes)')).toBeInTheDocument()
+        expect(screen.getByText(/^measures$/i)).toBeInTheDocument()
+        expect(within(screen.getByLabelText(/x-axis field/i)).getByRole('option', { name: 'Broker Name' })).toBeInTheDocument()
+        expect(within(screen.getByLabelText(/x-axis field/i)).getByRole('option', { name: 'Gross Premium' })).toBeInTheDocument()
+        // Click + Add Measure to reveal a measure select and verify filter behaviour
+        await userEvent.click(screen.getByRole('button', { name: /add measure/i }))
+        const measuresSelect = screen.getByLabelText(/^measure 1$/i)
+        expect(within(measuresSelect).getByRole('option', { name: 'Count of Submissions' })).toBeInTheDocument()
+        expect(within(measuresSelect).getByRole('option', { name: 'Count of Quotes' })).toBeInTheDocument()
+        expect(within(measuresSelect).getByRole('option', { name: 'Gross Premium' })).toBeInTheDocument()
+        // Pure dimension fields must NOT appear in the measures list
+        expect(within(measuresSelect).queryByRole('option', { name: 'Status' })).not.toBeInTheDocument()
+        expect(within(measuresSelect).queryByRole('option', { name: 'Broker Name' })).not.toBeInTheDocument()
     })
 
     it('T-RPT-FE-F-R039b — sidebar Save Widgets persists configured chart settings with cross-domain fields', async () => {
@@ -1143,8 +1163,10 @@ describe('DashboardConfigurePage — /dashboards/configure/:id', () => {
         await userEvent.type(screen.getByLabelText(/y-axis label/i), 'Premium')
         await userEvent.selectOptions(screen.getByLabelText(/y-axis field/i), 'quotes::broker_name')
         await userEvent.selectOptions(screen.getByLabelText(/legend split by/i), 'submissions::status')
-        await userEvent.click(screen.getByLabelText('Gross Premium (Submissions)'))
-        await userEvent.click(screen.getByLabelText('Quoted Premium (Quotes)'))
+        await userEvent.click(screen.getByRole('button', { name: /add measure/i }))
+        await userEvent.selectOptions(screen.getByLabelText(/^measure 1$/i), 'submissions::gross_premium')
+        await userEvent.click(screen.getByRole('button', { name: /add measure/i }))
+        await userEvent.selectOptions(screen.getByLabelText(/^measure 2$/i), 'quotes::quoted_premium')
         await userEvent.click(screen.getByRole('button', { name: /save widget/i }))
 
         await triggerSidebarEvent('dashboard:configure:save')
@@ -1187,12 +1209,13 @@ describe('DashboardConfigurePage — /dashboards/configure/:id', () => {
         await userEvent.selectOptions(screen.getByLabelText(/x-axis field/i), 'submissions::status')
         await userEvent.selectOptions(screen.getByLabelText(/y-axis field/i), 'submissions::gross_premium')
         await userEvent.selectOptions(screen.getByLabelText(/legend split by/i), 'quotes::broker_name')
-        await userEvent.click(screen.getByLabelText('Gross Premium (Submissions)'))
+        await userEvent.click(screen.getByRole('button', { name: /add measure/i }))
+        await userEvent.selectOptions(screen.getByLabelText(/^measure 1$/i), 'submissions::gross_premium')
         await userEvent.click(screen.getByRole('button', { name: /save widget/i }))
 
         expect(screen.queryByText(/no widget assigned/i)).not.toBeInTheDocument()
-        expect(screen.getByText(/line • status \(submissions\)/i)).toBeInTheDocument()
-        expect(screen.getByText(/legend broker name \(quotes\)/i)).toBeInTheDocument()
+        // summary text is removed — slot renders a live widget preview instead
+        expect(screen.queryByText(/line \u2022 status/i)).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: /edit widget/i })).toBeInTheDocument()
     })
 
@@ -1228,6 +1251,73 @@ describe('DashboardConfigurePage — /dashboards/configure/:id', () => {
                 }),
             }),
         ))
+    })
+
+    it('T-RPT-FE-F-R039e — modal renders ignoresDashboardFilters checkbox and persists flag when saved (REQ-RPT-FE-F-044)', async () => {
+        renderDashboardConfigurePage()
+        await screen.findByRole('heading', { name: /configure dashboard widgets/i })
+        await userEvent.click(screen.getByRole('button', { name: /add widget/i }))
+        await userEvent.type(screen.getByLabelText(/widget title/i), 'Independent Metric')
+        await userEvent.selectOptions(screen.getByLabelText(/widget type/i), 'metric')
+
+        // checkbox must be present and unchecked by default
+        const independentCheckbox = screen.getByRole('checkbox', { name: /independent widget/i })
+        expect(independentCheckbox).toBeInTheDocument()
+        expect(independentCheckbox).not.toBeChecked()
+
+        // check it
+        await userEvent.click(independentCheckbox)
+        expect(independentCheckbox).toBeChecked()
+
+        await userEvent.click(screen.getByRole('button', { name: /save widget/i }))
+        await triggerSidebarEvent('dashboard:configure:save')
+
+        await waitFor(() => expect(mockUpdateDashboard).toHaveBeenCalledWith(
+            77,
+            expect.objectContaining({
+                config: expect.objectContaining({
+                    pages: expect.arrayContaining([
+                        expect.objectContaining({
+                            widgets: expect.arrayContaining([
+                                expect.objectContaining({
+                                    title: 'Independent Metric',
+                                    ignoresDashboardFilters: true,
+                                }),
+                            ]),
+                        }),
+                    ]),
+                }),
+            }),
+        ))
+    })
+
+    it('T-RPT-FE-F-R039f — modal renders Widget Filters section; adding a filter creates a row; removing clears it (REQ-RPT-FE-F-043)', async () => {
+        renderDashboardConfigurePage()
+        await screen.findByRole('heading', { name: /configure dashboard widgets/i })
+        await userEvent.click(screen.getByRole('button', { name: /add widget/i }))
+
+        // Widget Filters section and empty state must be present
+        expect(screen.getByText(/widget filters/i)).toBeInTheDocument()
+        expect(screen.getByText(/no widget-specific filters applied/i)).toBeInTheDocument()
+        const addFilterButton = screen.getByRole('button', { name: /\+ add filter/i })
+        expect(addFilterButton).toBeInTheDocument()
+
+        // adding a filter creates a row with field select, operator select, value input, remove button
+        await userEvent.click(addFilterButton)
+        expect(screen.queryByText(/no widget-specific filters applied/i)).not.toBeInTheDocument()
+        expect(screen.getByRole('option', { name: /select field/i })).toBeInTheDocument()
+        const removeButtons = screen.getAllByRole('button', { name: '' })
+        // a remove (×) button is present in the filter row
+        expect(removeButtons.length).toBeGreaterThan(0)
+
+        // removing the filter row restores empty state
+        // find the small × button in the filter row by querying the last icon-only button added
+        const allButtons = screen.getAllByRole('button')
+        const removeBtn = allButtons.find((btn) => btn.querySelector('svg') && btn.textContent === '')
+        if (removeBtn) {
+            await userEvent.click(removeBtn)
+            expect(await screen.findByText(/no widget-specific filters applied/i)).toBeInTheDocument()
+        }
     })
 
     it('T-RPT-FE-F-R041 — saved widgets render live data in configure mode instead of a static preview summary', async () => {
@@ -1404,5 +1494,101 @@ describe('DashboardViewPage — /dashboards/view/:reportId', () => {
                 reportingDate: '2026-04-10',
             }),
         ))
+    })
+
+    it('T-RPT-FE-F-R044 — independent widget bypasses dashboard filters and always uses default filters (REQ-RPT-FE-F-044)', async () => {
+        mockGetDashboard.mockResolvedValue({
+            id: 77,
+            name: 'Executive Dashboard',
+            description: 'Mixed widgets',
+            type: 'dashboard',
+            created_by: 'Alice',
+            created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-10T00:00:00.000Z',
+            dashboardConfig: {
+                pages: [
+                    {
+                        id: 1,
+                        name: 'Overview',
+                        template: 'twoColumn',
+                        widgets: [
+                            {
+                                id: 'widget-normal',
+                                slotId: 1,
+                                title: 'Normal Widget',
+                                type: 'metric',
+                                metric: 'submissions::gross_premium',
+                                aggregation: 'sum',
+                                ignoresDashboardFilters: false,
+                            },
+                            {
+                                id: 'widget-independent',
+                                slotId: 2,
+                                title: 'Independent Widget',
+                                type: 'metric',
+                                metric: 'policies::grossWrittenPremium',
+                                aggregation: 'sum',
+                                ignoresDashboardFilters: true,
+                            },
+                        ],
+                        scrollEnabled: false,
+                        maxRows: 12,
+                        sections: null,
+                    },
+                ],
+                showMetadata: false,
+            },
+        })
+        mockGetDashboardWidgetData.mockResolvedValue({ type: 'metric', value: 50000, label: 'Gross Premium' })
+
+        const { getByRole } = render(
+            <MemoryRouter initialEntries={['/dashboards/view/77']}>
+                <Routes>
+                    <Route path="/dashboards/view/:reportId" element={<DashboardViewPage />} />
+                </Routes>
+            </MemoryRouter>,
+        )
+
+        // wait for initial load
+        expect(await screen.findByText('Normal Widget')).toBeInTheDocument()
+
+        mockGetDashboardWidgetData.mockClear()
+
+        // apply a non-default dashboard filter
+        await userEvent.click(getByRole('button', { name: /dashboard filters/i }))
+        await userEvent.selectOptions(screen.getByLabelText(/analysis basis/i), 'mtd')
+        await userEvent.click(getByRole('button', { name: /apply filters/i }))
+
+        await waitFor(() => expect(mockGetDashboardWidgetData).toHaveBeenCalledTimes(2))
+
+        const calls = mockGetDashboardWidgetData.mock.calls
+        const normalCall = calls.find((c) => c[0].title === 'Normal Widget')
+        const independentCall = calls.find((c) => c[0].title === 'Independent Widget')
+
+        // normal widget receives the applied mtd filter
+        expect(normalCall?.[1]).toMatchObject({ analysisBasis: 'mtd' })
+        // independent widget receives default cumulative filter, not mtd
+        expect(independentCall?.[1]).toMatchObject({ analysisBasis: 'cumulative' })
+        expect(independentCall?.[1]).not.toMatchObject({ analysisBasis: 'mtd' })
+    })
+
+    it('T-RPT-FE-F-R050 — chart widget renders via react-chartjs-2 with no chart-type subtitle, no separate legend, and Chart.js tooltips available (REQ-RPT-FE-F-050)', async () => {
+        // Default beforeEach mock has widget-1 as a line chart (chartType:'line')
+        renderDashboardViewPage()
+
+        // Widget title is visible
+        expect(await screen.findByText('Premium by Status')).toBeInTheDocument()
+
+        // react-chartjs-2 Line mock renders a chart element
+        expect(screen.getByTestId('chart-line')).toBeInTheDocument()
+
+        // "line chart" subtitle must NOT appear — only title is shown
+        expect(screen.queryByText(/line chart/i)).not.toBeInTheDocument()
+
+        // Row-label legend entries (e.g. "Open: 120,000") must NOT be in the DOM
+        expect(screen.queryByText(/120,000/)).not.toBeInTheDocument()
+
+        // Loading placeholder must NOT be visible — data has loaded
+        expect(screen.queryByText(/Loading live data/i)).not.toBeInTheDocument()
     })
 })

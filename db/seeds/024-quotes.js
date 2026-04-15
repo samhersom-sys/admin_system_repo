@@ -41,6 +41,7 @@ const pool = new Pool({ connectionString: DB_URL })
 const QUOTES = [
     {
         reference: 'QUO-2024-001',
+        submissionRef: 'SUB-2024-001',      // inherits insured from submission
         insured: 'Acme Corp',
         insuredId: 'PTY-INS-001',
         status: 'Draft',
@@ -48,12 +49,13 @@ const QUOTES = [
         inceptionDate: '2024-01-15',
         expiryDate: '2025-01-14',
         quoteCurrency: 'USD',
-        contractType: 'Policy Contract',
+        contractType: 'Open Market',
         createdBy: 'broker.sam',
         createdByOrgCode: 'BBRK',
     },
     {
         reference: 'QUO-2024-002',
+        submissionRef: 'SUB-2024-002',
         insured: 'Global Electronics Ltd',
         insuredId: 'PTY-INS-002',
         status: 'Quoted',
@@ -61,12 +63,13 @@ const QUOTES = [
         inceptionDate: '2024-02-01',
         expiryDate: '2025-01-31',
         quoteCurrency: 'USD',
-        contractType: 'Policy Contract',
+        contractType: 'Open Market',
         createdBy: 'broker.jane',
         createdByOrgCode: 'MRSH',
     },
     {
         reference: 'QUO-2024-003',
+        submissionRef: 'SUB-2024-003',
         insured: 'Coastal Shipping PLC',
         insuredId: 'PTY-INS-003',
         status: 'Bound',
@@ -74,12 +77,13 @@ const QUOTES = [
         inceptionDate: '2024-03-01',
         expiryDate: '2025-02-28',
         quoteCurrency: 'GBP',
-        contractType: 'Policy Contract',
+        contractType: 'Open Market',
         createdBy: 'broker.david',
         createdByOrgCode: 'AON',
     },
     {
         reference: 'QUO-2024-004',
+        submissionRef: 'SUB-2024-004',
         insured: 'Meridian Construction Group',
         insuredId: 'PTY-INS-004',
         status: 'Declined',
@@ -87,12 +91,13 @@ const QUOTES = [
         inceptionDate: '2024-04-01',
         expiryDate: '2025-03-31',
         quoteCurrency: 'USD',
-        contractType: 'Policy Contract',
+        contractType: 'Open Market',
         createdBy: 'broker.david',
         createdByOrgCode: 'AON',
     },
     {
         reference: 'QUO-2025-001',
+        submissionRef: 'SUB-2024-005',
         insured: 'Skyline Hospitality Group',
         insuredId: 'PTY-INS-005',
         status: 'Draft',
@@ -100,12 +105,13 @@ const QUOTES = [
         inceptionDate: '2025-05-01',
         expiryDate: '2026-04-30',
         quoteCurrency: 'EUR',
-        contractType: 'Policy Contract',
+        contractType: 'Open Market',
         createdBy: 'broker.emma',
         createdByOrgCode: 'WTW',
     },
     {
         reference: 'QUO-2025-D01',
+        submissionRef: 'SUB-2025-D01',
         insured: 'Demo Manufacturing Co',
         insuredId: 'PTY-INS-D01',
         status: 'Draft',
@@ -113,12 +119,13 @@ const QUOTES = [
         inceptionDate: '2025-06-01',
         expiryDate: '2026-05-31',
         quoteCurrency: 'GBP',
-        contractType: 'Policy Contract',
+        contractType: 'Open Market',
         createdBy: 'admin',
         createdByOrgCode: 'DEMO',
     },
     {
         reference: 'QUO-2025-D02',
+        submissionRef: 'SUB-2025-D02',
         insured: 'Demo Logistics Ltd',
         insuredId: 'PTY-INS-D02',
         status: 'Quoted',
@@ -126,7 +133,7 @@ const QUOTES = [
         inceptionDate: '2025-07-01',
         expiryDate: '2026-06-30',
         quoteCurrency: 'GBP',
-        contractType: 'Policy Contract',
+        contractType: 'Open Market',
         createdBy: 'admin',
         createdByOrgCode: 'DEMO',
     },
@@ -144,13 +151,22 @@ async function run() {
         let skipped = 0
 
         for (const q of QUOTES) {
-            // Look up submission_id by matching insuredId and status progression
+            // Look up submission by explicit reference
             let submissionId = null
-            const subRes = await client.query(
-                `SELECT id FROM submission WHERE "insuredId" = $1 LIMIT 1`,
-                [q.insuredId]
-            )
-            if (subRes.rows.length > 0) submissionId = subRes.rows[0].id
+            let insured = q.insured
+            let insuredId = q.insuredId
+            if (q.submissionRef) {
+                const subRes = await client.query(
+                    `SELECT id, insured, "insuredId" FROM submission WHERE reference = $1 LIMIT 1`,
+                    [q.submissionRef]
+                )
+                if (subRes.rows.length > 0) {
+                    submissionId = subRes.rows[0].id
+                    // Inherit insured from the linked submission
+                    insured = subRes.rows[0].insured
+                    insuredId = subRes.rows[0].insuredId
+                }
+            }
 
             const existing = await client.query(
                 `SELECT id FROM quotes WHERE reference = $1`,
@@ -162,21 +178,24 @@ async function run() {
                 continue
             }
 
+            // Derive year_of_account from inception date
+            const yearOfAccount = q.inceptionDate ? q.inceptionDate.slice(0, 4) : null
+
             await client.query(
                 `INSERT INTO quotes (
                     reference, submission_id, insured, insured_id, status,
                     business_type, inception_date, expiry_date,
-                    quote_currency, contract_type,
+                    quote_currency, contract_type, year_of_account,
                     created_by, created_by_org_code
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
                 [
-                    q.reference, submissionId, q.insured, q.insuredId, q.status,
+                    q.reference, submissionId, insured, insuredId, q.status,
                     q.businessType, q.inceptionDate, q.expiryDate,
-                    q.quoteCurrency, q.contractType,
+                    q.quoteCurrency, q.contractType, yearOfAccount,
                     q.createdBy, q.createdByOrgCode,
                 ]
             )
-            console.log(`  ✅ ${q.reference} (${q.status}) — inserted`)
+            console.log(`  ✅ ${q.reference} (${q.status}) — inserted (sub: ${q.submissionRef ?? 'none'}, insured: ${insured})`)
             inserted++
         }
 

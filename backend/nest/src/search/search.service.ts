@@ -2,7 +2,7 @@
 import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
 
-const VALID_TYPES = new Set(['Submission', 'Quote', 'Policy', 'BindingAuthority', 'Party', 'Claim'])
+const VALID_TYPES = new Set(['Submission', 'Quote', 'Policy', 'Binding Authority', 'Party', 'Claim'])
 const DATE_PARAMS = ['inceptionFrom', 'inceptionTo', 'expiryFrom', 'expiryTo', 'lastOpenedFrom', 'lastOpenedTo', 'createdFrom', 'createdTo']
 
 const QUOTE_SEARCH_SELECT = `
@@ -210,7 +210,7 @@ export class SearchService {
         )
 
         result.bindingAuthorities = await this.fetchWithAuditOrFallback(
-            auditByType['BindingAuthority'],
+            auditByType['Binding Authority'],
             (ids) => this.dataSource.query(
                 `${BINDING_AUTHORITY_SEARCH_SELECT}
                  FROM binding_authorities ba
@@ -420,7 +420,7 @@ export class SearchService {
             return filterByLastOpened(await this.attachLastOpened(rows, 'Policy'))
         })
 
-        result.bindingAuthorities = await runForType('BindingAuthority', async () => {
+        result.bindingAuthorities = await runForType('Binding Authority', async () => {
             const { where, params } = buildClause([orgCode], {
                 reference: 'ba.reference',
                 status: 'ba.status',
@@ -439,7 +439,7 @@ export class SearchService {
                  LIMIT 200`,
                 params,
             ).catch(() => [])
-            return filterByLastOpened(await this.attachLastOpened(rows, 'BindingAuthority'))
+            return filterByLastOpened(await this.attachLastOpened(rows, 'Binding Authority'))
         })
 
         result.claims = await runForType('Claim', async () => {

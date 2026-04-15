@@ -30,7 +30,8 @@ type ResolvedFieldRef = {
     key: string
     label: string
     col: string
-    type?: 'text' | 'lookup' | 'date' | 'number'
+    type?: 'text' | 'lookup' | 'date' | 'number' | 'count'
+    filterExpr?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -445,6 +446,7 @@ export class ReportingService {
             label: fieldDef.label,
             col: fieldDef.col,
             type: fieldDef.type,
+            filterExpr: fieldDef.filterExpr,
         }
     }
 
@@ -540,6 +542,12 @@ export class ReportingService {
     }
 
     private buildAggregateExpression(field: ResolvedFieldRef | null, aggregation: DashboardWidgetRequest['aggregation']): string {
+        if (field?.type === 'count') {
+            // Semantic count measure — REQ-RPT-BE-F-049
+            return field.filterExpr
+                ? `SUM(CASE WHEN ${field.filterExpr} THEN 1 ELSE 0 END)`
+                : 'COUNT(*)'
+        }
         const normalizedAggregation = aggregation ?? 'count'
         if (normalizedAggregation === 'count' || !field) {
             return 'COUNT(*)'

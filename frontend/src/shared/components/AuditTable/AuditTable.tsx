@@ -20,6 +20,7 @@ interface AuditTableProps {
     loading?: boolean
     error?: string | null
     entityType?: string
+    emptyMessage?: string
 }
 
 function formatDate(dateStr: string): string {
@@ -56,6 +57,7 @@ export default function AuditTable({
     loading,
     error,
     entityType = 'record',
+    emptyMessage,
 }: AuditTableProps) {
     if (loading) {
         return (
@@ -84,7 +86,7 @@ export default function AuditTable({
                     {audit.length === 0 ? (
                         <tr>
                             <td colSpan={4} className="text-center text-gray-400 py-10 text-sm italic">
-                                No audit history available for this {entityType}.
+                                {emptyMessage ?? `No audit history available for this ${entityType}.`}
                             </td>
                         </tr>
                     ) : (

@@ -66,12 +66,25 @@ const {
     notificationsRouter,
     recentRecordsRouter,
     tasksRouter,
+    dashboardWidgetsRouter,
 } = require('./routes/dashboard-stubs')
 app.use('/api/policies', policiesRouter)
 app.use('/api/binding-authorities', baRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/recent-records-data', recentRecordsRouter)
 app.use('/api/tasks', tasksRouter)
+app.use('/api/dashboards', dashboardWidgetsRouter)
+
+// ── Reporting domain routes ──
+const { reportTemplatesRouter, fieldMappingsRouter } = require('./routes/reporting')
+app.use('/api/report-templates', reportTemplatesRouter)
+app.use('/api/report-field-mappings', fieldMappingsRouter)
+
+// ── Static lookups served directly from Express ──
+const { authenticateToken } = require('./middleware/auth')
+app.get('/api/date-basis', authenticateToken, (_req, res) => {
+    res.json(['Created Date', 'Inception Date', 'Expiry Date'])
+})
 
 // ---------------------------------------------------------------------------
 // 404 catch-all for unknown API routes

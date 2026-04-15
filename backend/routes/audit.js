@@ -44,7 +44,7 @@ async function logError(req, source, errorCode, description, context = {}) {
 
 // Valid canonical entity types (REQ-AUDIT-BE-F-002)
 const VALID_ENTITY_TYPES = new Set([
-    'Submission', 'Quote', 'Policy', 'BindingAuthority', 'Party', 'Claim',
+    'Submission', 'Quote', 'Policy', 'Binding Authority', 'Party', 'Claim',
     // Allow test entity type in non-production environments
     ...(process.env.NODE_ENV !== 'production' ? ['TestEntity'] : []),
 ])

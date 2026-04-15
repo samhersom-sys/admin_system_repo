@@ -10,9 +10,10 @@ async function run() {
     const client = await pool.connect()
     try {
         const names = ['Open Market', 'Binding Authority']
+        await client.query('DELETE FROM lookup_contract_types')
         for (const name of names) {
             await client.query(
-                `INSERT INTO lookup_contract_types (name) VALUES ($1) ON CONFLICT DO NOTHING`,
+                `INSERT INTO lookup_contract_types (name) VALUES ($1)`,
                 [name]
             )
         }

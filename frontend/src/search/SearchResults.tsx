@@ -15,7 +15,7 @@ import { brandClasses } from '@/shared/lib/design-tokens/brandClasses'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type EntityType = 'Submission' | 'Quote' | 'Policy' | 'BindingAuthority' | 'Party' | 'Claim'
+export type EntityType = 'Submission' | 'Quote' | 'Policy' | 'Binding Authority' | 'Party' | 'Claim'
 
 export interface SearchRecord {
   id: number
@@ -44,7 +44,7 @@ function recordUrl(record: SearchRecord): string | null {
     case 'Submission': return `/submissions/${id}`
     case 'Quote': return `/quotes/${id}`
     case 'Policy': return `/policies/${id}`
-    case 'BindingAuthority': return `/binding-authorities/${id}`
+    case 'Binding Authority': return `/binding-authorities/${id}`
     case 'Party': return `/parties/${id}`
     case 'Claim': return null
   }

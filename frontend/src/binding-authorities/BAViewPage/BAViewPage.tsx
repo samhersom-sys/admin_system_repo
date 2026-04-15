@@ -9,14 +9,18 @@
  * Registers sidebar section via useSidebarSection (REQ-BA-FE-F-020).
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { FiPlus, FiX, FiSearch, FiSave, FiCheckCircle, FiEdit2, FiArrowLeft, FiFileText, FiUsers, FiRepeat } from 'react-icons/fi'
+import { FiPlus, FiX, FiSearch, FiSave, FiCheckCircle, FiEdit2, FiArrowLeft, FiFileText, FiUsers, FiRepeat, FiUploadCloud } from 'react-icons/fi'
 import { useNotifications } from '@/shell/NotificationDock'
 import { useSidebarSection } from '@/shell/SidebarContext'
 import { useAudit } from '@/shared/lib/hooks/useAudit'
 import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
+import ResizableGrid, { type Column, type SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
+import AuditTable from '@/shared/components/AuditTable/AuditTable'
 import CoverholderSearchModal from '../CoverholderSearchModal/CoverholderSearchModal'
+import BordereauImportModal from '../BordereauImportModal/BordereauImportModal'
+import BordereauCreateModal from '../BordereauCreateModal/BordereauCreateModal'
 import {
     getBindingAuthority,
     updateBindingAuthority,
@@ -41,8 +45,6 @@ const STATUS_CLASSES: Record<BAStatus, string> = {
     Expired: 'bg-gray-100 text-gray-600',
     Cancelled: 'bg-red-100 text-red-700',
 }
-
-const STATUSES: BAStatus[] = ['Draft', 'Active', 'Bound', 'Expired', 'Cancelled']
 
 type Tab = 'sections' | 'financial' | 'transactions' | 'gpi' | 'policies' | 'claims' | 'audit'
 
@@ -86,7 +88,7 @@ export default function BAViewPage() {
     const [ba, setBa] = useState<BindingAuthority | null>(null)
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<Tab>('sections')
-    const [saving, setSaving] = useState(false)
+    const [, setSaving] = useState(false)
 
     // Editable header fields (REQ-BA-FE-F-017, F-027, F-028, F-029)
     const [inceptionTime, setInceptionTime] = useState('00:00:00')
@@ -96,6 +98,8 @@ export default function BAViewPage() {
     const [renewalTime, setRenewalTime] = useState('00:00:00')
     const [renewalStatus, setRenewalStatus] = useState('')
     const [coverholderModalOpen, setCoverholderModalOpen] = useState(false)
+    const [bordereauImportOpen, setBordereauImportOpen] = useState(false)
+    const [bordereauCreateOpen, setBordereauCreateOpen] = useState(false)
 
     // Sections
     const [sections, setSections] = useState<BASection[]>([])
@@ -103,6 +107,7 @@ export default function BAViewPage() {
     const [addingSection, setAddingSection] = useState(false)
     const [sectionForm, setSectionForm] = useState<CreateBASectionInput>(EMPTY_SECTION)
     const [savingSection, setSavingSection] = useState(false)
+    const [sectionSort, setSectionSort] = useState<SortConfig>({ key: 'reference', direction: 'asc' })
 
     // Transactions
     const [transactions, setTransactions] = useState<BATransaction[]>([])
@@ -119,7 +124,7 @@ export default function BAViewPage() {
 
     // Audit (REQ-BA-FE-F-069–F-071)
     const { audit, loading: auditLoading, error: auditError, getAudit } = useAudit({
-        entityType: 'BindingAuthority',
+        entityType: 'Binding Authority',
         entityId: baId || null,
         apiBase: '/api/binding-authorities',
         trackVisits: true,
@@ -132,11 +137,13 @@ export default function BAViewPage() {
         title: 'Binding Authority',
         items: [
             ...(isDraft ? [{ label: 'Save', icon: FiSave, event: 'ba:save' }] : []),
-            ...(isDraft ? [{ label: 'Issue BA', icon: FiCheckCircle, event: 'ba:issue' }] : []),
-            ...((ba?.status === 'Active' || ba?.status === 'Bound') ? [{ label: 'Create Amendment', icon: FiEdit2, event: 'ba:create-amendment' }] : []),
+            ...(isDraft ? [{ label: 'Issue Binding Authority', icon: FiCheckCircle, event: 'ba:issue' }] : []),
+            ...((ba?.status === 'Active' || ba?.status === 'Bound') ? [{ label: 'Endorse Binding Authority', icon: FiEdit2, event: 'ba:create-amendment' }] : []),
+            { label: 'Import Bordereaux', icon: FiUploadCloud, event: 'ba:import-bordereaux' },
+            { label: 'Create Bordereau', icon: FiPlus, event: 'ba:create-bordereaux' },
             { label: 'Documents', icon: FiFileText, to: `/binding-authorities/${baId}/documents` },
             { label: 'Create Party', icon: FiUsers, to: '/parties/new' },
-            { label: 'Renew BA Contract', icon: FiRepeat, event: 'ba:renew' },
+            { label: 'Renew Binding Authority', icon: FiRepeat, event: 'ba:renew' },
             ...(ba?.submission_id ? [{ label: 'Back to Submission', icon: FiArrowLeft, to: `/submissions/${ba.submission_id}` }] : []),
         ],
     }), [isDraft, ba?.status, ba?.submission_id, baId])
@@ -165,13 +172,19 @@ export default function BAViewPage() {
         const handleSave = () => handleSaveBA()
         const handleIssue = () => handleIssueBA()
         const handleRenew = () => navigate('/binding-authorities/new')
+        const handleImportBordereaux = () => setBordereauImportOpen(true)
+        const handleCreateBordereaux = () => setBordereauCreateOpen(true)
         window.addEventListener('ba:save', handleSave)
         window.addEventListener('ba:issue', handleIssue)
         window.addEventListener('ba:renew', handleRenew)
+        window.addEventListener('ba:import-bordereaux', handleImportBordereaux)
+        window.addEventListener('ba:create-bordereaux', handleCreateBordereaux)
         return () => {
             window.removeEventListener('ba:save', handleSave)
             window.removeEventListener('ba:issue', handleIssue)
             window.removeEventListener('ba:renew', handleRenew)
+            window.removeEventListener('ba:import-bordereaux', handleImportBordereaux)
+            window.removeEventListener('ba:create-bordereaux', handleCreateBordereaux)
         }
     }) // intentionally no deps — always latest handlers
 
@@ -274,6 +287,72 @@ export default function BAViewPage() {
         }
     }
 
+    // ── Sections ResizableGrid config ────────────────────────────────────────
+    const SECTION_COLUMNS: Column[] = [
+        { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 140 },
+        { key: 'class_of_business', label: 'Class of Business', sortable: true, defaultWidth: 160 },
+        { key: 'inception_date', label: 'Inception Date', sortable: true, defaultWidth: 130 },
+        { key: 'expiry_date', label: 'Expiry Date', sortable: true, defaultWidth: 120 },
+        { key: 'time_basis', label: 'Time Basis', sortable: true, defaultWidth: 110 },
+        { key: 'days_on_cover', label: 'Max Period of Insurance (days)', sortable: true, defaultWidth: 180 },
+        { key: 'currency', label: 'Settlement Premium Currency', sortable: true, defaultWidth: 160 },
+        { key: 'written_premium_limit', label: 'Gross Premium Income Limit', sortable: true, defaultWidth: 160 },
+        ...(isDraft ? [{ key: '_action', label: (!addingSection ? (
+            <button
+                type="button"
+                title="Add Section"
+                className="text-brand-600 hover:text-brand-800"
+                onClick={() => setAddingSection(true)}
+            >
+                <FiPlus size={14} />
+            </button>
+        ) : '') as React.ReactNode, sortable: false, defaultWidth: 44 }] : []),
+    ]
+
+    function handleSectionSort(key: string) {
+        setSectionSort((prev) =>
+            prev.key === key
+                ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+                : { key, direction: 'asc' }
+        )
+    }
+
+    const sortedSections = [...sections].sort((a, b) => {
+        const av = (a as unknown as Record<string, unknown>)[sectionSort.key] ?? ''
+        const bv = (b as unknown as Record<string, unknown>)[sectionSort.key] ?? ''
+        if (av < bv) return sectionSort.direction === 'asc' ? -1 : 1
+        if (av > bv) return sectionSort.direction === 'asc' ? 1 : -1
+        return 0
+    })
+
+    function renderSectionCell(key: string, row: unknown): React.ReactNode {
+        const sec = row as BASection
+        if (key === 'reference') {
+            return (
+                <Link
+                    to={`/binding-authorities/${baId}/sections/${sec.id}`}
+                    className="font-medium text-brand-600 hover:underline"
+                >
+                    {sec.reference}
+                </Link>
+            )
+        }
+        if (key === '_action') {
+            return (
+                <button
+                    type="button"
+                    onClick={() => handleDeleteSection(sec.id)}
+                    className="text-gray-300 hover:text-red-500"
+                >
+                    <FiX size={14} />
+                </button>
+            )
+        }
+        if (key === 'days_on_cover') return sec.days_on_cover?.toLocaleString() ?? '—'
+        if (key === 'written_premium_limit') return sec.written_premium_limit?.toLocaleString() ?? '—'
+        return (sec as unknown as Record<string, unknown>)[key]?.toString() ?? '—'
+    }
+
     if (loading) return <LoadingSpinner />
     if (!ba) return <p className="p-6 text-gray-500">Binding authority not found.</p>
 
@@ -281,46 +360,13 @@ export default function BAViewPage() {
 
     return (
         <div className="p-6 flex flex-col gap-6">
-            {/* Locked banner — REQ-BA-FE-F-030 */}
-            {isLocked && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-                    This binding authority is <strong>{ba.status}</strong> — changes require an amendment.
-                </div>
-            )}
-
             {/* Header */}
             <div className="flex items-start justify-between gap-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-2xl font-semibold text-gray-900">{ba.reference}</h2>
                     {ba.coverholder && <p className="text-sm text-gray-500">{ba.coverholder}</p>}
                 </div>
-                <div className="flex items-center gap-3">
-                    {isDraft && (
-                        <>
-                            <select
-                                value={ba.status}
-                                onChange={(e) => handleStatusChange(e.target.value as BAStatus)}
-                                disabled={saving}
-                                className="border border-gray-300 rounded px-3 py-2 text-sm"
-                            >
-                                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                            <button
-                                type="button"
-                                onClick={handleIssueBA}
-                                disabled={saving}
-                                className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-                            >
-                                Issue BA
-                            </button>
-                        </>
-                    )}
-                    {!isDraft && (
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${STATUS_CLASSES[ba.status]}`}>
-                            {ba.status}
-                        </span>
-                    )}
-                </div>
+
             </div>
 
             {/* Details panel — two columns per REQ-BA-FE-F-022 */}
@@ -335,7 +381,9 @@ export default function BAViewPage() {
                         </div>
                         <div>
                             <p className={labelClass}>Status</p>
-                            <p className={valClass}>{ba.status}</p>
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${STATUS_CLASSES[ba.status]}`}>
+                                {ba.status}
+                            </span>
                         </div>
                         <div>
                             <p className={labelClass}>Coverholder</p>
@@ -499,159 +547,105 @@ export default function BAViewPage() {
                 </nav>
             </div>
 
-            {/* ── Sections tab — table with always-visible headers (REQ-BA-FE-F-031) ── */}
+            {/* ── Sections tab — ResizableGrid with sort/resize (REQ-BA-FE-F-031) ── */}
             {activeTab === 'sections' && (
                 <div className="flex flex-col gap-4">
                     {!sectionsLoaded ? (
                         <LoadingSpinner />
                     ) : (
-                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <table className="min-w-full text-sm">
-                                <thead className="bg-gray-100 text-left">
-                                    <tr>
-                                        <th className="px-4 py-3 font-medium text-gray-600">Reference</th>
-                                        <th className="px-4 py-3 font-medium text-gray-600">Class of Business</th>
-                                        <th className="px-4 py-3 font-medium text-gray-600">Inception Date</th>
-                                        <th className="px-4 py-3 font-medium text-gray-600">Expiry Date</th>
-                                        <th className="px-4 py-3 font-medium text-gray-600">Time Basis</th>
-                                        <th className="px-4 py-3 font-medium text-gray-600">Maximum Period of Insurance (days)</th>
-                                        <th className="px-4 py-3 font-medium text-gray-600">Settlement Premium Currency</th>
-                                        <th className="px-4 py-3 font-medium text-gray-600">Gross Premium Income Limit</th>
-                                        {isDraft && (
-                                            <th className="px-4 py-3 font-medium text-gray-600 w-12 text-center">
-                                                {!addingSection && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setAddingSection(true)}
-                                                        title="Add Section"
-                                                        className="text-brand-600 hover:text-brand-800"
-                                                    >
-                                                        <FiPlus size={14} />
-                                                    </button>
-                                                )}
-                                            </th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {sections.length === 0 && !addingSection ? (
-                                        <tr>
-                                            <td colSpan={isDraft ? 9 : 8} className="px-4 py-8 text-center text-gray-400">
-                                                No sections found.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        sections.map((sec) => (
-                                            <tr key={sec.id} className="border-t border-gray-100 hover:bg-gray-50">
-                                                <td className="px-4 py-3">
-                                                    <Link
-                                                        to={`/binding-authorities/${baId}/sections/${sec.id}`}
-                                                        className="font-medium text-brand-600 hover:underline"
-                                                    >
-                                                        {sec.reference}
-                                                    </Link>
-                                                </td>
-                                                <td className="px-4 py-3">{sec.class_of_business ?? '—'}</td>
-                                                <td className="px-4 py-3">{sec.inception_date ?? '—'}</td>
-                                                <td className="px-4 py-3">{sec.expiry_date ?? '—'}</td>
-                                                <td className="px-4 py-3">{sec.time_basis ?? '—'}</td>
-                                                <td className="px-4 py-3">{sec.days_on_cover?.toLocaleString() ?? '—'}</td>
-                                                <td className="px-4 py-3">{sec.currency ?? '—'}</td>
-                                                <td className="px-4 py-3">{sec.written_premium_limit?.toLocaleString() ?? '—'}</td>
-                                                {isDraft && (
-                                                    <td className="px-4 py-3">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleDeleteSection(sec.id)}
-                                                            className="text-gray-300 hover:text-red-500"
-                                                        >
-                                                            <FiX size={14} />
-                                                        </button>
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        ))
-                                    )}
-                                    {/* Inline add row — REQ-BA-FE-F-032 (within table, not a button) */}
-                                    {isDraft && addingSection && (
-                                        <tr className="border-t border-gray-200 bg-brand-50/30">
-                                            <td className="px-4 py-2 text-xs text-gray-400 italic">Auto</td>
-                                            <td className="px-4 py-2">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Class of Business"
-                                                    value={sectionForm.class_of_business ?? ''}
-                                                    onChange={(e) => setSectionForm((p) => ({ ...p, class_of_business: e.target.value }))}
-                                                    className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <input
-                                                    type="date"
-                                                    value={sectionForm.inception_date ?? ''}
-                                                    onChange={(e) => setSectionForm((p) => ({ ...p, inception_date: e.target.value }))}
-                                                    className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <input
-                                                    type="date"
-                                                    value={sectionForm.expiry_date ?? ''}
-                                                    onChange={(e) => setSectionForm((p) => ({ ...p, expiry_date: e.target.value }))}
-                                                    className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <input
-                                                    type="text"
-                                                    placeholder="e.g. Annual"
-                                                    value={sectionForm.time_basis ?? ''}
-                                                    onChange={(e) => setSectionForm((p) => ({ ...p, time_basis: e.target.value }))}
-                                                    className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2 text-xs text-gray-400 italic">Computed</td>
-                                            <td className="px-4 py-2">
-                                                <input
-                                                    type="text"
-                                                    placeholder="GBP"
-                                                    value={sectionForm.currency ?? ''}
-                                                    onChange={(e) => setSectionForm((p) => ({ ...p, currency: e.target.value }))}
-                                                    className="border border-gray-300 rounded px-2 py-1 text-sm w-24"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <input
-                                                    type="number"
-                                                    placeholder="0"
-                                                    value={sectionForm.written_premium_limit ?? ''}
-                                                    onChange={(e) => setSectionForm((p) => ({ ...p, written_premium_limit: parseFloat(e.target.value) || undefined }))}
-                                                    className="border border-gray-300 rounded px-2 py-1 text-sm w-28"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-2 flex items-center gap-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={handleAddSection}
-                                                    disabled={savingSection}
-                                                    className="text-brand-600 hover:text-brand-800 disabled:opacity-50"
-                                                    title="Save section"
-                                                >
-                                                    <FiCheckCircle size={16} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setAddingSection(false); setSectionForm(EMPTY_SECTION) }}
-                                                    className="text-gray-400 hover:text-red-500"
-                                                    title="Cancel"
-                                                >
-                                                    <FiX size={14} />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                        <ResizableGrid
+                            columns={SECTION_COLUMNS}
+                            rows={sortedSections}
+                            storageKey="table-widths-ba-sections"
+                            sortConfig={sectionSort}
+                            onRequestSort={handleSectionSort}
+                            renderCell={renderSectionCell}
+                            rowKey={(row) => (row as BASection).id}
+                            emptyMessage="No sections found."
+                            onRowClick={(row) => navigate(`/binding-authorities/${baId}/sections/${(row as BASection).id}`)}
+                        />
+                    )}
+                    {/* Inline add row — REQ-BA-FE-F-032 */}
+                    {isDraft && addingSection && (
+                        <div className="bg-brand-50/30 border border-gray-200 rounded-lg p-4 flex flex-col gap-3">
+                            <h3 className="text-sm font-semibold text-gray-700">New Section</h3>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-gray-500">Class of Business</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Class of Business"
+                                        value={sectionForm.class_of_business ?? ''}
+                                        onChange={(e) => setSectionForm((p) => ({ ...p, class_of_business: e.target.value }))}
+                                        className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-gray-500">Inception Date</label>
+                                    <input
+                                        type="date"
+                                        value={sectionForm.inception_date ?? ''}
+                                        onChange={(e) => setSectionForm((p) => ({ ...p, inception_date: e.target.value }))}
+                                        className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-gray-500">Expiry Date</label>
+                                    <input
+                                        type="date"
+                                        value={sectionForm.expiry_date ?? ''}
+                                        onChange={(e) => setSectionForm((p) => ({ ...p, expiry_date: e.target.value }))}
+                                        className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-gray-500">Time Basis</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Annual"
+                                        value={sectionForm.time_basis ?? ''}
+                                        onChange={(e) => setSectionForm((p) => ({ ...p, time_basis: e.target.value }))}
+                                        className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-gray-500">Currency</label>
+                                    <input
+                                        type="text"
+                                        placeholder="GBP"
+                                        value={sectionForm.currency ?? ''}
+                                        onChange={(e) => setSectionForm((p) => ({ ...p, currency: e.target.value }))}
+                                        className="border border-gray-300 rounded px-2 py-1 text-sm w-24"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-gray-500">Gross Premium Income Limit</label>
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={sectionForm.written_premium_limit ?? ''}
+                                        onChange={(e) => setSectionForm((p) => ({ ...p, written_premium_limit: parseFloat(e.target.value) || undefined }))}
+                                        className="border border-gray-300 rounded px-2 py-1 text-sm w-28"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={handleAddSection}
+                                    disabled={savingSection}
+                                    className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+                                >
+                                    {savingSection ? 'Saving…' : 'Save Section'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setAddingSection(false); setSectionForm(EMPTY_SECTION) }}
+                                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -752,6 +746,15 @@ export default function BAViewPage() {
             {/* ── GPI Monitoring tab — REQ-BA-FE-F-056 to F-059 ── */}
             {activeTab === 'gpi' && (
                 <div className="flex flex-col gap-4">
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            className="btn btn-secondary inline-flex items-center gap-2 text-sm"
+                            onClick={() => setBordereauImportOpen(true)}
+                        >
+                            <FiUploadCloud size={14} /> Import Bordereaux
+                        </button>
+                    </div>
                     {sections.filter((s) => s.written_premium_limit).length === 0 ? (
                         <p className="text-sm text-gray-400">No GPI limits configured for this binding authority.</p>
                     ) : (
@@ -868,42 +871,13 @@ export default function BAViewPage() {
 
             {/* ── Audit tab — REQ-BA-FE-F-069 to F-070 ── */}
             {activeTab === 'audit' && (
-                <div className="flex flex-col gap-4">
-                    {auditLoading ? (
-                        <LoadingSpinner />
-                    ) : auditError ? (
-                        <p className="text-sm text-red-500">{auditError}</p>
-                    ) : (
-                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <table className="min-w-full text-sm">
-                                <thead className="bg-gray-100 text-left">
-                                    <tr>
-                                        <th className="px-4 py-3 font-medium text-gray-600">Date</th>
-                                        <th className="px-4 py-3 font-medium text-gray-600">Action</th>
-                                        <th className="px-4 py-3 font-medium text-gray-600">User</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {audit.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={3} className="px-4 py-8 text-center text-gray-400">
-                                                No audit events recorded.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        audit.map((evt, i) => (
-                                            <tr key={`${evt.date}-${i}`} className="border-t border-gray-100">
-                                                <td className="px-4 py-3">{new Date(evt.date).toLocaleString()}</td>
-                                                <td className="px-4 py-3">{evt.action}</td>
-                                                <td className="px-4 py-3">{evt.user ?? '—'}</td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
+                <AuditTable
+                    audit={audit}
+                    loading={auditLoading}
+                    error={auditError}
+                    entityType="Binding Authority"
+                    emptyMessage="No audit events recorded."
+                />
             )}
 
             {/* Coverholder Search Modal — REQ-BA-FE-F-024 */}
@@ -911,6 +885,20 @@ export default function BAViewPage() {
                 isOpen={coverholderModalOpen}
                 onClose={() => setCoverholderModalOpen(false)}
                 onSelect={handleCoverholderSelect}
+            />
+
+            {/* Bordereaux Import Modal — REQ-BA-FE-F-012 */}
+            <BordereauImportModal
+                isOpen={bordereauImportOpen}
+                onClose={() => setBordereauImportOpen(false)}
+                bindingAuthorityId={id}
+            />
+
+            {/* Bordereaux Create Modal */}
+            <BordereauCreateModal
+                isOpen={bordereauCreateOpen}
+                onClose={() => setBordereauCreateOpen(false)}
+                bindingAuthorityId={id}
             />
 
             {/* Add Transaction Modal */}

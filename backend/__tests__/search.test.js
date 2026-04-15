@@ -88,7 +88,7 @@ afterAll(async () => {
     }
     if (testBindingAuthorityId) {
         await runQuery(`DELETE FROM binding_authorities WHERE id = $1`, [testBindingAuthorityId])
-        await runQuery(`DELETE FROM public.audit_event WHERE entity_type = 'BindingAuthority' AND entity_id = $1`, [testBindingAuthorityId])
+        await runQuery(`DELETE FROM public.audit_event WHERE entity_type = 'Binding Authority' AND entity_id = $1`, [testBindingAuthorityId])
     }
     if (testPolicyId) {
         await runQuery(`DELETE FROM policies WHERE id = $1`, [testPolicyId])
@@ -367,7 +367,7 @@ describe('T-BE-SEARCH-R16: GET /api/search — binding authority search contract
         const res = await agent
             .get('/api/search')
             .set('Authorization', `Bearer ${token}`)
-            .query({ type: 'BindingAuthority', reference: 'SEARCH-TEST-BA-001' })
+            .query({ type: 'Binding Authority', reference: 'SEARCH-TEST-BA-001' })
 
         expect(res.status).toBe(200)
         expect(res.body.bindingAuthorities).toHaveLength(1)

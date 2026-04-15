@@ -44,6 +44,8 @@ export interface Quote {
     renewable_indicator?: string | null
     renewal_date?: string | null
     renewal_status?: string | null
+    renewal_time?: string | null
+    new_or_renewal?: string | null
     payload?: Record<string, unknown>
 }
 
@@ -185,9 +187,12 @@ export interface QuoteSection {
     reference: string
     class_of_business: string | null
     inception_date: string | null
+    effective_date: string | null
     expiry_date: string | null
     inception_time: string | null
+    effective_time: string | null
     expiry_time: string | null
+    days_on_cover: number | null
     limit_currency: string | null
     limit_amount: number | null
     limit_loss_qualifier: string | null
@@ -201,10 +206,19 @@ export interface QuoteSection {
     gross_gross_premium: number | null
     deductions: number | null
     net_premium: number | null
+    tax_receivable: number | null
     annual_gross_premium: number | null
     annual_net_premium: number | null
     written_order: number | null
     signed_order: number | null
+    // Gap-fill fields from migrations 102–104 (REQ-QUO-FE-F-074)
+    time_basis?: string | null
+    written_order_basis?: string | null
+    signed_order_basis?: string | null
+    written_line_total?: number | null
+    signed_line_total?: number | null
+    delegated_authority_ref?: string | null
+    delegated_authority_section_ref?: string | null
     payload: Record<string, unknown> | null
     is_current: boolean
     created_at: string
@@ -213,8 +227,10 @@ export interface QuoteSection {
 export interface QuoteSectionPatch {
     class_of_business?: string
     inception_date?: string
+    effective_date?: string | null
     expiry_date?: string
     inception_time?: string
+    effective_time?: string | null
     expiry_time?: string
     limit_currency?: string
     limit_amount?: number | null
@@ -226,10 +242,19 @@ export interface QuoteSectionPatch {
     sum_insured_amount?: number | null
     premium_currency?: string
     gross_premium?: number | null
+    tax_receivable?: number | null
     annual_gross_premium?: number | null
     annual_net_premium?: number | null
     written_order?: number | null
     signed_order?: number | null
+    // Gap-fill patch fields from migrations 102–104 (REQ-QUO-FE-F-074)
+    time_basis?: string | null
+    written_order_basis?: string | null
+    signed_order_basis?: string | null
+    written_line_total?: number | null
+    signed_line_total?: number | null
+    delegated_authority_ref?: string | null
+    delegated_authority_section_ref?: string | null
     payload?: Record<string, unknown>
 }
 
@@ -339,6 +364,10 @@ export async function getMethodsOfPlacement(): Promise<string[]> {
 
 export async function getRenewalStatuses(): Promise<string[]> {
     return get<string[]>('/api/lookups/renewalStatuses')
+}
+
+export async function getCurrencies(): Promise<string[]> {
+    return get<string[]>('/api/lookups/currencies')
 }
 
 export async function getRiskCodes(): Promise<string[]> {

@@ -355,6 +355,69 @@ describe('ReportingService', () => {
             const fields = service.getFieldMappings('parties')
             expect(fields.some((f) => f.key === 'name')).toBe(true)
         })
+
+        it('returns field list for quoteSections domain including numeric premium measures', () => {
+            const fields = service.getFieldMappings('quoteSections')
+            expect(fields.length).toBeGreaterThan(0)
+            const numericKeys = ['grossPremium', 'netPremium', 'annualGrossPremium', 'annualNetPremium', 'writtenLineTotal', 'signedLineTotal']
+            numericKeys.forEach((key) => {
+                const field = fields.find((f) => f.key === key)
+                expect(field).toBeDefined()
+                expect(field?.type).toBe('number')
+            })
+        })
+
+        it('returns field list for policyTransactions domain with transactionType and effectiveDate', () => {
+            const fields = service.getFieldMappings('policyTransactions')
+            expect(fields.length).toBeGreaterThan(0)
+            expect(fields.some((f) => f.key === 'transactionType')).toBe(true)
+            expect(fields.some((f) => f.key === 'effectiveDate' && f.type === 'date')).toBe(true)
+        })
+
+        it('submissions domain includes workflowStatus and clearanceStatus fields', () => {
+            const fields = service.getFieldMappings('submissions')
+            expect(fields.some((f) => f.key === 'workflowStatus')).toBe(true)
+            expect(fields.some((f) => f.key === 'clearanceStatus')).toBe(true)
+        })
+
+        it('policies domain includes businessType and contractType fields', () => {
+            const fields = service.getFieldMappings('policies')
+            expect(fields.some((f) => f.key === 'businessType')).toBe(true)
+            expect(fields.some((f) => f.key === 'contractType')).toBe(true)
+        })
+
+        // REQ-RPT-BE-F-049 — curated Measures catalog
+        it('T-RPT-BE-R049a — submissions domain exposes a countAll measure with type count and label "Count of Submissions"', () => {
+            const fields = service.getFieldMappings('submissions')
+            const measure = fields.find((f) => f.key === 'countAll')
+            expect(measure).toBeDefined()
+            expect(measure?.label).toBe('Count of Submissions')
+            expect(measure?.type).toBe('count')
+        })
+
+        it('T-RPT-BE-R049b — quotes domain exposes countAll, countDeclined, countRenewable, countRenewed measures', () => {
+            const fields = service.getFieldMappings('quotes')
+            const keys = fields.map((f) => f.key)
+            expect(keys).toContain('countAll')
+            expect(keys).toContain('countDeclined')
+            expect(keys).toContain('countRenewable')
+            expect(keys).toContain('countRenewed')
+            expect(fields.find((f) => f.key === 'countAll')?.label).toBe('Count of Quotes')
+            expect(fields.find((f) => f.key === 'countDeclined')?.label).toBe('Count of Declined Quotes')
+        })
+
+        it('T-RPT-BE-R049c — policies domain exposes countAll and countActive measures, and grossWrittenPremium labelled "Gross Net Written Premium"', () => {
+            const fields = service.getFieldMappings('policies')
+            expect(fields.find((f) => f.key === 'countAll')?.label).toBe('Count of Policies')
+            expect(fields.find((f) => f.key === 'countActive')?.label).toBe('Count of Active Policies')
+            expect(fields.find((f) => f.key === 'grossWrittenPremium')?.label).toBe('Gross Net Written Premium')
+        })
+
+        it('T-RPT-BE-R049d — bindingAuthorities domain exposes countAll measure labelled "Count of Binding Authorities"', () => {
+            const fields = service.getFieldMappings('bindingAuthorities')
+            expect(fields.length).toBeGreaterThan(0)
+            expect(fields.find((f) => f.key === 'countAll')?.label).toBe('Count of Binding Authorities')
+        })
     })
 
     describe('getDashboardWidgetData', () => {

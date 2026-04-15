@@ -27,6 +27,8 @@
 
 **REQ-SUB-BE-F-004:** The `GET /api/submissions` endpoint shall accept an optional `?status=<value>` query parameter and shall filter the returned array to only records matching that status when the parameter is present.
 
+**REQ-SUB-BE-F-035:** The `GET /api/submissions` endpoint shall accept optional `?date_basis=<label>&date_from=<YYYY-MM-DD>&date_to=<YYYY-MM-DD>` query parameters. When all three are present and `date_basis` maps to a known column (`Created Date` → `createdDate`, `Inception Date` → `inceptionDate`, `Expiry Date` → `expiryDate`), the endpoint shall cast the column value to a date and filter to rows where the date falls within the inclusive range `[date_from, date_to]`. When `date_basis` does not map to a known column, the date parameters shall be silently ignored.
+
 ### 2.2 POST /api/submissions
 
 **REQ-SUB-BE-F-005:** The `POST /api/submissions` endpoint shall require a valid `Authorization: Bearer <token>` header and shall return HTTP 401 when absent or invalid.
@@ -55,7 +57,9 @@
 
 **REQ-SUB-BE-F-015:** The `PUT /api/submissions/:id` endpoint shall require a valid `Authorization: Bearer <token>` header and shall return HTTP 401 when absent or invalid.
 
-**REQ-SUB-BE-F-016:** The `PUT /api/submissions/:id` endpoint shall permit updates to the fields `inceptionDate`, `expiryDate`, `contractType`, `placingBroker`, and `placingBrokerId` only.
+**REQ-SUB-BE-F-016:** The `PUT /api/submissions/:id` endpoint shall permit updates to the fields `inceptionDate`, `expiryDate`, `contractType`, `placingBroker`, `placingBrokerId`, and the following fields added by migrations 106–108 (schema-only at first, now API-wired): `workflow_notes`, `ai_extracted`, `review_required`, `email_source`, `email_received_date`, `email_processed_date`, `extraction_confidence`, `assigned_by`, `assigned_date`, `clearance_status`, `clearance_status_code`, `clearance_notes`, `clearance_matched_submissions`, `clearance_reviewed_by`, `clearance_reviewed_date`, `auto_clearance_checked`. These new fields are all optional in the patch body.
+
+**REQ-SUB-BE-F-026:** (Submissions NestJS service — gap-fill) The NestJS `SubmissionsService.update()` method shall also accept and persist the following optional patch fields from migrations 091, 106, 107, 108: `workflow_notes`, `ai_extracted`, `review_required`, `email_source`, `email_received_date`, `email_processed_date`, `extraction_confidence`, `assigned_by`, `assigned_date`, `clearance_status`, `clearance_status_code`, `clearance_notes`, `clearance_matched_submissions`, `clearance_reviewed_by`, `clearance_reviewed_date`, `auto_clearance_checked`. Fields absent from the body shall be left unchanged.
 
 **REQ-SUB-BE-F-017:** The `PUT /api/submissions/:id` endpoint shall strip the fields `status`, `createdByOrgCode`, `createdBy`, and `reference` from the request body before issuing the UPDATE statement.
 
@@ -139,6 +143,7 @@
 | REQ-SUB-BE-F-032 | `backend/__tests__/submissions.test.js` | pending |
 | REQ-SUB-BE-F-033 | `backend/__tests__/submissions.test.js` | validated |
 | REQ-SUB-BE-F-034 | `backend/__tests__/submissions.test.js` | validated |
+| REQ-SUB-BE-F-035 | `backend/__tests__/submissions.test.js` | T-SUB-BE-R35a, T-SUB-BE-R35b, T-SUB-BE-R35c |
 
 ---
 
@@ -156,6 +161,7 @@
 | 2026-03-11 | Rewritten into formal REQ-SUB-BE-{TYPE}-{NNN} format per Guideline 13 |
 | 2026-03-20 | Added REQ-SUB-BE-F-021–F-026: related submissions join table endpoints (Block E) |
 | 2026-03-23 | Added REQ-SUB-BE-F-027–F-034: submission concurrent edit-lock acquire/release plus save, submit, and decline enforcement |
+| 2026-05-22 | Added REQ-SUB-BE-F-035: date range filtering (date_basis, date_from, date_to) for Submissions Report date filter fix |
 
 ---
 
