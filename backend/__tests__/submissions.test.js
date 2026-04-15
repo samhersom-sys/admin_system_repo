@@ -541,4 +541,37 @@ describe('Layer 2: /api/submissions', () => {
             expect(res.status).toBe(403)
         })
     })
+
+    // -------------------------------------------------------------------------
+    // R35 — GET /api/submissions?date_basis=...&date_from=...&date_to=...
+    // -------------------------------------------------------------------------
+
+    describe('GET /api/submissions — date range filtering (R35)', () => {
+        test('T-BE-submissions-R35a — filters by Created Date range', async () => {
+            const res = await agent
+                .get('/api/submissions?date_basis=Created%20Date&date_from=2020-01-01&date_to=2099-12-31')
+                .set('Authorization', `Bearer ${token}`)
+            expect(res.status).toBe(200)
+            expect(Array.isArray(res.body)).toBe(true)
+        })
+
+        test('T-BE-submissions-R35b — returns empty array for date range with no records', async () => {
+            const res = await agent
+                .get('/api/submissions?date_basis=Created%20Date&date_from=1900-01-01&date_to=1900-01-02')
+                .set('Authorization', `Bearer ${token}`)
+            expect(res.status).toBe(200)
+            expect(res.body).toEqual([])
+        })
+
+        test('T-BE-submissions-R35c — ignores invalid date_basis and returns all records', async () => {
+            const allRes = await agent
+                .get('/api/submissions')
+                .set('Authorization', `Bearer ${token}`)
+            const filteredRes = await agent
+                .get('/api/submissions?date_basis=Invalid%20Column&date_from=2020-01-01&date_to=2099-12-31')
+                .set('Authorization', `Bearer ${token}`)
+            expect(filteredRes.status).toBe(200)
+            expect(filteredRes.body.length).toBe(allRes.body.length)
+        })
+    })
 })

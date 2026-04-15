@@ -28,7 +28,7 @@ The `audit_event` table:
 ```sql
 CREATE TABLE IF NOT EXISTS public.audit_event (
   id          BIGSERIAL PRIMARY KEY,
-  entity_type TEXT        NOT NULL,   -- 'Submission' | 'Quote' | 'Policy' | 'BindingAuthority' | 'Party' | 'Claim'
+  entity_type TEXT        NOT NULL,   -- 'Submission' | 'Quote' | 'Policy' | 'Binding Authority' | 'Party' | 'Claim'
   entity_id   INTEGER     NOT NULL,
   action      TEXT        NOT NULL,   -- 'Submission Opened' | 'Submission Updated' | etc.
   details     JSONB       NOT NULL DEFAULT '{}',
@@ -52,7 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_event_user_action
 | `Submission` | Submission domain |
 | `Quote` | Quote domain |
 | `Policy` | Policy domain |
-| `BindingAuthority` | Binding Authority domain |
+| `Binding Authority` | Binding Authority domain |
 | `Party` | Party domain |
 | `Claim` | Claims domain |
 

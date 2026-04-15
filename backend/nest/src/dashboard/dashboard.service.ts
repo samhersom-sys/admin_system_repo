@@ -100,7 +100,7 @@ export class DashboardService {
         const auditRows = await this.dataSource.query(
             `SELECT ae.entity_type, ae.entity_id, MAX(ae.created_at) AS last_opened
              FROM public.audit_event ae
-             WHERE ae.entity_type IN ('Submission', 'Quote', 'Policy', 'BindingAuthority')
+             WHERE ae.entity_type IN ('Submission', 'Quote', 'Policy', 'Binding Authority')
                AND (ae.action ILIKE '%Opened%' OR ae.action ILIKE '%Updated%')
              GROUP BY ae.entity_type, ae.entity_id
              ORDER BY last_opened DESC
@@ -134,7 +134,7 @@ export class DashboardService {
                 [ids, orgCode],
             ),
             () => this.dataSource.query(
-            `SELECT
+                `SELECT
                  s.id,
                  s.reference,
                  s."submissionType"     AS "submissionType",
@@ -150,7 +150,7 @@ export class DashboardService {
              WHERE s."createdByOrgCode" = $1
              ORDER BY s."createdDate" DESC
              LIMIT 25`,
-            [orgCode],
+                [orgCode],
             ),
         ).catch(() => [])
 
@@ -175,7 +175,7 @@ export class DashboardService {
                 [ids, orgCode],
             ),
             () => this.dataSource.query(
-            `SELECT
+                `SELECT
                  q.id,
                  q.reference,
                  COALESCE(p.name, q.insured) AS "insuredName",
@@ -191,7 +191,7 @@ export class DashboardService {
                AND q.deleted_at IS NULL
              ORDER BY q.created_date DESC
              LIMIT 25`,
-            [orgCode],
+                [orgCode],
             ),
         ).catch(() => [])
 
@@ -215,7 +215,7 @@ export class DashboardService {
                 [ids, orgCode],
             ),
             () => this.dataSource.query(
-            `SELECT
+                `SELECT
                  policy.id,
                  policy.reference,
                  COALESCE(p.name, policy.insured) AS "insuredName",
@@ -230,12 +230,12 @@ export class DashboardService {
                AND policy.deleted_at IS NULL
              ORDER BY policy.created_date DESC
              LIMIT 25`,
-            [orgCode],
+                [orgCode],
             ),
         ).catch(() => [])
 
         const bindingAuthorityRows = await this.fetchWithAuditOrFallback(
-            auditByType['BindingAuthority'],
+            auditByType['Binding Authority'],
             (ids) => this.dataSource.query(
                 `SELECT
                      ba.id,
@@ -249,7 +249,7 @@ export class DashboardService {
                 [ids, orgCode],
             ),
             () => this.dataSource.query(
-            `SELECT
+                `SELECT
                  ba.id,
                  ba.reference,
                  ba.status,
@@ -259,7 +259,7 @@ export class DashboardService {
                AND ba.deleted_at IS NULL
              ORDER BY ba.created_at DESC
              LIMIT 25`,
-            [orgCode],
+                [orgCode],
             ),
         ).catch(() => [])
 

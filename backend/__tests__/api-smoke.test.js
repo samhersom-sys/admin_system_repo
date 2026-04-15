@@ -46,6 +46,8 @@ const REQUIRED_200_ENDPOINTS = [
     { method: 'get', path: '/api/notifications' },
     { method: 'get', path: '/api/recent-records-data' },
     { method: 'get', path: '/api/parties' },
+    { method: 'get', path: '/api/date-basis' },
+    { method: 'get', path: '/api/report-templates' },
 ]
 
 // ---------------------------------------------------------------------------

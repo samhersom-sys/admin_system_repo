@@ -9,7 +9,7 @@
  * Tests: SubmissionViewPage.test.tsx
  */
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
     getSubmission,
@@ -126,7 +126,8 @@ export default function SubmissionViewPage() {
         JSON.stringify(formValues) !== JSON.stringify(savedValues)
 
     // Dynamic sidebar section — Save excluded when cascade-locked
-    const sidebarSection = {
+    // MUST be memoized — SidebarContext requires a stable reference to prevent infinite re-renders
+    const sidebarSection = useMemo(() => ({
         title: 'Submission',
         items: [
             ...(isCascadeLocked || isConcurrentLocked
@@ -150,7 +151,7 @@ export default function SubmissionViewPage() {
                 ],
             },
         ],
-    }
+    }), [isCascadeLocked, isConcurrentLocked, submission?.status, submissionId])
 
     useSidebarSection(sidebarSection)
 

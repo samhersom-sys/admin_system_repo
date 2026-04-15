@@ -48,7 +48,7 @@ async function logError(req, source, errorCode, description, context = {}) {
     }
 }
 
-const VALID_TYPES = new Set(['Submission', 'Quote', 'Policy', 'BindingAuthority', 'Party', 'Claim'])
+const VALID_TYPES = new Set(['Submission', 'Quote', 'Policy', 'Binding Authority', 'Party', 'Claim'])
 const DATE_PARAMS = ['inceptionFrom', 'inceptionTo', 'expiryFrom', 'expiryTo', 'lastOpenedFrom', 'lastOpenedTo', 'createdFrom', 'createdTo']
 
 const QUOTE_SEARCH_SELECT = `
@@ -513,7 +513,7 @@ async function filterMode(q, orgCode, requestedTypes) {
         return filterByLastOpened(await attachLastOpened(rows, 'Policy'))
     })
 
-    result.bindingAuthorities = await runForType('BindingAuthority', async () => {
+    result.bindingAuthorities = await runForType('Binding Authority', async () => {
         const { where, params } = buildClause([orgCode], {
             reference: 'ba.reference',
             status: 'ba.status',
@@ -532,7 +532,7 @@ async function filterMode(q, orgCode, requestedTypes) {
              LIMIT 200`,
             params
         ).catch(() => [])
-        return filterByLastOpened(await attachLastOpened(rows, 'BindingAuthority'))
+        return filterByLastOpened(await attachLastOpened(rows, 'Binding Authority'))
     })
 
     result.claims = await runForType('Claim', async () => {

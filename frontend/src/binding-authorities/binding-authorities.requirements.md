@@ -179,20 +179,24 @@ Sources read from `policy-forge-chat (BackUp)/`:
 
 **REQ-BA-FE-F-016:** The BA view page shall fetch the BA record via `GET /api/binding-authorities/:id` on mount and display a loading indicator while the request is in flight.
 
-**REQ-BA-FE-F-017:** The BA view page shall render the following fields in the BA header details panel: Reference (read-only), Status (select: Draft, Active, Bound, Expired, Cancelled, Lapsed), Coverholder (CoverholderSearch modal — see REQ-BA-FE-F-024), Submission Reference (read-only link when linked — see REQ-BA-FE-F-025), Year of Account (text input — see REQ-BA-FE-F-026), Inception Date, Inception Time (see REQ-BA-FE-F-027), Expiry Date, Expiry Time (see REQ-BA-FE-F-027), Multi-Year (checkbox — see REQ-BA-FE-F-028), Renewal Date + Time + Renewal Status (see REQ-BA-FE-F-029).
+**REQ-BA-FE-F-017:** The BA view page shall render the following fields in the BA header details panel: Reference (read-only), Status (read-only badge — **not** a select; status transitions are managed exclusively through sidebar workflow actions), Coverholder (CoverholderSearch modal — see REQ-BA-FE-F-024), Submission Reference (read-only link when linked — see REQ-BA-FE-F-025), Year of Account (text input — see REQ-BA-FE-F-026), Inception Date, Inception Time (see REQ-BA-FE-F-027), Expiry Date, Expiry Time (see REQ-BA-FE-F-027), Multi-Year (checkbox — see REQ-BA-FE-F-028), Renewal Date + Time + Renewal Status (see REQ-BA-FE-F-029).
 
-**REQ-BA-FE-F-018:** All editable fields in the BA header panel shall be rendered as inputs only when the BA status is `"Draft"`. When status is `"Active"`, `"Bound"`, `"Expired"`, `"Cancelled"`, or `"Lapsed"`, all fields shall be rendered read-only and a locked banner (see REQ-BA-FE-F-030) shall be shown. Status field itself remains a select to allow transitions between non-Draft states.
+**REQ-BA-FE-F-018:** All editable fields in the BA header panel shall be rendered as inputs only when the BA status is `"Draft"`. When status is `"Active"`, `"Bound"`, `"Expired"`, `"Cancelled"`, or `"Lapsed"`, all fields shall be rendered read-only. The Status field shall always be rendered as a read-only badge (not a select).
 
 **REQ-BA-FE-F-019:** The BA view page shall call `PUT /api/binding-authorities/:id` with changed field values when the user triggers the save action (sidebar `ba:save` event).
 
 **REQ-BA-FE-F-020:** The BA view page shall register a sidebar section titled `Binding Authority` whose allowed items are state-dependent:
 - `Save` action — visible when status is `"Draft"`
-- `Issue BA` action — visible when status is `"Draft"`, transitions status to `"Active"`
-- `Create Amendment` action — visible when status is `"Active"` or `"Bound"`
+- `Issue BA` action — visible when status is `"Draft"`, transitions status to `"Active"` (sidebar only — no header button)
+- `Endorse Binding Authority` action — visible when status is `"Active"` or `"Bound"` (previously labelled "Create Amendment")
+- `Import Bordereaux` action — always visible, opens the `BordereauImportModal` (fires `ba:import-bordereaux` event)
+- `Create Bordereau` action — always visible, fires `ba:create-bordereaux` event (FiPlus icon)
 - `Documents` link — always visible, navigates to `/binding-authorities/:id/documents`
 - `Create Party` link — always visible, navigates to `/parties/new` (§14 — cross-domain party creation from BA context)
-- `Renew BA Contract` link — always visible, fires `ba:renew` event; handler navigates to `/binding-authorities/new` to create a renewal (BackUp: FiRepeat icon)
+- `Renew Binding Authority` link — always visible, fires `ba:renew` event; handler navigates to `/binding-authorities/new` to create a renewal (BackUp: FiRepeat icon)
 - `Back to Submission` link — visible when `submission_id` is set
+
+No duplicate status badge shall appear in the header — the status is displayed only in the Contract & Reference section of the details panel (see REQ-BA-FE-F-017, REQ-BA-FE-F-022).
 
 **REQ-BA-FE-F-021:** The BA view page shall render an inline error message on load failure (404 or network error).
 
@@ -214,13 +218,13 @@ Sources read from `policy-forge-chat (BackUp)/`:
 
 **REQ-BA-FE-F-029:** When Multi-Year is checked, the BA header shall display Renewal Date (date input), Renewal Time (time input, step=1), and Renewal Status (select from `GET /api/lookups/renewalStatuses`). Values sent as `renewalDate`, `renewalTime`, `renewalStatus`.
 
-**REQ-BA-FE-F-030:** When the BA status is not `"Draft"`, the BA view page shall display a prominent yellow banner reading `"This binding authority is locked — changes require an amendment"` immediately above the details panel.
+**REQ-BA-FE-F-030:** ~~REMOVED — Defect 8.~~ The locked banner is no longer displayed. Status is shown as a read-only badge in the header (see REQ-BA-FE-F-017). No separate banner is required.
 
 ### 4.4 BAViewPage — Sections Tab
 
-**REQ-BA-FE-F-031:** The Sections tab shall load section data via `GET /api/binding-authorities/:id/sections` on page mount (not gated by tab selection) and render the returned records in an `app-table` table wrapped in `table-wrapper`. The table shall display the following columns (using current BASection data model fields): Reference (linked to `/binding-authorities/:id/sections/:sectionId` per §14.7 RULE 9), Class of Business, Inception Date, Expiry Date, Time Basis (`time_basis` field), Maximum Period of Insurance (days) (`days_on_cover` field), Settlement Premium Currency (`currency` field), Gross Premium Income Limit (`written_premium_limit` field). Deferred columns (not in current data model — Block 3): Effective Date, financial view Gross Premium / Net Premium / Limit Amount / Sum Insured (Whole/Market/Line toggle), GPI Limit Currency. The `<thead>` shall always be rendered (per §14.7 RULE 8). When the array is empty, the `<tbody>` shall render a single colspan row with `"No sections found."`.
+**REQ-BA-FE-F-031:** The Sections tab shall load section data via `GET /api/binding-authorities/:id/sections` on page mount (not gated by tab selection) and render the returned records using the shared `ResizableGrid` component (from `@/shared/components/ResizableGrid/ResizableGrid`). The grid shall be sortable and columns shall be resizable. The grid shall display the following columns: Reference (linked to `/binding-authorities/:id/sections/:sectionId`), Class of Business, Inception Date, Expiry Date, Time Basis (`time_basis` field), Days on Cover (`days_on_cover` field), Currency (`currency` field), Written Premium Limit (`written_premium_limit` field), and an Actions column (with delete button when Draft). Default sort shall be by Reference ascending. When the array is empty, the grid shall render `"No sections found."`. Deferred columns (Block 3): Effective Date, financial view columns, GPI Limit Currency.
 
-**REQ-BA-FE-F-032:** When the BA status is `"Draft"`, the Sections table `<thead>` actions column shall render a `FiPlus` icon button (`title="Add Section"`) that triggers an inline add row. When clicked, a new inline edit row shall appear in the table body. Confirming calls `POST /api/binding-authorities/:id/sections`; on a 201 response the returned section shall be prepended to the grid. Each section row shall have a delete button that calls `DELETE /api/binding-authority-sections/:sectionId`; on a 204 response the row shall be removed. Both actions shall be hidden when the BA is not `"Draft"`. The FiPlus trigger is hidden when an inline add row is already open.
+**REQ-BA-FE-F-032:** When the BA status is `"Draft"`, the Sections tab shall render a compact `FiPlus` icon-only button (`title="Add Section"`, 32×32px, brand-600 background, white icon) that triggers an inline add row. When clicked, a new inline edit row shall appear below the table. Confirming calls `POST /api/binding-authorities/:id/sections`; on a 201 response the returned section shall be prepended to the grid. Each section row shall have a delete button that calls `DELETE /api/binding-authority-sections/:sectionId`; on a 204 response the row shall be removed. Both actions shall be hidden when the BA is not `"Draft"`. The FiPlus trigger is hidden when an inline add row is already open.
 
 **REQ-BA-FE-F-033:** While sections are loading, a loading indicator shall be visible above the table. On load failure, an inline error message with a Retry button shall be shown.
 
@@ -272,7 +276,7 @@ Sources read from `policy-forge-chat (BackUp)/`:
 
 **REQ-BA-FE-F-070:** The audit table shall display columns: Date, Action, User. When no audit events exist, the table shall render `"No audit events recorded."`. On fetch failure, the error message shall be displayed.
 
-**REQ-BA-FE-F-071:** The BA view page shall use the `useAudit` hook with `{ entityType: 'BindingAuthority', entityId: ba.id, trackVisits: true }` so that a `"BA Opened"` event is posted on page mount and a `"BA Closed"` event is posted on page unmount, once the BA id is known. Both calls shall be best-effort.
+**REQ-BA-FE-F-071:** The BA view page shall use the `useAudit` hook with `{ entityType: 'Binding Authority', entityId: ba.id, trackVisits: true }` so that a `"Binding Authority Opened"` event is posted on page mount and a `"Binding Authority Closed"` event is posted on page unmount, once the BA id is known. Both calls shall be best-effort.
 
 ### 4.11 BASectionViewPage — /binding-authorities/:id/sections/:sectionId
 
@@ -467,16 +471,131 @@ All editable fields shall be inputs when the parent BA status is `"Draft"` and r
 | OQ-BA-001 | Should the Rating Configuration tab (section-level) be included in Block 1 or deferred? Legacy had rating schedule linking. | Open — deferred to Block 3 |
 | OQ-BA-002 | Should the Endorsement editor page be a full page or modal-based in the simplified rebuild? | Open — deferred to Block 3 |
 | OQ-BA-003 | What status transitions are valid? Legacy had: Draft → Active → Bound → Expired/Cancelled/Lapsed. | Open — confirm with business |
-| OQ-BA-004 | Should the Bordereau wizard be included? Legacy had 6 bordereau-related modals. | Open — deferred to Block 4 |
+| OQ-BA-004 | Should the Bordereau wizard be included? Legacy had 6 bordereau-related modals. | **Closed — Block 2: partial implementation added (see §5 Bordereaux Import below)** |
 
 ---
 
-## 7. Change Log
+## 5. Bordereaux Import — Block 2 Addition
+
+This section covers the `BordereauImportModal` 4-step wizard added to the GPI Monitoring tab of `BAViewPage`, and the `bordereauValidations` shared utility used by the wizard. The backend `POST /api/bordereaux/import` endpoint is covered by `backend/nest/src/binding-authorities/bordereaux.requirements.md`.
+
+### REQ-BA-FE-F-101 — Import Bordereaux button
+
+The **GPI Monitoring** tab of `BAViewPage` shall include an **"Import Bordereaux"** button that opens the `BordereauImportModal`. The button shall only be rendered when the user is on the GPI Monitoring tab; it shall not appear on other tabs.
+
+Acceptance criteria:
+- The button renders in the GPI Monitoring tab header area.
+- Clicking the button opens the `BordereauImportModal`.
+- The button is not rendered on any other tab.
+
+### REQ-BA-FE-F-102 — Step 1: Setup (type, subtype, data type, file upload)
+
+Step 1 of the wizard shall allow the user to select: **Bordereaux type** (Risk / Claims), **sub-type** (Premium / Adjustment / ... inferred from type), **data type** (Risk / Policy), and upload a **spreadsheet file** (`.xlsx` or `.csv`). The step shall validate that all fields are filled and a file is selected before allowing progression to Step 2.
+
+Acceptance criteria:
+- All four controls are present on Step 1.
+- The "Next" button is disabled until type, subtype, data type, and file are all selected.
+- Accepting `.xlsx` and `.csv` file types only.
+
+### REQ-BA-FE-F-103 — Step 2: Column mapping with auto-hints and localStorage persistence
+
+Step 2 shall parse the uploaded file using the XLSX library (loaded from CDN as `window.XLSX`), detect column headers from the first row, and present a mapping interface. Each source column may be mapped to a target field from the canonical field list. Auto-hint logic shall pre-populate mappings using fuzzy header matching. Mappings shall be persisted to and restored from `localStorage` using the key `ba:{id}:import:{type}:{subtype}:{datatype}:mapping`.
+
+Acceptance criteria:
+- Columns from the spreadsheet appear as selectable source headers.
+- Auto-hints pre-populate recognisable columns.
+- The "Next" button is always enabled (column mapping is optional; the user may proceed with an empty mapping).
+- On re-opening the modal with the same BA + configuration, the previous mapping is restored from `localStorage`.
+
+### REQ-BA-FE-F-104 — Step 3: Preview and validation
+
+Step 3 shall display the first 5 normalised rows as a preview table and run `validateRows()` from `bordereauValidations`. Each validation issue shall be displayed with its severity (error / warning), row number, field, and message. The user may proceed to Step 4 (import) even when warnings are present; errors do not block progression in the current implementation but must be visible.
+
+Acceptance criteria:
+- Up to 5 preview rows are displayed in a table.
+- Each row from `validateRows()` with `severity: 'error'` is displayed with the error message.
+- Each row from `validateRows()` with `severity: 'warning'` is displayed with the warning message.
+- An "Import" button on Step 3 submits the data.
+
+### REQ-BA-FE-F-105 — Step 4: Confirmation (done state)
+
+After a successful `POST /api/bordereaux/import` response, the modal shall advance to Step 4 and display a success message including the counts of created policies, sections, coverages, and transactions from the response. The modal shall include a "Close" button that dismisses it.
+
+Acceptance criteria:
+- Step 4 renders after a 2xx response.
+- Created counts (policies, sections, coverages, transactions) are visible.
+- The modal closes when the "Close" button is clicked.
+- On close, a `ba:gpi-actuals-updated` custom event is dispatched on `window`.
+
+### REQ-BA-FE-F-106 — bordereauValidations: value normalisation
+
+`normalizeValue(targetKey, raw)` shall return the canonical string for a known mapping key, or the trimmed raw string for unmapped keys.
+- For `policyTxn.transactionType`, the following aliases shall map to their canonical values: `N`/`NB`/`NEW` → `New Business`; `R`/`RN`/`RNL`/`REN` → `Renewal`; `E`/`END` → `Endorsement`; `C`/`CAN` → `Cancellation`. The comparison shall be case-insensitive.
+- `null` or `undefined` shall return `''`.
+
+Acceptance criteria:
+- `normalizeValue('policyTxn.transactionType', 'NB')` returns `'New Business'`.
+- `normalizeValue('policyTxn.transactionType', 'ren')` returns `'Renewal'`.
+- `normalizeValue('other.field', 'foo')` returns `'foo'`.
+- `normalizeValue('policyTxn.transactionType', null)` returns `''`.
+
+### REQ-BA-FE-F-107 — bordereauValidations: parseNumber
+
+`parseNumber(raw)` shall strip commas and whitespace from the input, parse to float, and return the numeric value. It shall return `0` for null, undefined, empty string, and non-numeric input.
+
+Acceptance criteria:
+- `parseNumber('1,234.56')` returns `1234.56`.
+- `parseNumber('')` returns `0`.
+- `parseNumber(null)` returns `0`.
+- `parseNumber('abc')` returns `0`.
+- `parseNumber('  500 ')` returns `500`.
+
+### REQ-BA-FE-F-108 — bordereauValidations: validateRows — COB validation
+
+When `validateRows()` is called with a `context.classesOfBusiness` array, each row whose `section.classOfBusiness` (or `policy.classOfBusiness`) value does not match any item in the provided list (case-insensitive) shall produce an `'invalid-cob'` error issue.
+
+Acceptance criteria:
+- A row with a COB not in the list produces an issue with `type: 'invalid-cob'` and `severity: 'error'`.
+- A row with a COB present in the list (case-insensitive match) produces no COB issue.
+- When no COB field is present on a row, no COB issue is raised.
+
+### REQ-BA-FE-F-109 — bordereauValidations: validateRows — transaction type check
+
+A row whose `policyTxn.transactionType` after normalisation is not one of `'New Business'`, `'Renewal'`, `'Endorsement'`, `'Cancellation'` shall produce an `'invalid-txn-type'` error issue.
+
+Acceptance criteria:
+- `'Unknown'` transaction type produces `type: 'invalid-txn-type'` with `severity: 'error'`.
+- `'New Business'` produces no transaction type issue.
+- A row with no `policyTxn.transactionType` produces no transaction type issue.
+
+### REQ-BA-FE-F-110 — bordereauValidations: validateRows — negative premium check
+
+A row whose `section.grossPremium` (or `policy.grossPremium`) parses to a negative number shall produce a `'negative-premium'` error issue.
+
+Acceptance criteria:
+- `section.grossPremium = '-100'` produces `type: 'negative-premium'` with `severity: 'error'`.
+- `section.grossPremium = '0'` produces no negative-premium issue.
+- Missing gross premium field is treated as `0` and produces no issue.
+
+### REQ-BA-FE-F-111 — bordereauValidations: validateRows — per-policy sum check
+
+After processing all rows, when the sum of `section.grossPremium` (or `policy.grossPremium`) across all rows for a single `policy.reference` is less than zero, a `'policy-premium-below-zero'` warning issue shall be raised for that policy reference.
+
+Acceptance criteria:
+- Two rows with the same `policy.reference`, one with premium `-200` and one with `100`, produce a `'policy-premium-below-zero'` warning.
+- Two rows with the same `policy.reference` that sum to `0` or above produce no such warning.
+- `severity` is `'warning'` (not `'error'`) for per-policy sum issues.
+
+---
+
+## 6. Open Questions
 
 | Date | Change |
 |------|--------|
 | 2026-03-11 | Stub formatted per Guideline 13 |
 | 2026-04-05 | Full requirements written from BackUp source. 72 functional + 4 constraint + 2 security REQs added. Backup Coverage Map (32 rows). Impact Analysis. 4 pages: BAListPage, NewBAPage, BAViewPage, BASectionViewPage. 7 tabs on BAViewPage, 4 tabs on BASectionViewPage. BASearchModal reusable component. Documents/Bordereau/Endorsement deferred to Blocks 3–4. |
+| 2026-05-22 | §5 Bordereaux Import (Block 2) added — REQ-BA-FE-F-101 to F-111. Covers: Import Bordereaux button (F-101), 4-step wizard steps (F-102–F-105), and bordereauValidations utility (F-106–F-111). OQ-BA-004 closed. Open questions OQ-030, OQ-031, OQ-032 raised in 08-Open-Questions.md. Retroactive compliance with Three-Artifact Rule acknowledged. |
+| 2026-05-22 | Defect fixes: F-017 updated — Status now read-only badge (not select) per Defect 6. F-018 updated — removed locked-banner cross-reference per Defect 8. F-020 updated — renamed "Create Amendment" to "Endorse Binding Authority" (Defect 9), added "Import Bordereaux" sidebar item (Defect 12), clarified "Issue BA" is sidebar-only (Defect 5). F-030 removed — locked banner no longer displayed (Defect 8). F-031 updated — sections tab now uses ResizableGrid with sort/resize (Defect 4). |
 
 ---
 

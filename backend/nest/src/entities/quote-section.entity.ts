@@ -11,6 +11,9 @@ import {
  * Schema source:
  *   db/migrations/012-create-quote-sections-table.js  (base table)
  *   db/migrations/078-alter-quote_sections-add-deleted-at.js (deleted_at)
+ *   db/migrations/102-alter-quote-sections-add-order-time-fields.js (time_basis, order basis, line totals)
+ *   db/migrations/103-alter-quote-sections-add-annual-premiums.js   (annual_gross_premium, annual_net_premium)
+ *   db/migrations/104-alter-quote-sections-add-da-ref-strings.js    (da ref strings)
  */
 @Entity('quote_sections')
 @Index('idx_quote_sections_quote_id', ['quoteId'])
@@ -90,11 +93,41 @@ export class QuoteSection {
     @Column({ name: 'tax_receivable', type: 'numeric', precision: 18, scale: 2, nullable: true })
     taxReceivable: string | null
 
+    // Added in migration 102 — order/time basis fields
+    @Column({ name: 'time_basis', type: 'varchar', length: 100, nullable: true })
+    timeBasis: string | null
+
+    @Column({ name: 'written_order_basis', type: 'text', nullable: true })
+    writtenOrderBasis: string | null
+
+    @Column({ name: 'signed_order_basis', type: 'text', nullable: true })
+    signedOrderBasis: string | null
+
+    @Column({ name: 'written_line_total', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    writtenLineTotal: string | null
+
+    @Column({ name: 'signed_line_total', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    signedLineTotal: string | null
+
+    // Added in migration 103 — annual premiums promoted from payload
+    @Column({ name: 'annual_gross_premium', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    annualGrossPremium: string | null
+
+    @Column({ name: 'annual_net_premium', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    annualNetPremium: string | null
+
     @Column({ name: 'delegated_authority_id', type: 'int', nullable: true })
     delegatedAuthorityId: number | null
 
     @Column({ name: 'delegated_authority_section_id', type: 'int', nullable: true })
     delegatedAuthoritySectionId: number | null
+
+    // Added in migration 104 — convenience text columns (denormalised refs)
+    @Column({ name: 'delegated_authority_ref', type: 'text', nullable: true })
+    delegatedAuthorityRef: string | null
+
+    @Column({ name: 'delegated_authority_section_ref', type: 'text', nullable: true })
+    delegatedAuthoritySectionRef: string | null
 
     @Column({ name: 'is_current', type: 'boolean', default: true })
     isCurrent: boolean
@@ -137,12 +170,19 @@ export class QuoteSection {
             deductions: this.deductions,
             net_premium: this.netPremium,
             tax_receivable: this.taxReceivable,
+            time_basis: this.timeBasis,
+            written_order_basis: this.writtenOrderBasis,
+            signed_order_basis: this.signedOrderBasis,
+            written_line_total: this.writtenLineTotal,
+            signed_line_total: this.signedLineTotal,
+            annual_gross_premium: this.annualGrossPremium,
+            annual_net_premium: this.annualNetPremium,
             written_order: (this.payload as Record<string, unknown>)?.written_order ?? null,
             signed_order: (this.payload as Record<string, unknown>)?.signed_order ?? null,
-            annual_gross_premium: (this.payload as Record<string, unknown>)?.annual_gross_premium ?? null,
-            annual_net_premium: (this.payload as Record<string, unknown>)?.annual_net_premium ?? null,
             delegated_authority_id: this.delegatedAuthorityId,
             delegated_authority_section_id: this.delegatedAuthoritySectionId,
+            delegated_authority_ref: this.delegatedAuthorityRef,
+            delegated_authority_section_ref: this.delegatedAuthoritySectionRef,
             is_current: this.isCurrent,
             created_at: this.createdAt,
             payload: this.payload,

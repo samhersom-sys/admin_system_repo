@@ -68,7 +68,7 @@ C. **Fallback to `createdDate` ordering when audit is empty** — resolves flaw 
 
 **REQ-SEARCH-BE-F-006:** The endpoint shall accept the following optional query parameters: `type`, `reference`, `status`, `insured`, `broker`, `inceptionFrom`, `inceptionTo`, `expiryFrom`, `expiryTo`.
 
-**REQ-SEARCH-BE-F-007:** When `type` is supplied, only the matching entity table shall be queried. Valid values: `Submission`, `Quote`, `Policy`, `BindingAuthority`, `Party`, `Claim`. An invalid value shall return HTTP 400.
+**REQ-SEARCH-BE-F-007:** When `type` is supplied, only the matching entity table shall be queried. Valid values: `Submission`, `Quote`, `Policy`, `Binding Authority`, `Party`, `Claim`. An invalid value shall return HTTP 400.
 
 **REQ-SEARCH-BE-F-008:** String filter params (`reference`, `status`, `insured`, `broker`) shall match using case-insensitive ILIKE (`%value%`).
 

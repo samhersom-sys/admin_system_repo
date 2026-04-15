@@ -1,15 +1,16 @@
 /**
  * ReportRunPage — REQ-RPT-FE-F-021 to F-029
  *
- * Loads template → shows Run button → executes → displays dynamic results table.
- * 3-tab layout: Results | Execution History | Audit History
+ * Loads template → shows Filters tab by default → executes → displays dynamic results table.
+ * 4-tab layout: Filters | Results | Execution History | Audit History
  * "Export CSV" downloads file named {reportName}_{YYYY-MM-DD}.csv
  */
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { FiPlay, FiDownload } from 'react-icons/fi'
+import { FiPlay, FiDownload, FiX } from 'react-icons/fi'
 import { useNotifications } from '@/shell/NotificationDock'
+import { useSidebarSection, type SidebarSection } from '@/shell/SidebarContext'
 import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
 import Card from '@/shared/Card/Card'
 import ResizableGrid, { type Column, type SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
@@ -18,11 +19,28 @@ import {
     runReport,
     runCoreReport,
     getReportHistory,
+    getDateBasisOptions,
     type ReportTemplate,
     type ExecutionHistory,
 } from '../reporting.service'
 
-type Tab = 'results' | 'history' | 'audit'
+type Tab = 'filters' | 'results' | 'history' | 'audit'
+
+interface FilterRow {
+    field: string
+    operator: string
+    value: string
+}
+
+const DOMAIN_SINGULAR: Record<string, string> = {
+    submissions: 'Submission',
+    quotes: 'Quote',
+    policies: 'Policy',
+    policyTransactions: 'Policy Transaction',
+    bindingAuthorities: 'Binding Authority',
+    parties: 'Party',
+    claims: 'Claim',
+}
 
 // Core report templates — mirrors ReportsListPage CORE_TEMPLATES
 // Loaded locally so navigating to /reports/run/submissions works without an API call.
@@ -62,10 +80,36 @@ export default function ReportRunPage() {
     const [running, setRunning] = useState(false)
     const [results, setResults] = useState<Record<string, unknown>[] | null>(null)
     const [history, setHistory] = useState<ExecutionHistory[]>([])
-    const [activeTab, setActiveTab] = useState<Tab>('results')
+    const [activeTab, setActiveTab] = useState<Tab>('filters')
     const [sortConfig, setSortConfig] = useState<SortConfig | undefined>(undefined)
 
+    // Filter state
+    const [dateBasis, setDateBasis] = useState('')
+    const [dateFrom, setDateFrom] = useState('')
+    const [dateTo, setDateTo] = useState('')
+    const [filterRows, setFilterRows] = useState<FilterRow[]>([])
+    const [dateBasisOptions, setDateBasisOptions] = useState<string[]>([])
+
+    // Sidebar Run button
+    const sidebarSection = useMemo<SidebarSection>(() => ({
+        title: 'Report',
+        items: [{ label: 'Run Report', icon: FiPlay, event: 'report:run' }],
+    }), [])
+    useSidebarSection(sidebarSection)
+
+    useEffect(() => {
+        const handler = () => { void handleRun() }
+        window.addEventListener('report:run', handler)
+        return () => window.removeEventListener('report:run', handler)
+    })
+
     const headers = results && results.length > 0 ? Object.keys(results[0]) : []
+
+    useEffect(() => {
+        getDateBasisOptions()
+            .then(setDateBasisOptions)
+            .catch(() => setDateBasisOptions([]))
+    }, [])
 
     const resultColumns: Column[] = useMemo(() =>
         headers.map((h) => ({
@@ -130,8 +174,21 @@ export default function ReportRunPage() {
         const coreTemplate = CORE_REPORT_TEMPLATES[reportId]
         setRunning(true)
         try {
+            // Build query params from filters
+            const params = new URLSearchParams()
+            if (dateBasis) params.set('date_basis', dateBasis)
+            if (dateFrom) params.set('date_from', dateFrom)
+            if (dateTo) params.set('date_to', dateTo)
+            filterRows.forEach((f, i) => {
+                if (f.field) {
+                    params.set(`filter_field_${i}`, f.field)
+                    params.set(`filter_op_${i}`, f.operator)
+                    params.set(`filter_value_${i}`, f.value)
+                }
+            })
+            const qs = params.toString()
             const res = coreTemplate
-                ? await runCoreReport(coreTemplate.data_source!)
+                ? await runCoreReport(`${coreTemplate.data_source!}${qs ? `?${qs}` : ''}`)
                 : await runReport(parseInt(reportId, 10))
             setResults(res)
             setActiveTab('results')
@@ -171,22 +228,13 @@ export default function ReportRunPage() {
                             Export CSV
                         </button>
                     )}
-                    <button
-                        type="button"
-                        onClick={handleRun}
-                        disabled={running}
-                        className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-                    >
-                        <FiPlay size={14} />
-                        {running ? 'Running…' : 'Run Report'}
-                    </button>
                 </div>
             </div>
 
             {/* Tabs */}
             <div className="border-b border-gray-200">
                 <nav className="flex gap-0">
-                    {(['results', 'history', 'audit'] as Tab[]).map((tab) => (
+                    {(['filters', 'results', 'history', 'audit'] as Tab[]).map((tab) => (
                         <button
                             key={tab}
                             type="button"
@@ -195,11 +243,121 @@ export default function ReportRunPage() {
                                 ? 'border-brand-600 text-brand-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                         >
-                            {tab === 'results' ? 'Results' : tab === 'history' ? 'Execution History' : 'Audit History'}
+                            {tab === 'filters' ? 'Filters'
+                                : tab === 'results' ? 'Results'
+                                    : tab === 'history' ? 'Execution History'
+                                        : 'Audit History'}
                         </button>
                     ))}
                 </nav>
             </div>
+
+            {/* Filters tab */}
+            {activeTab === 'filters' && (
+                <Card className="p-5 flex flex-col gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="flex flex-col gap-1">
+                            <label className="text-sm font-medium text-gray-700" htmlFor="run-date-basis">Date Basis</label>
+                            <select
+                                id="run-date-basis"
+                                value={dateBasis}
+                                onChange={(e) => setDateBasis(e.target.value)}
+                                className="border border-gray-300 rounded px-3 py-2 text-sm"
+                                aria-label="Date Basis"
+                            >
+                                <option value="">Any</option>
+                                {dateBasisOptions.map((opt) => {
+                                    const prefix = DOMAIN_SINGULAR[template?.data_source ?? '']
+                                    return <option key={opt} value={opt}>{prefix ? `${prefix} ${opt}` : opt}</option>
+                                })}
+                            </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-sm font-medium text-gray-700" htmlFor="run-date-from">Date From</label>
+                            <input
+                                id="run-date-from"
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="border border-gray-300 rounded px-3 py-2 text-sm"
+                                aria-label="Date From"
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-sm font-medium text-gray-700" htmlFor="run-date-to">Date To</label>
+                            <input
+                                id="run-date-to"
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="border border-gray-300 rounded px-3 py-2 text-sm"
+                                aria-label="Date To"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Dynamic filter rows */}
+                    <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-700">Additional Filters</span>
+                            <button
+                                type="button"
+                                onClick={() => setFilterRows((prev) => [...prev, { field: '', operator: 'equals', value: '' }])}
+                                className="text-sm text-brand-600 hover:underline"
+                            >+ Add Filter</button>
+                        </div>
+                        {filterRows.length === 0 && (
+                            <p className="text-xs text-gray-400">No additional filters.</p>
+                        )}
+                        {filterRows.map((row, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Field name"
+                                    value={row.field}
+                                    onChange={(e) => setFilterRows((prev) => prev.map((r, i) => i === idx ? { ...r, field: e.target.value } : r))}
+                                    className="border border-gray-300 rounded px-2 py-1 text-sm flex-1"
+                                />
+                                <select
+                                    value={row.operator}
+                                    onChange={(e) => setFilterRows((prev) => prev.map((r, i) => i === idx ? { ...r, operator: e.target.value } : r))}
+                                    className="border border-gray-300 rounded px-2 py-1 text-sm"
+                                >
+                                    <option value="equals">equals</option>
+                                    <option value="not_equals">≠</option>
+                                    <option value="contains">contains</option>
+                                    <option value="greater_than">&gt;</option>
+                                    <option value="less_than">&lt;</option>
+                                </select>
+                                <input
+                                    type="text"
+                                    placeholder="Value"
+                                    value={row.value}
+                                    onChange={(e) => setFilterRows((prev) => prev.map((r, i) => i === idx ? { ...r, value: e.target.value } : r))}
+                                    className="border border-gray-300 rounded px-2 py-1 text-sm flex-1"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setFilterRows((prev) => prev.filter((_, i) => i !== idx))}
+                                    className="text-gray-400 hover:text-red-500"
+                                ><FiX size={14} /></button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            onClick={handleRun}
+                            disabled={running}
+                            className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+                        >
+                            <FiPlay size={14} />
+                            {running ? 'Running…' : 'Run Report'}
+                        </button>
+                    </div>
+                </Card>
+            )}
 
             {/* Tab content */}
             {activeTab === 'results' && (

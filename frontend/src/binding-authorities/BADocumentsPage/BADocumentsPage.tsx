@@ -32,7 +32,7 @@ export default function BADocumentsPage() {
     const sidebarSection = useMemo<SidebarSection>(() => ({
         title: 'Binding Authority',
         items: [
-            { label: 'Back to BA', icon: FiArrowLeft, to: `/binding-authorities/${baId}` },
+            { label: 'Back to Binding Authority', icon: FiArrowLeft, to: `/binding-authorities/${baId}` },
         ],
     }), [baId])
     useSidebarSection(sidebarSection)

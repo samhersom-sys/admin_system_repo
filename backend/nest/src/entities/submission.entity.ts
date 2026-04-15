@@ -12,6 +12,10 @@ import {
  *   db/migrations/005-alter-submission-add-party-link.js   (party_created_id)
  *   db/migrations/059-alter-submission-add-status-fk.js    (status_id)
  *   db/migrations/060-alter-submission-add-workflow-status-fk.js (workflow_status_code)
+ *   db/migrations/091-alter-submission-add-workflow-and-last-opened.js (workflow_status, workflow_assigned_to, last_opened_date)
+ *   db/migrations/106-alter-submission-add-workflow-ai-fields.js (workflow_notes, ai pipeline cols)
+ *   db/migrations/107-alter-submission-add-assignment-fields.js  (assigned_by, assigned_date)
+ *   db/migrations/108-alter-submission-add-clearance-fields.js   (clearance columns)
  *
  * Note: the table uses quoted camelCase column names for legacy fields.
  */
@@ -88,4 +92,65 @@ export class Submission {
   // Added in migration 060
   @Column({ name: 'workflow_status_code', type: 'varchar', length: 50, nullable: true })
   workflowStatusCode: string | null
+
+  // Added in migration 091
+  @Column({ name: 'workflow_status', type: 'varchar', length: 50, nullable: true })
+  workflowStatus: string | null
+
+  @Column({ name: 'workflow_assigned_to', type: 'int', nullable: true })
+  workflowAssignedTo: number | null
+
+  @Column({ name: 'last_opened_date', type: 'timestamp', nullable: true })
+  lastOpenedDate: Date | null
+
+  // Added in migration 106 — workflow notes and AI pipeline fields
+  @Column({ name: 'workflow_notes', type: 'text', nullable: true })
+  workflowNotes: string | null
+
+  @Column({ name: 'ai_extracted', type: 'boolean', default: false })
+  aiExtracted: boolean
+
+  @Column({ name: 'review_required', type: 'boolean', default: false })
+  reviewRequired: boolean
+
+  @Column({ name: 'email_source', type: 'text', nullable: true })
+  emailSource: string | null
+
+  @Column({ name: 'email_received_date', type: 'timestamptz', nullable: true })
+  emailReceivedDate: Date | null
+
+  @Column({ name: 'email_processed_date', type: 'timestamptz', nullable: true })
+  emailProcessedDate: Date | null
+
+  @Column({ name: 'extraction_confidence', type: 'numeric', precision: 5, scale: 2, nullable: true })
+  extractionConfidence: string | null
+
+  // Added in migration 107 — work-assignment fields
+  @Column({ name: 'assigned_by', type: 'int', nullable: true })
+  assignedBy: number | null
+
+  @Column({ name: 'assigned_date', type: 'timestamptz', nullable: true })
+  assignedDate: Date | null
+
+  // Added in migration 108 — clearance workflow fields
+  @Column({ name: 'clearance_status', type: 'text', nullable: true })
+  clearanceStatus: string | null
+
+  @Column({ name: 'clearance_status_code', type: 'varchar', length: 50, nullable: true })
+  clearanceStatusCode: string | null
+
+  @Column({ name: 'clearance_notes', type: 'text', nullable: true })
+  clearanceNotes: string | null
+
+  @Column({ name: 'clearance_matched_submissions', type: 'jsonb', nullable: true })
+  clearanceMatchedSubmissions: Record<string, unknown>[] | null
+
+  @Column({ name: 'clearance_reviewed_by', type: 'int', nullable: true })
+  clearanceReviewedBy: number | null
+
+  @Column({ name: 'clearance_reviewed_date', type: 'timestamptz', nullable: true })
+  clearanceReviewedDate: Date | null
+
+  @Column({ name: 'auto_clearance_checked', type: 'boolean', default: false })
+  autoClearanceChecked: boolean
 }

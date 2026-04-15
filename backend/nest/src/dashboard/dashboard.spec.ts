@@ -87,7 +87,7 @@ describe('DashboardService', () => {
         { entity_type: 'Submission', entity_id: 1, last_opened: '2026-04-10T12:00:00Z' },
         { entity_type: 'Quote', entity_id: 2, last_opened: '2026-04-10T11:00:00Z' },
         { entity_type: 'Policy', entity_id: 3, last_opened: '2026-04-10T10:00:00Z' },
-        { entity_type: 'BindingAuthority', entity_id: 4, last_opened: '2026-04-10T09:00:00Z' },
+        { entity_type: 'Binding Authority', entity_id: 4, last_opened: '2026-04-10T09:00:00Z' },
       ]
       const submissions = [{ id: 1, reference: 'SUB-TST-001' }]
       const quotes = [{ id: 2, reference: 'QUO-TST-001' }]

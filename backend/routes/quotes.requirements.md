@@ -114,6 +114,8 @@
 
 **REQ-QUO-BE-F-004:** The `GET /api/quotes` endpoint shall accept an optional `?status=<string>` query parameter and shall filter the returned array to only records matching that status when the parameter is present.
 
+**REQ-QUO-BE-F-047:** The `GET /api/quotes` endpoint shall accept optional `?date_basis=<label>&date_from=<YYYY-MM-DD>&date_to=<YYYY-MM-DD>` query parameters. When all three are present and `date_basis` maps to a known column (`Created Date` → `created_date`, `Inception Date` → `inception_date`, `Expiry Date` → `expiry_date`), the endpoint shall cast the column value to a date and filter to rows where the date falls within the inclusive range `[date_from, date_to]`. When `date_basis` does not map to a known column, the date parameters shall be silently ignored.
+
 ### 3.2 POST /api/quotes
 
 **REQ-QUO-BE-F-005:** The `POST /api/quotes` endpoint shall require a valid `Authorization: Bearer <token>` header and shall return HTTP 401 when absent or invalid.
@@ -368,6 +370,7 @@
 | REQ-QUO-BE-F-044 | `backend/__tests__/quotes.test.js` | pending |
 | REQ-QUO-BE-F-045 | `backend/__tests__/quotes.test.js` | pending |
 | REQ-QUO-BE-F-046 | `backend/__tests__/quotes.test.js` | pending |
+| REQ-QUO-BE-F-047 | `backend/__tests__/quotes.test.js` | T-QUO-BE-R47a, T-QUO-BE-R47b, T-QUO-BE-R47c |
 
 ---
 
@@ -384,6 +387,7 @@ None.
 | 2026-06-08 | Initial requirements written — Quotes BE Block 2 |
 | 2026-03-19 | Block 3: REQ-QUO-BE-F-030 to F-036 added — GET and POST /api/quotes/:id/audit endpoints |
 | 2026-03-20 | Block 3 remaining + Block 4: REQ-QUO-BE-F-037 to F-046 added — sections CRUD (§3.9–3.12), coverages CRUD (§3.13–3.16), participations (§3.17–3.18); migration 094 prerequisite noted |
+| 2026-05-22 | Added REQ-QUO-BE-F-047: date range filtering (date_basis, date_from, date_to) for New Business Report date filter fix |
 
 ---
 

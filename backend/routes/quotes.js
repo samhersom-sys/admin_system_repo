@@ -1,12 +1,12 @@
-/**
- * Quotes Route — /api/quotes
+﻿/**
+ * Quotes Route â€” /api/quotes
  *
  * Requirements: quotes.requirements.md
  *
  * All routes require a valid JWT.  Data is scoped by created_by_org_code
- * from the JWT payload (multi-tenant isolation — §05-Multi-Tenant-Rules.md).
+ * from the JWT payload (multi-tenant isolation â€” Â§05-Multi-Tenant-Rules.md).
  *
- * Status workflow: Draft → Quoted → Bound | Declined
+ * Status workflow: Draft â†’ Quoted â†’ Bound | Declined
  */
 
 'use strict'
@@ -20,7 +20,7 @@ const { authenticateToken } = require('../middleware/auth')
 router.use(authenticateToken)
 
 // ---------------------------------------------------------------------------
-// Error logger — writes to error_log table (§16-Error-Handling-Standards.md)
+// Error logger â€” writes to error_log table (Â§16-Error-Handling-Standards.md)
 // ---------------------------------------------------------------------------
 
 async function logError(req, source, errorCode, description, context = {}) {
@@ -63,13 +63,13 @@ async function generateReference(orgCode) {
 }
 
 // ---------------------------------------------------------------------------
-// R01 — GET /api/quotes
+// R01 â€” GET /api/quotes
 // Returns quotes scoped to the caller's org, with optional filters.
 // ---------------------------------------------------------------------------
 
 router.get('/', async (req, res) => {
     const orgCode = req.user.orgCode
-    const { submission_id, status } = req.query
+    const { submission_id, status, date_basis, date_from, date_to } = req.query
 
     try {
         let sql = `SELECT * FROM quotes WHERE created_by_org_code = $1 AND deleted_at IS NULL`
@@ -84,6 +84,20 @@ router.get('/', async (req, res) => {
             sql += ` AND status = $${params.length}`
         }
 
+        // Date range filtering â€” maps date_basis label to a column name
+        if (date_basis && date_from && date_to) {
+            const DATE_COLUMN_MAP = {
+                'Created Date': 'created_date',
+                'Inception Date': 'inception_date',
+                'Expiry Date': 'expiry_date',
+            }
+            const col = DATE_COLUMN_MAP[date_basis]
+            if (col) {
+                params.push(date_from, date_to)
+                sql += ` AND ${col}::date >= $${params.length - 1}::date AND ${col}::date <= $${params.length}::date`
+            }
+        }
+
         sql += ` ORDER BY created_date DESC`
 
         const rows = await runQuery(sql, params)
@@ -91,12 +105,12 @@ router.get('/', async (req, res) => {
     } catch (err) {
         console.error('[GET /api/quotes] Error:', err.message)
         await logError(req, 'GET /api/quotes', 'ERR_QUOTES_FETCH_500', err.message, {})
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R02 — POST /api/quotes
+// R02 â€” POST /api/quotes
 // Creates a new quote. Forces status to Draft and created_by_org_code from JWT.
 // Generates reference server-side. Defaults expiry to inception + 365 days.
 // ---------------------------------------------------------------------------
@@ -130,7 +144,7 @@ router.post('/', async (req, res) => {
 
     if (!insured || !insured.trim()) {
         await logError(req, 'POST /api/quotes', 'ERR_QUOTE_CREATE_MISSING_INSURED', 'insured is required', {})
-        return res.status(400).json({ error: 'insured is required' })
+        return res.status(400).json({ message: 'insured is required' })
     }
 
     // Default expiry to inception + 365 days
@@ -141,7 +155,7 @@ router.post('/', async (req, res) => {
             d.setDate(d.getDate() + 365)
             resolvedExpiry = d.toISOString().slice(0, 10)
         } catch (_) {
-            // non-fatal — leave null
+            // non-fatal â€” leave null
         }
     }
 
@@ -189,12 +203,12 @@ router.post('/', async (req, res) => {
     } catch (err) {
         console.error('[POST /api/quotes] Error:', err.message)
         await logError(req, 'POST /api/quotes', 'ERR_QUOTE_CREATE_500', err.message, {})
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R03 — GET /api/quotes/:id
+// R03 â€” GET /api/quotes/:id
 // ---------------------------------------------------------------------------
 
 router.get('/:id', async (req, res) => {
@@ -205,22 +219,22 @@ router.get('/:id', async (req, res) => {
         const rows = await runQuery('SELECT * FROM quotes WHERE id = $1', [parseInt(id, 10)])
         if (rows.length === 0) {
             await logError(req, 'GET /api/quotes/:id', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
-            return res.status(404).json({ error: 'Quote not found' })
+            return res.status(404).json({ message: 'Quote not found' })
         }
         if (rows[0].created_by_org_code !== orgCode) {
             await logError(req, 'GET /api/quotes/:id', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
-            return res.status(403).json({ error: 'Forbidden' })
+            return res.status(403).json({ message: 'Forbidden' })
         }
         res.json(rows[0])
     } catch (err) {
         console.error('[GET /api/quotes/:id] Error:', err.message)
         await logError(req, 'GET /api/quotes/:id', 'ERR_QUOTE_FETCH_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R04 — PUT /api/quotes/:id
+// R04 â€” PUT /api/quotes/:id
 // Updates mutable fields. Strips immutable fields. Blocks edits on Bound/Declined.
 // ---------------------------------------------------------------------------
 
@@ -232,16 +246,16 @@ router.put('/:id', async (req, res) => {
         const rows = await runQuery('SELECT * FROM quotes WHERE id = $1', [parseInt(id, 10)])
         if (rows.length === 0) {
             await logError(req, 'PUT /api/quotes/:id', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
-            return res.status(404).json({ error: 'Quote not found' })
+            return res.status(404).json({ message: 'Quote not found' })
         }
         const quote = rows[0]
         if (quote.created_by_org_code !== orgCode) {
             await logError(req, 'PUT /api/quotes/:id', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
-            return res.status(403).json({ error: 'Forbidden' })
+            return res.status(403).json({ message: 'Forbidden' })
         }
         if (['Bound', 'Declined'].includes(quote.status)) {
             await logError(req, 'PUT /api/quotes/:id', 'ERR_QUOTE_EDIT_LOCKED', 'Cannot edit a Bound or Declined quote', { id, status: quote.status })
-            return res.status(400).json({ error: 'Cannot edit a Bound or Declined quote' })
+            return res.status(400).json({ message: 'Cannot edit a Bound or Declined quote' })
         }
 
         // Strip immutable fields
@@ -252,7 +266,7 @@ router.put('/:id', async (req, res) => {
             created_by: _cb,
             created_date: _cd,
             id: _id,
-            _forceStatus, // test helper — ignored
+            _forceStatus, // test helper â€” ignored
             ...mutable
         } = req.body
 
@@ -260,6 +274,18 @@ router.put('/:id', async (req, res) => {
         const keys = Object.keys(mutable).filter((k) => mutable[k] !== undefined)
         if (keys.length === 0) {
             return res.json(quote)
+        }
+
+        // Coerce empty strings to null for date/time columns (PostgreSQL rejects '')
+        const DATE_TIME_COLS = new Set([
+            'inception_date', 'expiry_date', 'inception_time', 'expiry_time',
+            'lta_start_date', 'lta_expiry_date', 'lta_start_time', 'lta_expiry_time',
+            'renewal_date', 'renewal_time',
+        ])
+        for (const k of keys) {
+            if (DATE_TIME_COLS.has(k) && mutable[k] === '') {
+                mutable[k] = null
+            }
         }
 
         const updates = keys.map((k, i) => `"${k}" = $${i + 2}`).join(', ')
@@ -273,13 +299,13 @@ router.put('/:id', async (req, res) => {
     } catch (err) {
         console.error('[PUT /api/quotes/:id] Error:', err.message)
         await logError(req, 'PUT /api/quotes/:id', 'ERR_QUOTE_UPDATE_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R05 — POST /api/quotes/:id/quote
-// Transitions status from Draft → Quoted.
+// R05 â€” POST /api/quotes/:id/quote
+// Transitions status from Draft â†’ Quoted.
 // ---------------------------------------------------------------------------
 
 router.post('/:id/quote', async (req, res) => {
@@ -290,16 +316,16 @@ router.post('/:id/quote', async (req, res) => {
         const rows = await runQuery('SELECT * FROM quotes WHERE id = $1', [parseInt(id, 10)])
         if (rows.length === 0) {
             await logError(req, 'POST /api/quotes/:id/quote', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
-            return res.status(404).json({ error: 'Quote not found' })
+            return res.status(404).json({ message: 'Quote not found' })
         }
         const quote = rows[0]
         if (quote.created_by_org_code !== orgCode) {
             await logError(req, 'POST /api/quotes/:id/quote', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
-            return res.status(403).json({ error: 'Forbidden' })
+            return res.status(403).json({ message: 'Forbidden' })
         }
         if (quote.status !== 'Draft') {
             await logError(req, 'POST /api/quotes/:id/quote', 'ERR_QUOTE_INVALID_TRANSITION', 'Only a Draft quote may be marked as Quoted', { id, status: quote.status })
-            return res.status(400).json({ error: 'Only a Draft quote may be marked as Quoted' })
+            return res.status(400).json({ message: 'Only a Draft quote may be marked as Quoted' })
         }
 
         const updated = await runQuery(
@@ -310,13 +336,13 @@ router.post('/:id/quote', async (req, res) => {
     } catch (err) {
         console.error('[POST /api/quotes/:id/quote] Error:', err.message)
         await logError(req, 'POST /api/quotes/:id/quote', 'ERR_QUOTE_MARK_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R06 — POST /api/quotes/:id/bind
-// Transitions status from Quoted → Bound.
+// R06 â€” POST /api/quotes/:id/bind
+// Transitions status from Quoted â†’ Bound.
 // ---------------------------------------------------------------------------
 
 router.post('/:id/bind', async (req, res) => {
@@ -327,16 +353,16 @@ router.post('/:id/bind', async (req, res) => {
         const rows = await runQuery('SELECT * FROM quotes WHERE id = $1', [parseInt(id, 10)])
         if (rows.length === 0) {
             await logError(req, 'POST /api/quotes/:id/bind', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
-            return res.status(404).json({ error: 'Quote not found' })
+            return res.status(404).json({ message: 'Quote not found' })
         }
         const quote = rows[0]
         if (quote.created_by_org_code !== orgCode) {
             await logError(req, 'POST /api/quotes/:id/bind', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
-            return res.status(403).json({ error: 'Forbidden' })
+            return res.status(403).json({ message: 'Forbidden' })
         }
         if (quote.status !== 'Quoted') {
             await logError(req, 'POST /api/quotes/:id/bind', 'ERR_QUOTE_INVALID_TRANSITION', 'Only a Quoted quote may be bound', { id, status: quote.status })
-            return res.status(400).json({ error: 'Only a Quoted quote may be bound' })
+            return res.status(400).json({ message: 'Only a Quoted quote may be bound' })
         }
 
         const updated = await runQuery(
@@ -369,12 +395,12 @@ router.post('/:id/bind', async (req, res) => {
     } catch (err) {
         console.error('[POST /api/quotes/:id/bind] Error:', err.message)
         await logError(req, 'POST /api/quotes/:id/bind', 'ERR_QUOTE_BIND_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R07 — POST /api/quotes/:id/decline
+// R07 â€” POST /api/quotes/:id/decline
 // Transitions status to Declined (from Draft or Quoted). Requires reasonCode.
 // ---------------------------------------------------------------------------
 
@@ -385,23 +411,23 @@ router.post('/:id/decline', async (req, res) => {
 
     if (!reasonCode) {
         await logError(req, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_DECLINE_MISSING_REASON', 'reasonCode is required', { id })
-        return res.status(400).json({ error: 'reasonCode is required' })
+        return res.status(400).json({ message: 'reasonCode is required' })
     }
 
     try {
         const rows = await runQuery('SELECT * FROM quotes WHERE id = $1', [parseInt(id, 10)])
         if (rows.length === 0) {
             await logError(req, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
-            return res.status(404).json({ error: 'Quote not found' })
+            return res.status(404).json({ message: 'Quote not found' })
         }
         const quote = rows[0]
         if (quote.created_by_org_code !== orgCode) {
             await logError(req, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
-            return res.status(403).json({ error: 'Forbidden' })
+            return res.status(403).json({ message: 'Forbidden' })
         }
         if (quote.status === 'Bound') {
             await logError(req, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_INVALID_TRANSITION', 'Cannot decline a Bound quote', { id, status: quote.status })
-            return res.status(400).json({ error: 'Cannot decline a Bound quote' })
+            return res.status(400).json({ message: 'Cannot decline a Bound quote' })
         }
 
         const updated = await runQuery(
@@ -419,12 +445,12 @@ router.post('/:id/decline', async (req, res) => {
     } catch (err) {
         console.error('[POST /api/quotes/:id/decline] Error:', err.message)
         await logError(req, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_DECLINE_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R08 — DELETE /api/quotes/:id
+// R08 â€” DELETE /api/quotes/:id
 // Soft-deletes a quote by setting deleted_at. Only Draft quotes may be deleted.
 // ---------------------------------------------------------------------------
 
@@ -436,16 +462,16 @@ router.delete('/:id', async (req, res) => {
         const rows = await runQuery('SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL', [parseInt(id, 10)])
         if (rows.length === 0) {
             await logError(req, 'DELETE /api/quotes/:id', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
-            return res.status(404).json({ error: 'Quote not found' })
+            return res.status(404).json({ message: 'Quote not found' })
         }
         const quote = rows[0]
         if (quote.created_by_org_code !== orgCode) {
             await logError(req, 'DELETE /api/quotes/:id', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
-            return res.status(403).json({ error: 'Forbidden' })
+            return res.status(403).json({ message: 'Forbidden' })
         }
         if (quote.status !== 'Draft') {
             await logError(req, 'DELETE /api/quotes/:id', 'ERR_QUOTE_DELETE_LOCKED', 'Only Draft quotes may be deleted', { id, status: quote.status })
-            return res.status(400).json({ error: 'Only Draft quotes may be deleted' })
+            return res.status(400).json({ message: 'Only Draft quotes may be deleted' })
         }
 
         await runQuery(
@@ -456,12 +482,12 @@ router.delete('/:id', async (req, res) => {
     } catch (err) {
         console.error('[DELETE /api/quotes/:id] Error:', err.message)
         await logError(req, 'DELETE /api/quotes/:id', 'ERR_QUOTE_DELETE_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R09 — GET /api/quotes/:id/audit
+// R09 â€” GET /api/quotes/:id/audit
 // Returns all audit events for the specified quote, ordered by time ascending.
 // Only accessible to users whose org created the quote.
 // ---------------------------------------------------------------------------
@@ -474,9 +500,9 @@ router.get('/:id/audit', async (req, res) => {
             'SELECT id FROM quotes WHERE id = $1 AND deleted_at IS NULL',
             [parseInt(id, 10)]
         )
-        if (rows.length === 0) return res.status(404).json({ error: 'Quote not found' })
+        if (rows.length === 0) return res.status(404).json({ message: 'Quote not found' })
         const quoteRow = await runQuery('SELECT created_by_org_code FROM quotes WHERE id = $1', [parseInt(id, 10)])
-        if (quoteRow[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+        if (quoteRow[0].created_by_org_code !== orgCode) return res.status(403).json({ message: 'Forbidden' })
         const events = await runQuery(
             `SELECT action, user_name, user_id, created_at, details
              FROM public.audit_event
@@ -495,12 +521,12 @@ router.get('/:id/audit', async (req, res) => {
     } catch (err) {
         console.error('[GET /api/quotes/:id/audit] Error:', err.message)
         await logError(req, 'GET /api/quotes/:id/audit', 'ERR_QUOTE_AUDIT_GET_500', err.message, { id })
-        return res.status(500).json({ error: err.message })
+        return res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R10 — POST /api/quotes/:id/audit
+// R10 â€” POST /api/quotes/:id/audit
 // Records a new audit event for the specified quote.
 // User identity is read exclusively from the JWT (req.user); body user fields
 // are ignored to prevent spoofing.
@@ -518,9 +544,9 @@ router.post('/:id/audit', async (req, res) => {
             'SELECT id FROM quotes WHERE id = $1 AND deleted_at IS NULL',
             [parseInt(id, 10)]
         )
-        if (rows.length === 0) return res.status(404).json({ error: 'Quote not found' })
+        if (rows.length === 0) return res.status(404).json({ message: 'Quote not found' })
         const quoteRow = await runQuery('SELECT created_by_org_code FROM quotes WHERE id = $1', [parseInt(id, 10)])
-        if (quoteRow[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+        if (quoteRow[0].created_by_org_code !== orgCode) return res.status(403).json({ message: 'Forbidden' })
         const userName = req.user.username || req.user.email || 'System'
         const userId = req.user.id ?? null
         const storedDetails = (details && typeof details === 'object') ? details : {}
@@ -535,12 +561,12 @@ router.post('/:id/audit', async (req, res) => {
     } catch (err) {
         console.error('[POST /api/quotes/:id/audit] Error:', err.message)
         await logError(req, 'POST /api/quotes/:id/audit', 'ERR_QUOTE_AUDIT_POST_500', err.message, { id })
-        return res.status(500).json({ error: err.message })
+        return res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R11 — POST /api/quotes/:id/copy
+// R11 â€” POST /api/quotes/:id/copy
 // Creates a Draft copy of the quote with a new reference. All editable fields
 // are duplicated; status is forced to Draft; created_date is set to NOW().
 // ---------------------------------------------------------------------------
@@ -556,12 +582,12 @@ router.post('/:id/copy', async (req, res) => {
         )
         if (rows.length === 0) {
             await logError(req, 'POST /api/quotes/:id/copy', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
-            return res.status(404).json({ error: 'Quote not found' })
+            return res.status(404).json({ message: 'Quote not found' })
         }
         const original = rows[0]
         if (original.created_by_org_code !== orgCode) {
             await logError(req, 'POST /api/quotes/:id/copy', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
-            return res.status(403).json({ error: 'Forbidden' })
+            return res.status(403).json({ message: 'Forbidden' })
         }
 
         const reference = await generateReference(orgCode)
@@ -606,12 +632,12 @@ router.post('/:id/copy', async (req, res) => {
     } catch (err) {
         console.error('[POST /api/quotes/:id/copy] Error:', err.message)
         await logError(req, 'POST /api/quotes/:id/copy', 'ERR_QUOTE_COPY_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R12 — GET /api/quotes/:id/sections
+// R12 â€” GET /api/quotes/:id/sections
 // Returns all non-deleted sections for the quote, ordered by id ascending.
 // ---------------------------------------------------------------------------
 
@@ -623,8 +649,8 @@ router.get('/:id/sections', async (req, res) => {
             'SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL',
             [parseInt(id, 10)]
         )
-        if (quoteRows.length === 0) return res.status(404).json({ error: 'Quote not found' })
-        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+        if (quoteRows.length === 0) return res.status(404).json({ message: 'Quote not found' })
+        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ message: 'Forbidden' })
         const sections = await runQuery(
             'SELECT * FROM quote_sections WHERE quote_id = $1 AND deleted_at IS NULL ORDER BY id ASC',
             [parseInt(id, 10)]
@@ -632,12 +658,12 @@ router.get('/:id/sections', async (req, res) => {
         res.json(sections)
     } catch (err) {
         await logError(req, 'GET /api/quotes/:id/sections', 'ERR_SECTIONS_FETCH_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R13 — POST /api/quotes/:id/sections
+// R13 â€” POST /api/quotes/:id/sections
 // Creates a new section for the quote. Section reference is auto-generated.
 // ---------------------------------------------------------------------------
 
@@ -659,9 +685,9 @@ router.post('/:id/sections', async (req, res) => {
             'SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL',
             [parseInt(id, 10)]
         )
-        if (quoteRows.length === 0) return res.status(404).json({ error: 'Quote not found' })
+        if (quoteRows.length === 0) return res.status(404).json({ message: 'Quote not found' })
         const q = quoteRows[0]
-        if (q.created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+        if (q.created_by_org_code !== orgCode) return res.status(403).json({ message: 'Forbidden' })
 
         // Auto-generate section reference based on current section count
         const countRows = await runQuery(
@@ -692,12 +718,12 @@ router.post('/:id/sections', async (req, res) => {
         res.status(201).json(result[0])
     } catch (err) {
         await logError(req, 'POST /api/quotes/:id/sections', 'ERR_SECTION_CREATE_500', err.message, { id })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R14 — DELETE /api/quotes/:id/sections/:sectionId
+// R14 â€” DELETE /api/quotes/:id/sections/:sectionId
 // Soft-deletes a section (sets deleted_at). Only accessible to quote owner.
 // ---------------------------------------------------------------------------
 
@@ -709,14 +735,14 @@ router.delete('/:id/sections/:sectionId', async (req, res) => {
             'SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL',
             [parseInt(id, 10)]
         )
-        if (quoteRows.length === 0) return res.status(404).json({ error: 'Quote not found' })
-        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+        if (quoteRows.length === 0) return res.status(404).json({ message: 'Quote not found' })
+        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ message: 'Forbidden' })
 
         const sectionRows = await runQuery(
             'SELECT * FROM quote_sections WHERE id = $1 AND quote_id = $2 AND deleted_at IS NULL',
             [parseInt(sectionId, 10), parseInt(id, 10)]
         )
-        if (sectionRows.length === 0) return res.status(404).json({ error: 'Section not found' })
+        if (sectionRows.length === 0) return res.status(404).json({ message: 'Section not found' })
 
         await runQuery(
             'UPDATE quote_sections SET deleted_at = NOW() WHERE id = $1',
@@ -725,12 +751,12 @@ router.delete('/:id/sections/:sectionId', async (req, res) => {
         res.status(204).send()
     } catch (err) {
         await logError(req, 'DELETE /api/quotes/:id/sections/:sectionId', 'ERR_SECTION_DELETE_500', err.message, { id, sectionId })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R41 — GET /api/quotes/:id/sections/:sectionId/coverages
+// R41 â€” GET /api/quotes/:id/sections/:sectionId/coverages
 // Returns all non-soft-deleted coverages for a section, ordered by id ASC.
 // REQ-QUO-BE-F-041
 // ---------------------------------------------------------------------------
@@ -743,14 +769,14 @@ router.get('/:id/sections/:sectionId/coverages', async (req, res) => {
             'SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL',
             [parseInt(id, 10)]
         )
-        if (quoteRows.length === 0) return res.status(404).json({ error: 'Quote not found' })
-        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+        if (quoteRows.length === 0) return res.status(404).json({ message: 'Quote not found' })
+        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ message: 'Forbidden' })
 
         const sectionRows = await runQuery(
             'SELECT * FROM quote_sections WHERE id = $1 AND quote_id = $2 AND deleted_at IS NULL',
             [parseInt(sectionId, 10), parseInt(id, 10)]
         )
-        if (sectionRows.length === 0) return res.status(404).json({ error: 'Section not found' })
+        if (sectionRows.length === 0) return res.status(404).json({ message: 'Section not found' })
 
         const coverages = await runQuery(
             'SELECT * FROM quote_section_coverages WHERE section_id = $1 AND deleted_at IS NULL ORDER BY id ASC',
@@ -759,12 +785,12 @@ router.get('/:id/sections/:sectionId/coverages', async (req, res) => {
         res.json(coverages)
     } catch (err) {
         await logError(req, 'GET /api/quotes/:id/sections/:sectionId/coverages', 'ERR_COVERAGES_FETCH_500', err.message, { id, sectionId })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R42 — POST /api/quotes/:id/sections/:sectionId/coverages
+// R42 â€” POST /api/quotes/:id/sections/:sectionId/coverages
 // Creates a coverage with auto-generated reference {sectionRef}-COV-NNN.
 // REQ-QUO-BE-F-042
 // ---------------------------------------------------------------------------
@@ -777,14 +803,14 @@ router.post('/:id/sections/:sectionId/coverages', async (req, res) => {
             'SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL',
             [parseInt(id, 10)]
         )
-        if (quoteRows.length === 0) return res.status(404).json({ error: 'Quote not found' })
-        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+        if (quoteRows.length === 0) return res.status(404).json({ message: 'Quote not found' })
+        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ message: 'Forbidden' })
 
         const sectionRows = await runQuery(
             'SELECT * FROM quote_sections WHERE id = $1 AND quote_id = $2 AND deleted_at IS NULL',
             [parseInt(sectionId, 10), parseInt(id, 10)]
         )
-        if (sectionRows.length === 0) return res.status(404).json({ error: 'Section not found' })
+        if (sectionRows.length === 0) return res.status(404).json({ message: 'Section not found' })
 
         const sectionRef = sectionRows[0].reference
 
@@ -833,12 +859,12 @@ router.post('/:id/sections/:sectionId/coverages', async (req, res) => {
         res.status(201).json(inserted[0])
     } catch (err) {
         await logError(req, 'POST /api/quotes/:id/sections/:sectionId/coverages', 'ERR_COVERAGE_CREATE_500', err.message, { id, sectionId })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R43 — PUT /api/quotes/:id/sections/:sectionId/coverages/:coverageId
+// R43 â€” PUT /api/quotes/:id/sections/:sectionId/coverages/:coverageId
 // Updates mutable fields; auto-computes days_on_cover when both dates present.
 // REQ-QUO-BE-F-043
 // ---------------------------------------------------------------------------
@@ -851,14 +877,14 @@ router.put('/:id/sections/:sectionId/coverages/:coverageId', async (req, res) =>
             'SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL',
             [parseInt(id, 10)]
         )
-        if (quoteRows.length === 0) return res.status(404).json({ error: 'Quote not found' })
-        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+        if (quoteRows.length === 0) return res.status(404).json({ message: 'Quote not found' })
+        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ message: 'Forbidden' })
 
         const covRows = await runQuery(
             'SELECT * FROM quote_section_coverages WHERE id = $1 AND section_id = $2 AND deleted_at IS NULL',
             [parseInt(coverageId, 10), parseInt(sectionId, 10)]
         )
-        if (covRows.length === 0) return res.status(404).json({ error: 'Coverage not found' })
+        if (covRows.length === 0) return res.status(404).json({ message: 'Coverage not found' })
 
         const MUTABLE = [
             'coverage', 'class_of_business', 'effective_date', 'expiry_date',
@@ -903,12 +929,12 @@ router.put('/:id/sections/:sectionId/coverages/:coverageId', async (req, res) =>
         res.json(updated[0])
     } catch (err) {
         await logError(req, 'PUT /api/quotes/:id/sections/:sectionId/coverages/:coverageId', 'ERR_COVERAGE_UPDATE_500', err.message, { id, sectionId, coverageId })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 
 // ---------------------------------------------------------------------------
-// R44 — DELETE /api/quotes/:id/sections/:sectionId/coverages/:coverageId
+// R44 â€” DELETE /api/quotes/:id/sections/:sectionId/coverages/:coverageId
 // Soft-deletes a coverage (sets deleted_at). Returns 204.
 // REQ-QUO-BE-F-044
 // ---------------------------------------------------------------------------
@@ -921,8 +947,8 @@ router.delete('/:id/sections/:sectionId/coverages/:coverageId', async (req, res)
             'SELECT * FROM quotes WHERE id = $1 AND deleted_at IS NULL',
             [parseInt(id, 10)]
         )
-        if (quoteRows.length === 0) return res.status(404).json({ error: 'Quote not found' })
-        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ error: 'Forbidden' })
+        if (quoteRows.length === 0) return res.status(404).json({ message: 'Quote not found' })
+        if (quoteRows[0].created_by_org_code !== orgCode) return res.status(403).json({ message: 'Forbidden' })
 
         const updated = await runQuery(
             `UPDATE quote_section_coverages
@@ -931,12 +957,12 @@ router.delete('/:id/sections/:sectionId/coverages/:coverageId', async (req, res)
              RETURNING id`,
             [parseInt(coverageId, 10), parseInt(sectionId, 10)]
         )
-        if (updated.length === 0) return res.status(404).json({ error: 'Coverage not found' })
+        if (updated.length === 0) return res.status(404).json({ message: 'Coverage not found' })
 
         res.status(204).send()
     } catch (err) {
         await logError(req, 'DELETE /api/quotes/:id/sections/:sectionId/coverages/:coverageId', 'ERR_COVERAGE_DELETE_500', err.message, { id, sectionId, coverageId })
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ message: err.message })
     }
 })
 

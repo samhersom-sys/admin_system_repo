@@ -6,11 +6,13 @@ import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
 import { useNotifications } from '@/shell/NotificationDock'
 import {
     getDashboard,
+    getDashboardWidgetData,
     getFieldMappings,
     type DashboardActiveFilters,
     type DashboardPage,
     type DashboardSection,
     type DashboardWidget,
+    type DashboardWidgetDataResponse,
     type FieldMapping,
     type ReportTemplate,
 } from '@/reporting/reporting.service'
@@ -42,6 +44,7 @@ export default function DashboardViewPage() {
     const [showFilterPanel, setShowFilterPanel] = useState(false)
     const [draftFilters, setDraftFilters] = useState<DashboardActiveFilters>(createDefaultDashboardFilters())
     const [appliedFilters, setAppliedFilters] = useState<DashboardActiveFilters>(createDefaultDashboardFilters())
+    const [initialWidgetData, setInitialWidgetData] = useState<Record<string, DashboardWidgetDataResponse>>({})
 
     useEffect(() => {
         let cancelled = false
@@ -64,8 +67,9 @@ export default function DashboardViewPage() {
             return
         }
         setLoading(true)
+        const defaultFilters = createDefaultDashboardFilters()
         getDashboard(parseInt(reportId, 10))
-            .then((loadedDashboard) => {
+            .then(async (loadedDashboard) => {
                 if (loadedDashboard.type !== 'dashboard') {
                     throw new Error('Not a dashboard')
                 }
@@ -73,6 +77,21 @@ export default function DashboardViewPage() {
                 setPages(loadedDashboard.dashboardConfig.pages)
                 setShowMetadata(loadedDashboard.dashboardConfig.showMetadata)
                 setCurrentPageId(loadedDashboard.dashboardConfig.pages[0]?.id ?? 1)
+                const widgetList = loadedDashboard.dashboardConfig.pages.flatMap((p) =>
+                    (p.widgets ?? []).map((w) => normalizeDashboardWidget(w)).filter((w) => w.type !== 'text'),
+                )
+                const results = await Promise.all(
+                    widgetList.map((w) =>
+                        getDashboardWidgetData(w, w.ignoresDashboardFilters ? createDefaultDashboardFilters() : defaultFilters)
+                            .then((data): [string, DashboardWidgetDataResponse] => [w.id, data])
+                            .catch(() => null),
+                    ),
+                )
+                const map: Record<string, DashboardWidgetDataResponse> = {}
+                for (const entry of results) {
+                    if (entry) map[entry[0]] = entry[1]
+                }
+                setInitialWidgetData(map)
             })
             .catch(() => {
                 setDashboard(null)
@@ -102,10 +121,14 @@ export default function DashboardViewPage() {
         [currentPage, allFields],
     )
 
+    const currentPageWidgets = useMemo(
+        () => (currentPage?.widgets ?? []).map((w) => normalizeDashboardWidget(w)),
+        [currentPage],
+    )
+
     useEffect(() => {
         const nextDateBasis = filterOptions.dateBasisOptions[0]?.compositeKey ?? null
         setDraftFilters((prev) => (prev.dateBasis === nextDateBasis ? prev : { ...prev, dateBasis: nextDateBasis }))
-        setAppliedFilters((prev) => (prev.dateBasis === nextDateBasis ? prev : { ...prev, dateBasis: nextDateBasis }))
     }, [filterOptions.dateBasisOptions])
 
     function getFieldLabel(value: string | null | undefined) {
@@ -121,12 +144,9 @@ export default function DashboardViewPage() {
     }
 
     function getWidgetsForSlot(slotId: number, sectionId?: number | null) {
-        if (!currentPage) {
-            return []
-        }
-        return (currentPage.widgets ?? [])
-            .map((widget) => normalizeDashboardWidget(widget))
-            .filter((widget) => widget.slotId === slotId && (widget.sectionId ?? null) === (sectionId ?? null))
+        return currentPageWidgets.filter(
+            (widget) => widget.slotId === slotId && (widget.sectionId ?? null) === (sectionId ?? null),
+        )
     }
 
     function addCustomFilterRow() {
@@ -141,196 +161,186 @@ export default function DashboardViewPage() {
     }
 
     function renderFilterPanel() {
-        if (!filterOptions.hasFilterPanel) {
+        if (!filterOptions.hasFilterPanel || !showFilterPanel) {
             return null
         }
 
         return (
             <Card>
-                <div>
-                    <button
-                        type="button"
-                        onClick={() => setShowFilterPanel((prev) => !prev)}
-                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-                        aria-label="Dashboard Filters"
-                    >
-                        <div className="flex items-center gap-2">
-                            <FiFilter className="text-brand-600" />
-                            <span className="font-medium text-gray-900">Dashboard Filters</span>
+                <div className="p-3 flex flex-col gap-3">
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <div className="flex flex-col gap-1">
+                            <label htmlFor="dashboard-analysis-basis" className="text-sm font-medium text-gray-700">Analysis Basis</label>
+                            <select
+                                id="dashboard-analysis-basis"
+                                value={draftFilters.analysisBasis}
+                                onChange={(event) => setDraftFilters((prev) => ({
+                                    ...prev,
+                                    analysisBasis: event.target.value as DashboardActiveFilters['analysisBasis'],
+                                }))}
+                                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                            >
+                                <option value="cumulative">Cumulative</option>
+                                <option value="ytd">Year to Date</option>
+                                <option value="qtd">Quarter to Date</option>
+                                <option value="mtd">Month to Date</option>
+                                <option value="month">Month</option>
+                                <option value="week">Week</option>
+                                <option value="day">Day</option>
+                            </select>
                         </div>
-                        {showFilterPanel ? <FiChevronUp className="text-gray-500" /> : <FiChevronDown className="text-gray-500" />}
-                    </button>
 
-                    {showFilterPanel ? (
-                        <div className="border-t p-4 flex flex-col gap-4">
-                            <div className="grid gap-4 md:grid-cols-3">
-                                <div className="flex flex-col gap-1">
-                                    <label htmlFor="dashboard-analysis-basis" className="text-sm font-medium text-gray-700">Analysis Basis</label>
-                                    <select
-                                        id="dashboard-analysis-basis"
-                                        value={draftFilters.analysisBasis}
-                                        onChange={(event) => setDraftFilters((prev) => ({
-                                            ...prev,
-                                            analysisBasis: event.target.value as DashboardActiveFilters['analysisBasis'],
-                                        }))}
-                                        className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-                                    >
-                                        <option value="cumulative">Cumulative</option>
-                                        <option value="ytd">Year to Date</option>
-                                        <option value="qtd">Quarter to Date</option>
-                                        <option value="mtd">Month to Date</option>
-                                        <option value="month">Month</option>
-                                        <option value="week">Week</option>
-                                        <option value="day">Day</option>
-                                    </select>
-                                </div>
+                        <div className="flex flex-col gap-1">
+                            <label htmlFor="dashboard-date-basis" className="text-sm font-medium text-gray-700">Date Basis</label>
+                            <select
+                                id="dashboard-date-basis"
+                                value={draftFilters.dateBasis ?? ''}
+                                onChange={(event) => setDraftFilters((prev) => ({
+                                    ...prev,
+                                    dateBasis: event.target.value || null,
+                                }))}
+                                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                            >
+                                {filterOptions.dateBasisOptions.map((field) => {
+                                    const domainSingular = {
+                                        submissions: 'Submission', quotes: 'Quote', policies: 'Policy',
+                                        policyTransactions: 'Policy Transaction', bindingAuthorities: 'Binding Authority',
+                                        parties: 'Party', claims: 'Claim',
+                                    }[field.source] ?? field.domain
+                                    return (
+                                        <option key={field.compositeKey} value={field.compositeKey}>
+                                            {domainSingular} {field.label}
+                                        </option>
+                                    )
+                                })}
+                            </select>
+                        </div>
 
-                                <div className="flex flex-col gap-1">
-                                    <label htmlFor="dashboard-date-basis" className="text-sm font-medium text-gray-700">Date Basis</label>
-                                    <select
-                                        id="dashboard-date-basis"
-                                        value={draftFilters.dateBasis ?? ''}
-                                        onChange={(event) => setDraftFilters((prev) => ({
-                                            ...prev,
-                                            dateBasis: event.target.value || null,
-                                        }))}
-                                        className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-                                    >
-                                        {filterOptions.dateBasisOptions.map((field) => (
-                                            <option key={field.compositeKey} value={field.compositeKey}>
-                                                {field.label} ({field.domain})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                        <div className="flex flex-col gap-1">
+                            <label htmlFor="dashboard-reporting-date" className="text-sm font-medium text-gray-700">Reporting Date</label>
+                            <input
+                                id="dashboard-reporting-date"
+                                type="date"
+                                value={draftFilters.reportingDate}
+                                onChange={(event) => setDraftFilters((prev) => ({
+                                    ...prev,
+                                    reportingDate: event.target.value,
+                                }))}
+                                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                            />
+                        </div>
+                    </div>
 
-                                <div className="flex flex-col gap-1">
-                                    <label htmlFor="dashboard-reporting-date" className="text-sm font-medium text-gray-700">Reporting Date</label>
-                                    <input
-                                        id="dashboard-reporting-date"
-                                        type="date"
-                                        value={draftFilters.reportingDate}
-                                        onChange={(event) => setDraftFilters((prev) => ({
-                                            ...prev,
-                                            reportingDate: event.target.value,
-                                        }))}
-                                        className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-                                    />
-                                </div>
+                    {filterOptions.customFieldOptions.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium text-gray-700">Custom Filters</p>
+                                <button
+                                    type="button"
+                                    onClick={addCustomFilterRow}
+                                    className="text-sm text-brand-600 hover:text-brand-700"
+                                >
+                                    + Add Filter
+                                </button>
                             </div>
 
-                            {filterOptions.customFieldOptions.length > 0 ? (
+                            {draftFilters.customAttributes.length === 0 ? (
+                                <p className="text-sm text-gray-500">No custom filters added.</p>
+                            ) : (
                                 <div className="flex flex-col gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm font-medium text-gray-700">Custom Filters</p>
-                                        <button
-                                            type="button"
-                                            onClick={addCustomFilterRow}
-                                            className="text-sm text-brand-600 hover:text-brand-700"
+                                    {draftFilters.customAttributes.map((filter, index) => (
+                                        <div
+                                            key={`${filter.field}-${index}`}
+                                            className="grid gap-2 md:grid-cols-[2fr,1fr,2fr,auto] items-center"
                                         >
-                                            + Add Filter
-                                        </button>
-                                    </div>
-
-                                    {draftFilters.customAttributes.length === 0 ? (
-                                        <p className="text-sm text-gray-500">No custom filters added.</p>
-                                    ) : (
-                                        <div className="flex flex-col gap-2">
-                                            {draftFilters.customAttributes.map((filter, index) => (
-                                                <div
-                                                    key={`${filter.field}-${index}`}
-                                                    className="grid gap-2 md:grid-cols-[2fr,1fr,2fr,auto] items-center"
-                                                >
-                                                    <select
-                                                        aria-label={`Custom filter field ${index + 1}`}
-                                                        value={filter.field}
-                                                        onChange={(event) => setDraftFilters((prev) => ({
-                                                            ...prev,
-                                                            customAttributes: prev.customAttributes.map((entry, entryIndex) =>
-                                                                entryIndex === index ? { ...entry, field: event.target.value } : entry,
-                                                            ),
-                                                        }))}
-                                                        className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-                                                    >
-                                                        {filterOptions.customFieldOptions.map((field) => (
-                                                            <option key={field.compositeKey} value={field.compositeKey}>
-                                                                {field.label} ({field.domain})
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    <select
-                                                        aria-label={`Custom filter operator ${index + 1}`}
-                                                        value={filter.operator}
-                                                        onChange={(event) => setDraftFilters((prev) => ({
-                                                            ...prev,
-                                                            customAttributes: prev.customAttributes.map((entry, entryIndex) =>
-                                                                entryIndex === index
-                                                                    ? { ...entry, operator: event.target.value as typeof entry.operator }
-                                                                    : entry,
-                                                            ),
-                                                        }))}
-                                                        className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-                                                    >
-                                                        <option value="equals">Equals</option>
-                                                        <option value="not_equals">Not Equals</option>
-                                                        <option value="contains">Contains</option>
-                                                        <option value="greater_than">Greater Than</option>
-                                                        <option value="less_than">Less Than</option>
-                                                    </select>
-                                                    <input
-                                                        aria-label={`Custom filter value ${index + 1}`}
-                                                        type="text"
-                                                        value={filter.value}
-                                                        onChange={(event) => setDraftFilters((prev) => ({
-                                                            ...prev,
-                                                            customAttributes: prev.customAttributes.map((entry, entryIndex) =>
-                                                                entryIndex === index ? { ...entry, value: event.target.value } : entry,
-                                                            ),
-                                                        }))}
-                                                        className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setDraftFilters((prev) => ({
-                                                            ...prev,
-                                                            customAttributes: prev.customAttributes.filter((_, entryIndex) => entryIndex !== index),
-                                                        }))}
-                                                        className="text-gray-500 hover:text-red-600"
-                                                        aria-label={`Remove custom filter ${index + 1}`}
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                </div>
-                                            ))}
+                                            <select
+                                                aria-label={`Custom filter field ${index + 1}`}
+                                                value={filter.field}
+                                                onChange={(event) => setDraftFilters((prev) => ({
+                                                    ...prev,
+                                                    customAttributes: prev.customAttributes.map((entry, entryIndex) =>
+                                                        entryIndex === index ? { ...entry, field: event.target.value } : entry,
+                                                    ),
+                                                }))}
+                                                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                                            >
+                                                {filterOptions.customFieldOptions.map((field) => (
+                                                    <option key={field.compositeKey} value={field.compositeKey}>
+                                                        {field.label} ({field.domain})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <select
+                                                aria-label={`Custom filter operator ${index + 1}`}
+                                                value={filter.operator}
+                                                onChange={(event) => setDraftFilters((prev) => ({
+                                                    ...prev,
+                                                    customAttributes: prev.customAttributes.map((entry, entryIndex) =>
+                                                        entryIndex === index
+                                                            ? { ...entry, operator: event.target.value as typeof entry.operator }
+                                                            : entry,
+                                                    ),
+                                                }))}
+                                                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                                            >
+                                                <option value="equals">Equals</option>
+                                                <option value="not_equals">Not Equals</option>
+                                                <option value="contains">Contains</option>
+                                                <option value="greater_than">Greater Than</option>
+                                                <option value="less_than">Less Than</option>
+                                            </select>
+                                            <input
+                                                aria-label={`Custom filter value ${index + 1}`}
+                                                type="text"
+                                                value={filter.value}
+                                                onChange={(event) => setDraftFilters((prev) => ({
+                                                    ...prev,
+                                                    customAttributes: prev.customAttributes.map((entry, entryIndex) =>
+                                                        entryIndex === index ? { ...entry, value: event.target.value } : entry,
+                                                    ),
+                                                }))}
+                                                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setDraftFilters((prev) => ({
+                                                    ...prev,
+                                                    customAttributes: prev.customAttributes.filter((_, entryIndex) => entryIndex !== index),
+                                                }))}
+                                                className="text-gray-500 hover:text-red-600"
+                                                aria-label={`Remove custom filter ${index + 1}`}
+                                            >
+                                                Remove
+                                            </button>
                                         </div>
-                                    )}
+                                    ))}
                                 </div>
-                            ) : null}
-
-                            <div className="flex justify-end gap-2 pt-2 border-t">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const defaults = createDefaultDashboardFilters(
-                                            filterOptions.dateBasisOptions[0]?.compositeKey ?? null,
-                                        )
-                                        setDraftFilters(defaults)
-                                        setAppliedFilters(defaults)
-                                    }}
-                                    className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
-                                >
-                                    Reset Filters
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setAppliedFilters(draftFilters)}
-                                    className="px-4 py-2 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700"
-                                >
-                                    Apply Filters
-                                </button>
-                            </div>
+                            )}
                         </div>
                     ) : null}
+
+                    <div className="flex justify-end gap-2 pt-2 border-t">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const defaults = createDefaultDashboardFilters(
+                                    filterOptions.dateBasisOptions[0]?.compositeKey ?? null,
+                                )
+                                setDraftFilters(defaults)
+                                setAppliedFilters(defaults)
+                            }}
+                            className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+                        >
+                            Reset Filters
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setAppliedFilters(draftFilters)}
+                            className="px-4 py-2 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700"
+                        >
+                            Apply Filters
+                        </button>
+                    </div>
                 </div>
             </Card>
         )
@@ -348,15 +358,21 @@ export default function DashboardViewPage() {
             )
         }
 
+
+        const maxRow = Math.max(...template.slots.map((s) => s.row + s.rowSpan))
+
         return (
-            <div className="grid grid-cols-4 gap-3 auto-rows-[110px]">
+            <div
+                className="grid grid-cols-4 gap-3 flex-1 min-h-0"
+                style={{ gridTemplateRows: `repeat(${maxRow}, 1fr)` }}
+            >
                 {template.slots.map((slot) => {
                     const widget = getWidgetsForSlot(slot.id, section?.id)[0]
 
                     return (
                         <div
                             key={`${section?.id ?? 'page'}-${slot.id}`}
-                            className="rounded-xl border border-gray-200 p-3 flex flex-col"
+                            className="rounded-xl border border-gray-200 p-3 flex flex-col overflow-hidden"
                             style={{
                                 gridColumn: `span ${gridSpan(slot.colSpan)} / span ${gridSpan(slot.colSpan)}`,
                                 gridRow: `span ${gridSpan(slot.rowSpan)} / span ${gridSpan(slot.rowSpan)}`,
@@ -375,6 +391,7 @@ export default function DashboardViewPage() {
                                     <DashboardLiveWidget
                                         widget={widget as DashboardWidget}
                                         filters={appliedFilters}
+                                        initialData={initialWidgetData[widget.id]}
                                         getFieldLabel={getFieldLabel}
                                     />
                                 ) : (
@@ -405,30 +422,34 @@ export default function DashboardViewPage() {
     }
 
     return (
-        <div className="p-6 flex flex-col gap-6">
-            <div className="flex flex-col gap-1">
-                <h2 className="text-2xl font-semibold text-gray-900">{dashboard.name}</h2>
-                {dashboard.description ? <p className="text-sm text-gray-500">{dashboard.description}</p> : null}
+        <div className="p-6 flex flex-col gap-4 h-full">
+            <div className="flex items-start justify-between gap-6">
+                <div className="flex flex-col gap-1 min-w-0">
+                    <h2 className="text-2xl font-semibold text-gray-900">{dashboard.name}</h2>
+                    {dashboard.description ? <p className="text-sm text-gray-500">{dashboard.description}</p> : null}
+                </div>
+                <div className="flex items-center gap-6 flex-shrink-0">
+                    {showMetadata ? (
+                        <div className="flex items-center gap-6 text-xs text-gray-500">
+                            <span><span className="font-medium text-gray-700">Created By</span> {dashboard.created_by || 'Unknown'}</span>
+                            <span><span className="font-medium text-gray-700">Created</span> {dashboard.created_at ? new Date(dashboard.created_at).toLocaleDateString() : 'N/A'}</span>
+                            <span><span className="font-medium text-gray-700">Last Updated</span> {dashboard.updated_at ? new Date(dashboard.updated_at).toLocaleDateString() : 'N/A'}</span>
+                        </div>
+                    ) : null}
+                    {filterOptions.hasFilterPanel ? (
+                        <button
+                            type="button"
+                            onClick={() => setShowFilterPanel((prev) => !prev)}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                            aria-label="Dashboard Filters"
+                        >
+                            <FiFilter size={14} className="text-brand-600" />
+                            Dashboard Filters
+                            {showFilterPanel ? <FiChevronUp size={12} className="text-gray-500" /> : <FiChevronDown size={12} className="text-gray-500" />}
+                        </button>
+                    ) : null}
+                </div>
             </div>
-
-            {showMetadata ? (
-                <Card>
-                    <div className="p-6 grid gap-4 md:grid-cols-3 text-sm text-gray-600">
-                        <div>
-                            <p className="font-medium text-gray-900">Created By</p>
-                            <p>{dashboard.created_by || 'Unknown'}</p>
-                        </div>
-                        <div>
-                            <p className="font-medium text-gray-900">Created</p>
-                            <p>{dashboard.created_at ? new Date(dashboard.created_at).toLocaleDateString() : 'N/A'}</p>
-                        </div>
-                        <div>
-                            <p className="font-medium text-gray-900">Last Updated</p>
-                            <p>{dashboard.updated_at ? new Date(dashboard.updated_at).toLocaleDateString() : 'N/A'}</p>
-                        </div>
-                    </div>
-                </Card>
-            ) : null}
 
             {renderFilterPanel()}
 
@@ -448,8 +469,8 @@ export default function DashboardViewPage() {
             ) : null}
 
             {currentPage ? (
-                <Card>
-                    <div className="p-6 flex flex-col gap-5">
+                <div className="rounded-lg border border-gray-200 bg-white shadow-sm flex-1 flex flex-col min-h-0">
+                    <div className="p-6 flex flex-col gap-5 flex-1 min-h-0">
                         {currentPage.sections && currentPage.sections.length > 0 ? (
                             currentPage.sections.map((section) => (
                                 <div key={section.id} className="flex flex-col gap-3">
@@ -463,7 +484,7 @@ export default function DashboardViewPage() {
                                 </div>
                             ))
                         ) : (
-                            <div className="flex flex-col gap-3">
+                            <div className="flex flex-col gap-3 flex-1 min-h-0">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-sm font-semibold text-gray-800">{currentPage.name}</h3>
                                     <span className="text-xs text-gray-500">Template: {getTemplateId(currentPage) ?? 'None'}</span>
@@ -472,7 +493,7 @@ export default function DashboardViewPage() {
                             </div>
                         )}
                     </div>
-                </Card>
+                </div>
             ) : null}
         </div>
     )

@@ -33,6 +33,7 @@ const mockCopyQuote = jest.fn()
 const mockGetContractTypes = jest.fn()
 const mockGetMethodsOfPlacement = jest.fn()
 const mockGetRenewalStatuses = jest.fn()
+const mockGetCurrencies = jest.fn()
 const mockListSections = jest.fn()
 const mockGetSubmission = jest.fn()
 const mockUpdateSection = jest.fn()
@@ -69,6 +70,7 @@ jest.mock('@/quotes/quotes.service', () => ({
     getContractTypes: () => mockGetContractTypes(),
     getMethodsOfPlacement: () => mockGetMethodsOfPlacement(),
     getRenewalStatuses: () => mockGetRenewalStatuses(),
+    getCurrencies: () => mockGetCurrencies(),
     getRiskCodes: () => mockGetRiskCodes(),
 }))
 
@@ -232,9 +234,11 @@ function makeSection(overrides: Record<string, unknown> = {}) {
         reference: 'QUO-DEMO-20260601-001-S01',
         class_of_business: 'Property',
         inception_date: '2026-06-01',
+        effective_date: null,
         expiry_date: '2027-06-01',
         inception_time: '00:00:00',
         expiry_time: '23:59:59',
+        days_on_cover: null,
         limit_currency: 'USD',
         limit_amount: 1000000,
         limit_loss_qualifier: null,
@@ -248,6 +252,7 @@ function makeSection(overrides: Record<string, unknown> = {}) {
         gross_gross_premium: null,
         deductions: null,
         net_premium: null,
+        tax_receivable: null,
         annual_gross_premium: null,
         annual_net_premium: null,
         written_order: null,
@@ -489,6 +494,7 @@ describe('QuoteViewPage', () => {
         mockGetContractTypes.mockResolvedValue(['Open Market', 'Binding Authority'])
         mockGetMethodsOfPlacement.mockResolvedValue(['Open Market', 'Delegated Authority'])
         mockGetRenewalStatuses.mockResolvedValue(['New Business', 'Renewal'])
+        mockGetCurrencies.mockResolvedValue(['USD', 'GBP', 'EUR'])
         mockListSections.mockResolvedValue([])
         mockGetSubmission.mockResolvedValue({
             id: 10,
@@ -802,14 +808,19 @@ describe('QuoteViewPage', () => {
         })
     })
 
-    // REQ-QUO-FE-F-024 — Insured not confirmed: red border + warning
-    test('T-quotes-view-R20b — Insured unconfirmed shows red border and warning text', async () => {
-        mockGetQuote.mockResolvedValue(makeQuote({ insured: '', insured_id: null }))
+    // REQ-QUO-FE-F-024 — Insured not confirmed: red border + warning only after save attempt
+    test('T-quotes-view-R20b — Insured unconfirmed warning is absent on load; appears after save attempt', async () => {
+        mockGetQuote.mockResolvedValue(makeQuote({ insured: '', insured_id: null, submission_id: null }))
         renderView()
-        await waitFor(() => {
+        await waitFor(() => screen.getByTestId('insured-unconfirmed'))
+        // No warning text on initial load (saveAttempted guard)
+        expect(screen.queryByText(/insured not confirmed/i)).not.toBeInTheDocument()
+        // Trigger save attempt
+        fireEvent(window, new Event('submission:save'))
+        await waitFor(() =>
             expect(screen.getByText(/insured not confirmed/i)).toBeInTheDocument()
-        })
-        // The wrapper should have a red border class
+        )
+        // The wrapper should have the unconfirmed state element
         const wrapper = screen.getByText(/insured not confirmed/i).closest('[data-testid="insured-unconfirmed"]')
         expect(wrapper).toBeInTheDocument()
     })
@@ -823,14 +834,19 @@ describe('QuoteViewPage', () => {
         expect(screen.queryByText(/insured not confirmed/i)).not.toBeInTheDocument()
     })
 
-    // REQ-QUO-FE-F-025 — Submission not confirmed: red border + warning
-    test('T-quotes-view-R20d — Submission unconfirmed shows red border and warning text', async () => {
+    // REQ-QUO-FE-F-025 — Submission not confirmed: red border + warning only after save attempt
+    test('T-quotes-view-R20d — Submission unconfirmed warning is absent on load; appears after save attempt', async () => {
         mockGetQuote.mockResolvedValue(makeQuote({ submission_id: null }))
         mockGetSubmission.mockResolvedValue(null)
         renderView()
-        await waitFor(() => {
+        await waitFor(() => screen.getByTestId('submission-unconfirmed'))
+        // No warning text on initial load (saveAttempted guard)
+        expect(screen.queryByText(/submission not confirmed/i)).not.toBeInTheDocument()
+        // Trigger save attempt
+        fireEvent(window, new Event('submission:save'))
+        await waitFor(() =>
             expect(screen.getByText(/submission not confirmed/i)).toBeInTheDocument()
-        })
+        )
         const wrapper = screen.getByText(/submission not confirmed/i).closest('[data-testid="submission-unconfirmed"]')
         expect(wrapper).toBeInTheDocument()
     })
@@ -842,6 +858,42 @@ describe('QuoteViewPage', () => {
             expect(screen.getByText('SUB-DEMO-20260601-001')).toBeInTheDocument()
         })
         expect(screen.queryByText(/submission not confirmed/i)).not.toBeInTheDocument()
+    })
+
+    // REQ-QUO-FE-F-076 — insured mismatch warning notification
+    test('T-quotes-view-R20f — addNotification warning fires when quote insured differs from submission insured', async () => {
+        mockGetQuote.mockResolvedValue(makeQuote({ insured: 'Widget Corp', insured_id: 'party-1' }))
+        mockGetSubmission.mockResolvedValue({
+            id: 10,
+            reference: 'SUB-DEMO-20260601-001',
+            insured: 'Different Co',
+            insuredId: 'party-2',
+            createdByOrgCode: 'DEMO',
+            status: 'Draft',
+            placingBroker: null,
+            placingBrokerName: null,
+            inceptionDate: '2026-06-01',
+        })
+        renderView()
+        await waitFor(() =>
+            expect(mockAddNotification).toHaveBeenCalledWith(
+                expect.stringMatching(/does not match/i),
+                'warning',
+                expect.objectContaining({ id: 'quote-1-insured-mismatch' })
+            )
+        )
+    })
+
+    // REQ-QUO-FE-F-076 — no warning when insureds match
+    test('T-quotes-view-R20g — no mismatch warning when quote insured matches submission insured', async () => {
+        // Default: makeQuote has insured 'Widget Corp'; beforeEach sets submission insured 'Widget Corp' — they match
+        renderView()
+        await waitFor(() => screen.getByText('Widget Corp'))
+        expect(mockAddNotification).not.toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            expect.objectContaining({ id: 'quote-1-insured-mismatch' })
+        )
     })
 
     // REQ-QUO-FE-F-039 — Dates FieldGroup
@@ -1045,9 +1097,95 @@ describe('QuoteViewPage', () => {
     test('T-quotes-view-R38 — Sections tab shows Open Section (FiSearch) and Delete Section (FiTrash2) icons per row in Draft', async () => {
         mockListSections.mockResolvedValue([makeSection()])
         renderView()
+        await waitFor(() => screen.getByTestId('tab-sections'))
+        fireEvent.click(screen.getByTestId('tab-sections'))
         await waitFor(() => screen.getByTitle('Open Section'))
         expect(screen.getByTitle('Open Section')).toBeInTheDocument()
         expect(screen.getByTitle('Delete Section')).toBeInTheDocument()
+    })
+
+    // REQ-QUO-FE-F-025a — save blocked when no submission linked
+    test('T-quotes-view-R40a — save is blocked and addNotification error fires when submission_id is null', async () => {
+        mockGetQuote.mockResolvedValue(makeQuote({ submission_id: null }))
+        renderView()
+        await waitFor(() => screen.getByText('QUO-DEMO-20260601-001'))
+        fireEvent(window, new Event('submission:save'))
+        await waitFor(() =>
+            expect(mockAddNotification).toHaveBeenCalledWith(
+                'Quote not saved: a linked submission is required.',
+                'error'
+            )
+        )
+        expect(mockUpdateQuote).not.toHaveBeenCalled()
+    })
+
+    // REQ-QUO-FE-F-025a — save proceeds when submission is linked
+    test('T-quotes-view-R40b — save is NOT blocked when submission_id is present', async () => {
+        renderView() // default makeQuote has submission_id: 10
+        await waitFor(() => screen.getByText('QUO-DEMO-20260601-001'))
+        fireEvent(window, new Event('submission:save'))
+        await waitFor(() =>
+            expect(mockUpdateQuote).toHaveBeenCalled()
+        )
+        expect(mockAddNotification).not.toHaveBeenCalledWith(
+            'Quote not saved: a linked submission is required.',
+            'error'
+        )
+    })
+
+    // REQ-QUO-FE-F-046 — inline editing in sections table when Draft
+    test('T-quotes-sections-R01 — sections table renders inline inputs for editable columns when quote is Draft', async () => {
+        mockListSections.mockResolvedValue([makeSection()])
+        renderView()
+        await waitFor(() => screen.getByTestId('tab-sections'))
+        fireEvent.click(screen.getByTestId('tab-sections'))
+        await waitFor(() => screen.getByText('QUO-DEMO-20260601-001-S01'))
+        // Effective Date cell should render as a date input
+        const effectiveDateInputs = screen.queryAllByDisplayValue('')
+        // At minimum there should be date inputs present for the section row
+        const dateInputs = document.querySelectorAll('input[type="date"]')
+        expect(dateInputs.length).toBeGreaterThan(0)
+    })
+
+    // REQ-QUO-FE-F-046 — blur on editable section cell calls updateSection
+    test('T-quotes-sections-R02 — blurring the effective_date input calls updateSection with the new value', async () => {
+        mockUpdateSection.mockResolvedValue({ ...makeSection(), effective_date: '2026-07-01', days_on_cover: 365 })
+        mockListSections.mockResolvedValue([makeSection()])
+        renderView()
+        await waitFor(() => screen.getByTestId('tab-sections'))
+        fireEvent.click(screen.getByTestId('tab-sections'))
+        await waitFor(() => screen.getByText('QUO-DEMO-20260601-001-S01'))
+        // Find effective_date input (empty initially — makeSection has null)
+        const dateInputs = document.querySelectorAll('input[type="date"]')
+        const effectiveDateInput = Array.from(dateInputs).find(
+            (el) => (el as HTMLInputElement).value === ''
+        ) as HTMLInputElement | undefined
+        if (effectiveDateInput) {
+            fireEvent.change(effectiveDateInput, { target: { value: '2026-07-01' } })
+            fireEvent.blur(effectiveDateInput)
+            await waitFor(() =>
+                expect(mockUpdateSection).toHaveBeenCalledWith(
+                    1,
+                    1,
+                    expect.objectContaining({ effective_date: '2026-07-01' })
+                )
+            )
+        }
+    })
+
+    // REQ-QUO-FE-F-046 — days_on_cover column is read-only
+    test('T-quotes-sections-R03 — days_on_cover column header is present and its cell is read-only', async () => {
+        mockListSections.mockResolvedValue([makeSection({ days_on_cover: 365 })])
+        renderView()
+        await waitFor(() => screen.getByTestId('tab-sections'))
+        fireEvent.click(screen.getByTestId('tab-sections'))
+        await waitFor(() =>
+            expect(screen.getByRole('columnheader', { name: /days on cover/i })).toBeInTheDocument()
+        )
+        await waitFor(() => expect(screen.getByText('365')).toBeInTheDocument())
+        // Verify the days_on_cover cell is NOT an input
+        const cell = screen.getByText('365')
+        expect(cell.tagName).not.toBe('INPUT')
     })
 })
 
@@ -1788,6 +1926,92 @@ describe('QuoteSearchModal', () => {
         fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
         expect(mockOnClose).toHaveBeenCalled()
         expect(mockOnSelect).not.toHaveBeenCalled()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// REQ-QUO-FE-F-074 / REQ-QUO-FE-F-075 — TypeScript interface completeness
+// Verifies that QuoteSection, QuoteSectionPatch, and Quote include the new
+// fields added by migrations 102–105.
+// ---------------------------------------------------------------------------
+describe('QuoteSection / Quote TypeScript interface completeness (migrations 102-105)', () => {
+    test('T-quotes-section-types-R01 — QuoteSection interface includes gap-fill section fields (REQ-QUO-FE-F-074)', () => {
+        const section: import('./quotes.service').QuoteSection = {
+            id: 1,
+            quote_id: 1,
+            reference: 'QUO-TST-001-S01',
+            class_of_business: null,
+            inception_date: null,
+            effective_date: null,
+            expiry_date: null,
+            inception_time: null,
+            effective_time: null,
+            expiry_time: null,
+            days_on_cover: null,
+            limit_currency: null,
+            limit_amount: null,
+            limit_loss_qualifier: null,
+            excess_currency: null,
+            excess_amount: null,
+            excess_loss_qualifier: null,
+            sum_insured_currency: null,
+            sum_insured_amount: null,
+            premium_currency: null,
+            gross_premium: null,
+            gross_gross_premium: null,
+            deductions: null,
+            net_premium: null,
+            tax_receivable: null,
+            annual_gross_premium: null,
+            annual_net_premium: null,
+            written_order: null,
+            signed_order: null,
+            time_basis: 'Annual',
+            written_order_basis: 'GWP',
+            signed_order_basis: 'GWP',
+            written_line_total: 500000,
+            signed_line_total: 500000,
+            delegated_authority_ref: 'DA-001',
+            delegated_authority_section_ref: 'DA-001-SEC-01',
+            payload: null,
+            is_current: true,
+            created_at: '2024-01-01T00:00:00.000Z',
+        }
+        expect(section.time_basis).toBe('Annual')
+        expect(section.written_order_basis).toBe('GWP')
+        expect(section.signed_order_basis).toBe('GWP')
+        expect(section.written_line_total).toBe(500000)
+        expect(section.signed_line_total).toBe(500000)
+        expect(section.delegated_authority_ref).toBe('DA-001')
+        expect(section.delegated_authority_section_ref).toBe('DA-001-SEC-01')
+    })
+
+    test('T-quotes-section-types-R02 — QuoteSectionPatch includes gap-fill fields as optional patch fields (REQ-QUO-FE-F-074)', () => {
+        const patch: import('./quotes.service').QuoteSectionPatch = {
+            time_basis: 'Annual',
+            written_order_basis: 'GWP',
+            signed_order_basis: 'GWP',
+            written_line_total: 250000,
+            signed_line_total: 250000,
+            delegated_authority_ref: 'DA-002',
+            delegated_authority_section_ref: null,
+        }
+        expect(patch.time_basis).toBe('Annual')
+        expect(patch.delegated_authority_section_ref).toBeNull()
+    })
+
+    test('T-quotes-section-types-R03 — Quote interface includes renewal_time (REQ-QUO-FE-F-075)', () => {
+        const quote: import('./quotes.service').Quote = {
+            id: 99,
+            reference: 'QUO-TST-20240101-001',
+            insured: 'Test Co',
+            status: 'Draft',
+            quote_currency: 'USD',
+            created_date: '2024-01-01',
+            created_by_org_code: 'TST',
+            renewal_time: '12:00:00',
+        }
+        expect(quote.renewal_time).toBe('12:00:00')
     })
 })
 

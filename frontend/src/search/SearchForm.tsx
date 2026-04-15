@@ -12,13 +12,13 @@ import { FiChevronDown, FiX } from 'react-icons/fi'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type RecordType = 'Submission' | 'Quote' | 'Policy' | 'BindingAuthority' | 'Party' | 'Claim'
+export type RecordType = 'Submission' | 'Quote' | 'Policy' | 'Binding Authority' | 'Party' | 'Claim'
 
 const ALL_RECORD_TYPES: { value: RecordType; label: string }[] = [
   { value: 'Submission', label: 'Submission' },
   { value: 'Quote', label: 'Quote' },
   { value: 'Policy', label: 'Policy' },
-  { value: 'BindingAuthority', label: 'Binding Authority' },
+  { value: 'Binding Authority', label: 'Binding Authority' },
   { value: 'Party', label: 'Party' },
   { value: 'Claim', label: 'Claim' },
 ]

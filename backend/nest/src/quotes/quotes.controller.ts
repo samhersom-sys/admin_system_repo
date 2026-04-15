@@ -15,8 +15,11 @@ export class QuotesController {
         @Req() req: any,
         @Query('submission_id') submissionId?: string,
         @Query('status') status?: string,
+        @Query('date_basis') dateBasis?: string,
+        @Query('date_from') dateFrom?: string,
+        @Query('date_to') dateTo?: string,
     ) {
-        return this.quotesService.findAll(req.user.orgCode, submissionId, status)
+        return this.quotesService.findAll(req.user.orgCode, submissionId, status, dateBasis, dateFrom, dateTo)
     }
 
     @Post()

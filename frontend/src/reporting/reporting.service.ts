@@ -132,6 +132,12 @@ export interface DashboardSection {
 export type DashboardWidgetType = 'metric' | 'chart' | 'table' | 'text'
 export type DashboardChartType = 'bar' | 'line' | 'pie' | 'doughnut' | 'area'
 
+export interface DashboardWidgetFilter {
+    field: string
+    operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than'
+    value: string
+}
+
 export interface DashboardWidget {
     id: string
     slotId: number
@@ -151,6 +157,9 @@ export interface DashboardWidget {
     categoryLabel?: string | null
     aggregation?: 'count' | 'sum' | 'avg' | 'min' | 'max'
     note?: string | null
+    filters?: DashboardWidgetFilter[]
+    ignoresDashboardFilters?: boolean
+    showTitle?: boolean
 }
 
 export interface DashboardCustomAttributeFilter {
@@ -209,6 +218,7 @@ export interface DashboardPage {
 export interface DashboardConfig {
     pages: DashboardPage[]
     showMetadata: boolean
+    showOnHomepage?: boolean
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     customTemplates?: Record<string, any>
 }

@@ -8,6 +8,7 @@
  *   GET /api/lookups/contractTypes       → string[]
  *   GET /api/lookups/methodsOfPlacement  → string[]
  *   GET /api/lookups/renewalStatuses     → string[]
+ *   GET /api/lookups/currencies          → { code, name }[]
  */
 
 'use strict'
@@ -41,6 +42,15 @@ router.get('/renewalStatuses', async (_req, res) => {
     try {
         const rows = await runQuery('SELECT name FROM lookup_renewal_statuses ORDER BY id')
         res.json(rows.map((r) => r.name))
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
+})
+
+router.get('/currencies', async (_req, res) => {
+    try {
+        const rows = await runQuery('SELECT code, name FROM lookup_currencies WHERE is_active = TRUE ORDER BY code')
+        res.json(rows.map((r) => r.code))
     } catch (err) {
         res.status(500).json({ error: err.message })
     }

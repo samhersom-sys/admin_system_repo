@@ -299,6 +299,67 @@ Invoicing components (`InvoiceLineItems`, `InvoiceSummary`) are shared and may b
 - **Answer:** [Deferred � to be addressed when the first vertical feature slice is built end-to-end]
 ---
 
+## OQ-030: Bordereaux Import — Row Count Limit
+
+- **Raised:** 2026-05-22
+- **Status:** Open
+- **Context:** `BordereauImportModal.tsx` currently sends only the first 5 rows of the parsed spreadsheet (`normalizedPreview`) to `POST /api/bordereaux/import`. The backup source code (`BindingAuthorityBordereauImportModal.jsx`) contained a comment: "send the entire set in a real upload; here we just preview first 5".
+- **Question:** Should the production import endpoint receive **all parsed rows** (potentially thousands), or should a chunk/streaming approach be used?  The current 5-row limit means the backend persists only a preview, not the full bordereaux.
+- **Why it matters:** The current implementation does not fulfil the user need — importing a full bordereaux. It needs a decision before the backend integration is complete.
+- **Risk:** HIGH — data is silently truncated. Users may believe the full file was imported.
+- **Dependencies:** Affects `bordereaux.controller.ts` payload handling and response message.
+- **Answer:** [Pending product decision]
+
+---
+
+## OQ-031: Bordereaux Import — Claims Table Target
+
+- **Raised:** 2026-05-22
+- **Status:** Open
+- **Context:** The `BordereauImportModal.tsx` supports a Claims bordereaux data type (`dataType = 'claims'`). The backend controller (`bordereaux.controller.ts`) only handles Risk rows (insert/update `policies`, `policy_sections`, `policy_section_coverages`, `policy_transactions`). There are no claims tables defined in the NestJS backend.
+- **Question:** Which database tables should Claims bordereaux data be persisted to? Does a claims table exist or need to be created?
+- **Why it matters:** Currently, sending a Claims bordereaux does not produce any persisted data — there is no handler for it. This is a silent data loss bug.
+- **Risk:** HIGH — feature appears to work (wizard completes) but nothing is saved for claims-type imports.
+- **Dependencies:** Blocks claims bordereaux support in `bordereaux.controller.ts`. May require a new migration.
+- **Answer:** [Pending]
+
+---
+
+## OQ-032: Bordereaux Import — Organisation Scoping on Policy Lookup
+
+- **Raised:** 2026-05-22
+- **Status:** Open
+- **Context:** `bordereaux.controller.ts` resolves existing policies using `WHERE LOWER(reference) = $1 AND created_by_org_code = $2`. This prevents cross-org matches. However, in a marketplace-participant tenant mode (OQ-009), a broker may import a bordereaux for policies owned by an insurer org.
+- **Question:** Should the org-scoping on the policy lookup use the importing user's `orgCode`, the binding authority's coverholder org code, or both?
+- **Why it matters:** Incorrect scoping could either block legitimate imports or allow cross-tenant data pollution.
+- **Dependencies:** Depends on OQ-009 (Cross-Tenant Data Sharing Model).
+- **Answer:** [Pending — blocked by OQ-009]
+
+---
+
+## OQ-033: Quote Date Filtering — Type Casting for `created` Basis
+
+- **Raised:** 2026-05-22
+- **Status:** Open
+- **Context:** `quotes.service.ts findAll` applies date range filtering via `q.createdDate >= :dateFrom` when `date_basis = 'created'`. The `createdDate` column is `TIMESTAMPTZ` in the database. The `dateFrom` / `dateTo` values are plain date strings (e.g. `'2026-01-01'`). PostgreSQL will implicitly cast the string to `TIMESTAMPTZ` at midnight UTC, which may produce off-by-one results for users in non-UTC timezones.
+- **Question:** Should the date comparison for `date_basis=created` use explicit timezone casting (e.g. `q.createdDate::date >= :dateFrom::date`) or should `dateFrom`/`dateTo` always be provided as ISO 8601 datetime strings by the frontend?
+- **Why it matters:** A user in UTC+5 querying "from 2026-01-01" expects records created after midnight local time, but the current filter will return records from midnight UTC (19:00 previous day local).
+- **Dependencies:** Affects `quotes.controller.ts` (parameter validation), `quotes.service.ts` (query), and frontend date picker behaviour.
+- **Answer:** [Pending — requires product decision on timezone handling]
+
+---
+
+## OQ-034: Homepage Pinned Dashboard Deletion
+
+- **Raised:** 2026-05-22
+- **Status:** Open
+- **Context:** `HomeEmbeddedDashboard.tsx` stores the index of the currently selected pinned dashboard in `selectedIndex` state. If a dashboard that is currently selected is deleted (or its `showOnHomepage` flag is toggled off), the next reload will re-fetch the list and reset `selectedIndex` to 0 — which is correct. However, if the deletion happens while the page is mounted and the component does not refresh, the `selectedIndex` may transiently point to a non-existent entry until the next navigation.
+- **Question:** Should `HomeEmbeddedDashboard` subscribe to a dashboard-update event or poll with a short interval to detect when pinned dashboards change while the tab is open?
+- **Why it matters:** Low severity — the issue resolves on next page visit — but may cause a brief "Could not load dashboard" error message while the stale index is held.
+- **Dependencies:** Affects `HomeEmbeddedDashboard.tsx` and possibly the reporting service event model.
+- **Answer:** [Deferred — acceptable risk given low severity; to be reviewed when real-time dashboard subscriptions are considered]
+---
+
 ## OQ-030: Clearance Rule Configuration Authority
 
 - **Raised:** 2026-03-08
