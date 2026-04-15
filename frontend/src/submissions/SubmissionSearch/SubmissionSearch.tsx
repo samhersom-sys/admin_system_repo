@@ -115,8 +115,8 @@ function SubmissionSearchModal({ isOpen, onClose, onSelect }: ModalProps) {
                             storageKey="table-widths-submission-search"
                             columns={[
                                 { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 180 },
-                                { key: 'insured',   label: 'Insured',   sortable: true, defaultWidth: 220 },
-                                { key: 'status',    label: 'Status',    sortable: true, defaultWidth: 130 },
+                                { key: 'insured', label: 'Insured', sortable: true, defaultWidth: 220 },
+                                { key: 'status', label: 'Status', sortable: true, defaultWidth: 130 },
                                 { key: 'inception', label: 'Inception', sortable: false, defaultWidth: 120 },
                             ]}
                             rows={filtered}
@@ -126,8 +126,8 @@ function SubmissionSearchModal({ isOpen, onClose, onSelect }: ModalProps) {
                             renderCell={(key, row) => {
                                 const s = row as Submission
                                 if (key === 'reference') return <span className="font-medium text-brand-700">{s.reference}</span>
-                                if (key === 'insured')   return s.insured
-                                if (key === 'status')    return s.status
+                                if (key === 'insured') return s.insured
+                                if (key === 'status') return s.status
                                 if (key === 'inception') return s.inceptionDate ?? '—'
                                 return null
                             }}

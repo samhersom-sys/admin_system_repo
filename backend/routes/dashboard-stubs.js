@@ -211,7 +211,7 @@ baRouter.post('/', async (req, res) => {
              VALUES ($1, $2, 'Draft', COALESCE($3, CURRENT_DATE), COALESCE($4, CURRENT_DATE + INTERVAL '1 year'), $5, $6, $7, $8, NOW(), NOW())
              RETURNING *`,
             [reference, coverholder_id ?? null, inception_date ?? null, expiry_date ?? null,
-             year_of_account ?? null, submission_id ?? null, orgCode, userName]
+                year_of_account ?? null, submission_id ?? null, orgCode, userName]
         )
 
         // Resolve coverholder name if id provided
@@ -366,8 +366,8 @@ baRouter.post('/:id/sections', async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING *`,
             [baId, reference, class_of_business ?? null, time_basis ?? null,
-             inception_date ?? null, expiry_date ?? null, line_size ?? null,
-             written_premium_limit ?? null, currency ?? 'GBP']
+                inception_date ?? null, expiry_date ?? null, line_size ?? null,
+                written_premium_limit ?? null, currency ?? 'GBP']
         )
         return res.status(201).json(inserted[0])
     } catch (err) {
@@ -624,12 +624,12 @@ dashboardWidgetsRouter.use(authenticateToken)
 
 // Source â†’ { table, orgColumn }
 const WIDGET_SOURCES = {
-    submissions:          { table: 'submission',            orgCol: '"createdByOrgCode"' },
-    quotes:               { table: 'quotes',                orgCol: 'created_by_org_code' },
-    policies:             { table: 'policies',              orgCol: 'created_by_org_code' },
-    binding_authorities:  { table: 'binding_authorities',   orgCol: 'created_by_org_code' },
-    bindingAuthorities:   { table: 'binding_authorities',   orgCol: 'created_by_org_code' },
-    parties:              { table: 'party',                 orgCol: 'org_code' },
+    submissions: { table: 'submission', orgCol: '"createdByOrgCode"' },
+    quotes: { table: 'quotes', orgCol: 'created_by_org_code' },
+    policies: { table: 'policies', orgCol: 'created_by_org_code' },
+    binding_authorities: { table: 'binding_authorities', orgCol: 'created_by_org_code' },
+    bindingAuthorities: { table: 'binding_authorities', orgCol: 'created_by_org_code' },
+    parties: { table: 'party', orgCol: 'org_code' },
 }
 
 dashboardWidgetsRouter.post('/widgets/data', async (req, res) => {

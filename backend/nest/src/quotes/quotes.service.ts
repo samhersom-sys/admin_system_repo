@@ -88,12 +88,12 @@ export class QuotesService {
         if (dateBasis && (dateFrom || dateTo)) {
             const colMap: Record<string, string> = {
                 inception: 'q.inceptionDate',
-                expiry:    'q.expiryDate',
-                created:   'q.createdDate',
+                expiry: 'q.expiryDate',
+                created: 'q.createdDate',
             }
             const col = colMap[dateBasis] ?? 'q.createdDate'
             if (dateFrom) qb.andWhere(`${col} >= :dateFrom`, { dateFrom })
-            if (dateTo)   qb.andWhere(`${col} <= :dateTo`,   { dateTo })
+            if (dateTo) qb.andWhere(`${col} <= :dateTo`, { dateTo })
         }
 
         return qb.getMany()

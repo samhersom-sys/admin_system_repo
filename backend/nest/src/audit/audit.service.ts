@@ -14,7 +14,7 @@ export class AuditService {
     constructor(
         @InjectDataSource()
         private readonly dataSource: DataSource,
-    ) {}
+    ) { }
 
     // ---------------------------------------------------------------------------
     // POST /api/audit/event  â€” REQ-AUDIT-BE-F-001 through F-007

@@ -26,7 +26,7 @@ export class BordereauxController {
     constructor(
         @InjectDataSource()
         private readonly dataSource: DataSource,
-    ) {}
+    ) { }
 
     @Post('import')
     @HttpCode(HttpStatus.OK)

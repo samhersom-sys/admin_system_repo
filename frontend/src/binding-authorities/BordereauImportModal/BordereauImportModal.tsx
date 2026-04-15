@@ -87,11 +87,10 @@ function ValidationSummary({ issues }: { issues: ValidationIssue[] }) {
             {top.map((iss, i) => (
                 <div
                     key={i}
-                    className={`flex items-start gap-2 rounded border px-2 py-1 ${
-                        iss.severity === 'error'
+                    className={`flex items-start gap-2 rounded border px-2 py-1 ${iss.severity === 'error'
                             ? 'border-red-300 bg-red-50 text-red-700'
                             : 'border-amber-300 bg-amber-50 text-amber-700'
-                    }`}
+                        }`}
                 >
                     <span className="shrink-0 font-semibold uppercase">{iss.severity}</span>
                     <span className="flex-1">
@@ -199,7 +198,7 @@ export default function BordereauImportModal({ isOpen, onClose, bindingAuthority
                 }
             }
         } catch { /* ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [storageKey, step, headers.join('|')])
 
     // Persist mapping whenever it changes
@@ -222,7 +221,7 @@ export default function BordereauImportModal({ isOpen, onClose, bindingAuthority
         let active = true
         apiGet<{ items?: string[] } | string[]>('/api/lookups/classesOfBusiness')
             .then((data) => { if (active) setClassesOfBusiness(Array.isArray(data) ? data : (data as { items?: string[] })?.items ?? []) })
-            .catch(() => {})
+            .catch(() => { })
         return () => { active = false }
     }, [])
 
@@ -304,21 +303,21 @@ export default function BordereauImportModal({ isOpen, onClose, bindingAuthority
             const lc = (s: string) => s.toLowerCase()
             hdrs.forEach((h) => {
                 const l = lc(h)
-                if (l.includes('policy') && l.includes('ref'))   auto[h] = 'policy.reference'
+                if (l.includes('policy') && l.includes('ref')) auto[h] = 'policy.reference'
                 else if (l.includes('insured') && l.includes('name')) auto[h] = 'policy.insuredName'
-                else if (l.includes('inception'))                auto[h] = 'policy.inceptionDate'
-                else if (l.includes('expiry'))                   auto[h] = 'policy.expiryDate'
-                else if (l.includes('currency'))                 auto[h] = mainType === 'Claims' ? 'claimTxn.currency' : 'policy.currency'
+                else if (l.includes('inception')) auto[h] = 'policy.inceptionDate'
+                else if (l.includes('expiry')) auto[h] = 'policy.expiryDate'
+                else if (l.includes('currency')) auto[h] = mainType === 'Claims' ? 'claimTxn.currency' : 'policy.currency'
                 else if (l.includes('gross') && l.includes('premium')) auto[h] = 'section.grossPremium'
                 else if (l.includes('section') && l.includes('ref')) auto[h] = 'section.reference'
-                else if (l.includes('class'))                    auto[h] = 'section.classOfBusiness'
+                else if (l.includes('class')) auto[h] = 'section.classOfBusiness'
                 else if (l.includes('premium') && l.includes('currency')) auto[h] = 'section.premiumCurrency'
                 else if (l.includes('coverage') && l.includes('ref')) auto[h] = 'coverage.reference'
-                else if (l.includes('limit'))                    auto[h] = 'coverage.limitAmount'
+                else if (l.includes('limit')) auto[h] = 'coverage.limitAmount'
                 else if (l.includes('party') && l.includes('name')) auto[h] = 'party.name'
                 else if (l.includes('claim') && l.includes('ref')) auto[h] = 'claim.reference'
                 else if (l.includes('loss') && l.includes('date')) auto[h] = 'claim.lossDate'
-                else if (l.includes('paid'))                     auto[h] = 'claimTxn.paidAmount'
+                else if (l.includes('paid')) auto[h] = 'claimTxn.paidAmount'
                 else if (l.includes('transaction') && l.includes('date')) auto[h] = 'claimTxn.transactionDate'
             })
             setColumnMapping(auto)

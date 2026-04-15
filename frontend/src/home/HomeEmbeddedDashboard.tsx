@@ -246,11 +246,10 @@ export default function HomeEmbeddedDashboard() {
                             title={d.name}
                             type="button"
                             onClick={() => setSelectedIndex(idx)}
-                            className={`rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 ${
-                                idx === selectedIndex
+                            className={`rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 ${idx === selectedIndex
                                     ? 'w-6 h-3 bg-brand-600'
                                     : 'w-3 h-3 bg-brand-200 hover:bg-brand-400'
-                            }`}
+                                }`}
                         />
                     ))}
                 </div>
@@ -264,11 +263,10 @@ export default function HomeEmbeddedDashboard() {
                             key={page.id}
                             type="button"
                             onClick={() => setCurrentPageId(page.id)}
-                            className={`px-3 py-1.5 rounded-full text-sm border ${
-                                page.id === currentPageId
+                            className={`px-3 py-1.5 rounded-full text-sm border ${page.id === currentPageId
                                     ? 'bg-brand-600 text-white border-brand-600'
                                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                            }`}
+                                }`}
                         >
                             {page.name}
                         </button>

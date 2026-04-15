@@ -10,16 +10,16 @@
 // ---------------------------------------------------------------------------
 const VALUE_MAPS: Record<string, Record<string, string>> = {
     'policyTxn.transactionType': {
-        N:   'New Business',
-        NB:  'New Business',
+        N: 'New Business',
+        NB: 'New Business',
         NEW: 'New Business',
-        R:   'Renewal',
-        RN:  'Renewal',
+        R: 'Renewal',
+        RN: 'Renewal',
         RNL: 'Renewal',
         REN: 'Renewal',
-        E:   'Endorsement',
+        E: 'Endorsement',
         END: 'Endorsement',
-        C:   'Cancellation',
+        C: 'Cancellation',
         CAN: 'Cancellation',
     },
 }

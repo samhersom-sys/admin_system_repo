@@ -245,8 +245,8 @@ export default function ReportRunPage() {
                         >
                             {tab === 'filters' ? 'Filters'
                                 : tab === 'results' ? 'Results'
-                                : tab === 'history' ? 'Execution History'
-                                : 'Audit History'}
+                                    : tab === 'history' ? 'Execution History'
+                                        : 'Audit History'}
                         </button>
                     ))}
                 </nav>

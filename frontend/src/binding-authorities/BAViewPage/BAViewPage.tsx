@@ -297,16 +297,18 @@ export default function BAViewPage() {
         { key: 'days_on_cover', label: 'Max Period of Insurance (days)', sortable: true, defaultWidth: 180 },
         { key: 'currency', label: 'Settlement Premium Currency', sortable: true, defaultWidth: 160 },
         { key: 'written_premium_limit', label: 'Gross Premium Income Limit', sortable: true, defaultWidth: 160 },
-        ...(isDraft ? [{ key: '_action', label: (!addingSection ? (
-            <button
-                type="button"
-                title="Add Section"
-                className="text-brand-600 hover:text-brand-800"
-                onClick={() => setAddingSection(true)}
-            >
-                <FiPlus size={14} />
-            </button>
-        ) : '') as React.ReactNode, sortable: false, defaultWidth: 44 }] : []),
+        ...(isDraft ? [{
+            key: '_action', label: (!addingSection ? (
+                <button
+                    type="button"
+                    title="Add Section"
+                    className="text-brand-600 hover:text-brand-800"
+                    onClick={() => setAddingSection(true)}
+                >
+                    <FiPlus size={14} />
+                </button>
+            ) : '') as React.ReactNode, sortable: false, defaultWidth: 44
+        }] : []),
     ]
 
     function handleSectionSort(key: string) {
