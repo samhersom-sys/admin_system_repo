@@ -15,7 +15,8 @@
  * Referential integrity:
  *   - quote_id looks up from QUO-2024-003 (Bound quote → Coastal Shipping PLC)
  *   - submission_id looks up from SUB-2024-003 (Bound submission → same insured)
- *   - Status coverage: Active, Expired, Cancelled
+ *   - Status coverage: Active, Expired, Cancelled, Renewed
+ *   - renewable coverage: Renewable, Non-Renewable (nullable)
  */
 
 'use strict'
@@ -37,6 +38,11 @@ const pool = new Pool({ connectionString: DB_URL })
 //   Active    — POL-2024-001 (linked to Bound quote QUO-2024-003)
 //   Expired   — POL-2023-001, POL-2024-D01..D06
 //   Cancelled — POL-2023-002
+//   Renewed   — POL-2024-R01, POL-2025-R01 (renewable measures coverage)
+//
+// renewable coverage (required):
+//   Renewable     — POL-2024-R01, POL-2025-R01, POL-2025-R02
+//   Non-Renewable — POL-2023-001, POL-2023-002
 //
 // DEMO org policies (populates GWP charts for DEMO-org users):
 //   2024 YoA  — POL-2024-D01..D06   (6 policies, Jan–Jun, GWP total: £683k)
@@ -75,6 +81,7 @@ const POLICIES = [
         expiryDate: '2024-01-14',
         grossWrittenPremium: 95000.00,
         status: 'Expired',
+        renewable: 'Non-Renewable',
         businessType: 'Insurance',
         contractType: 'Policy Contract',
         createdBy: 'broker.sam',
@@ -91,6 +98,7 @@ const POLICIES = [
         expiryDate: '2024-05-31',
         grossWrittenPremium: 78000.00,
         status: 'Cancelled',
+        renewable: 'Non-Renewable',
         businessType: 'Insurance',
         contractType: 'Policy Contract',
         createdBy: 'broker.jane',
@@ -349,6 +357,58 @@ const POLICIES = [
         createdByOrgCode: 'DEMO',
     },
 
+    // ------------------------------------------------------------------
+    // Renewed & Renewable policies — measures coverage
+    // ------------------------------------------------------------------
+    {
+        reference: 'POL-2024-R01',
+        quoteRef: null, submissionRef: null,
+        insured: 'Acme Corp',
+        insuredId: 'PTY-INS-001',
+        placingBroker: 'Demo Brokers Ltd',
+        inceptionDate: '2024-03-01',
+        expiryDate: '2025-02-28',
+        grossWrittenPremium: 102000.00,
+        status: 'Renewed',
+        renewable: 'Renewable',
+        businessType: 'Property',
+        contractType: 'Policy Contract',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
+    },
+    {
+        reference: 'POL-2025-R01',
+        quoteRef: null, submissionRef: null,
+        insured: 'Demo Logistics Ltd',
+        insuredId: 'PTY-INS-D02',
+        placingBroker: 'Demo Risk Partners',
+        inceptionDate: '2025-01-20',
+        expiryDate: '2026-01-19',
+        grossWrittenPremium: 74000.00,
+        status: 'Renewed',
+        renewable: 'Renewable',
+        businessType: 'Liability',
+        contractType: 'Policy Contract',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
+    },
+    {
+        reference: 'POL-2025-R02',
+        quoteRef: null, submissionRef: null,
+        insured: 'Coastal Shipping PLC',
+        insuredId: 'PTY-INS-003',
+        placingBroker: 'Demo Brokers Ltd',
+        inceptionDate: '2025-04-01',
+        expiryDate: '2026-03-31',
+        grossWrittenPremium: 88000.00,
+        status: 'Active',
+        renewable: 'Renewable',
+        businessType: 'Marine',
+        contractType: 'Policy Contract',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
+    },
+
     // ── 2024 Year of Account (prior year for comparison — H1) ─────────
     {
         reference: 'POL-2024-D01',
@@ -488,13 +548,13 @@ async function run() {
                 `INSERT INTO policies (
                     reference, quote_id, submission_id, insured, insured_id,
                     placing_broker, inception_date, expiry_date,
-                    gross_written_premium, status, business_type, contract_type,
+                    gross_written_premium, status, renewable, business_type, contract_type,
                     created_by, created_by_org_code
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
                 [
                     p.reference, quoteId, submissionId, p.insured, p.insuredId,
                     p.placingBroker, p.inceptionDate, p.expiryDate,
-                    p.grossWrittenPremium, p.status, p.businessType, p.contractType,
+                    p.grossWrittenPremium, p.status, p.renewable ?? null, p.businessType, p.contractType,
                     p.createdBy, p.createdByOrgCode,
                 ]
             )

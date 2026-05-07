@@ -27,20 +27,20 @@ npm run db:migrate
 Or run individual files:
 
 ```bash
-node db/migrations/001-create-users-table.js
-node db/migrations/002-create-parties-table.js
-node db/migrations/003-create-submission-table.js
+node db/schema/01-core-users.js
+node db/schema/02-core-parties.js
+node db/schema/03-core-submissions.js
 ```
 
-Migrations are idempotent — safe to re-run (`CREATE TABLE IF NOT EXISTS`).
+Schema scripts are idempotent — safe to re-run (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`).
 
 ---
 
-## Adding a new migration
+## Updating schema
 
-1. Create a new numbered file: `db/migrations/00N-describe-the-change.js`
+1. Update the relevant `db/schema/*.js` file
 2. Follow the pattern of existing files (dotenv load, Pool, idempotent SQL, log output)
-3. Add it to the `db:migrate` script in `package.json`
+3. Keep `db:migrate` in `package.json` aligned with `db/schema` ordering
 4. Document the schema change in `Technical Documentation/`
 
 ---
@@ -49,4 +49,4 @@ Migrations are idempotent — safe to re-run (`CREATE TABLE IF NOT EXISTS`).
 
 The `db/` folder is owned independently of the `backend/` API layer.  
 Schema changes must not be bundled into backend feature branches.  
-One migration = one schema concern = one PR.
+One schema concern = one PR.
