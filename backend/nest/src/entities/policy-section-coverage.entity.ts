@@ -157,4 +157,7 @@ export class QuoteSectionCoverage {
 
   @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deletedAt: Date | null
+
+  @Column({ name: 'days_on_cover', type: 'int', nullable: true })
+  daysOnCover: number | null
 }

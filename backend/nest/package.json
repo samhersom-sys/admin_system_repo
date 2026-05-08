@@ -10,7 +10,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "db:migrate": "npm --prefix ../.. run db:migrate",
+    "db:sync": "npm --prefix ../.. run db:sync",
     "db:seed": "npm --prefix ../.. run db:seed",
     "typeorm": "typeorm-ts-node-commonjs -d src/config/typeorm.config.ts",
     "typeorm:migration:generate": "npm run typeorm -- migration:generate src/migrations/",

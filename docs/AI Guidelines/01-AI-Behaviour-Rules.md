@@ -83,6 +83,20 @@ After every major section of work, the AI must stop and ask:
 
 The AI must not proceed past a checkpoint until the human has confirmed.
 
+### Commit and Push Checkpoint (Hard Stop)
+
+After completing a unit of work the AI must:
+
+1. **Confirm the active branch** — run `git branch --show-current` and verify it matches the intended branch before staging anything. If it does not match, stop and raise an open question. Do not proceed until the branch is correct.
+2. **Stage and commit** locally.
+3. **Show the push summary** — run `git log --oneline origin/<branch>..HEAD` and display the output verbatim so the user can see exactly what commits are queued.
+4. **Ask explicitly:** "Shall I push to `origin/<branch>`?"
+5. **Wait for confirmation** before running `git push`.
+
+The AI must **never** chain `git commit` and `git push` in a single step without a separate confirmation between them.
+
+This applies to every branch — `development`, `uat`, and `production` — without exception.
+
 ---
 
 ## 1.5  Open Questions Log
@@ -147,8 +161,44 @@ The AI must never:
 - Create files in `frontend/src/` domain folders, `frontend/src/shared/`, or shared module locations without explicit approval
 - Merge or delete legacy files without explicit approval
 - Execute any bulk file operation (rename, move, delete, or convert 3 or more files) without first applying the §1.3 challenge format and receiving explicit confirmation
+- Run `git push` to any remote without explicit confirmation (see §1.4 Commit and Push Checkpoint)
+- Run `git merge` into `uat` or `production` without explicit confirmation
+- Run `git reset --hard`, `git push --force`, or amend a published commit under any circumstances
+- Proceed on the wrong git branch — always verify with `git branch --show-current` before committing (see §1.4)
 
 These are hard stops.  If any of these would need to happen to proceed, the AI must raise an open question and wait.
+
+---
+
+## 1.16  npm Script Rename Rule
+
+Whenever an npm script is renamed or removed from any `package.json`, the AI must **immediately** search `.github/workflows/` for all references to the old script name and update them in the same commit.
+
+**Required steps:**
+1. Identify the old script name being removed or renamed.
+2. Run a text search across `.github/workflows/*.yml` for that name.
+3. Update every matching reference to the new name before staging.
+4. If a workflow reference cannot be cleanly updated, stop and raise an open question.
+
+**This applies to all `package.json` files in the workspace** — root, `frontend/`, `backend/nest/`, and `website/`.
+
+Failure to do this will break CI on the next push. This is a hard stop.
+
+---
+
+## 1.17  Guideline Re-read After Update
+
+If the AI edits any file in `docs/AI Guidelines/` during a session, it must re-read the updated section before continuing with any further work in that session.
+
+**Required behaviour:**
+1. Complete the guideline edit.
+2. Read back the changed section using `read_file`.
+3. Confirm to the user: "Guidelines updated and re-read. Continuing under the new rules."
+4. Apply the new rules to all subsequent actions in the session.
+
+This ensures the AI does not continue operating under rules it has just changed.
+
+**This is a hard stop. It applies from the point of the edit onward in the same session.**
 
 ---
 

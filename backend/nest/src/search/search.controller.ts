@@ -18,8 +18,6 @@ export class SearchController {
         const user = req.user
         return this.searchService.search(
             query,
-            user.id ?? null,
-            user.username || user.email || null,
             user.orgCode,
         )
     }

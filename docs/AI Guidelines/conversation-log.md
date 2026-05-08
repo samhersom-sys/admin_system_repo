@@ -4,6 +4,48 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-05-08] [Today] — TypeORM Entity-First Migration + Full Release to Production
+
+**Request:**
+Migrate database schema management from 29 `db/schema/*.js` raw SQL files and 5 TypeORM migration files to a TypeORM entity-first model (`@Entity()` classes as single source of truth). Push development to UAT and production.
+
+**Outcome:**
+Updated `docs/AI Guidelines/15-Database-Standards.md` and `12-Folder-Structure.md` to reflect entity-first standard. Augmented `ba-section.entity.ts` (16 columns) and `quote-section.entity.ts` (13 columns). Created 18 new entity files covering all previously unregistered tables. Created `backend/nest/src/database/db-sync.ts` replacing `db:migrate` for fresh installs. Updated `typeorm.config.ts` (all entities registered, `migrationsRun` removed), `entities/index.ts` (full exports), root `package.json` (`db:migrate` → `db:sync`). Deleted `db/schema/` (29 files) and `backend/nest/src/migrations/` (5 files). Fixed `LookupCurrency` `@Column` → `@PrimaryColumn`. Fixed CI workflow (`db:migrate` → `db:sync`). Committed as `73f2e27` + `1e9f823`. Merged development → UAT → production; all three branches now at `6ef131f`.
+
+**Files Changed:**
+- `docs/AI Guidelines/15-Database-Standards.md` — entity-first standard (§15.1, §15.7, §15.9, §15.10)
+- `docs/AI Guidelines/12-Folder-Structure.md` — db/ section updated (removed migrations/)
+- `backend/nest/src/entities/ba-section.entity.ts` — added 16 financial view columns
+- `backend/nest/src/entities/quote-section.entity.ts` — added 13 financial view columns
+- `backend/nest/src/entities/audit-event.entity.ts` — created
+- `backend/nest/src/entities/policy-transaction.entity.ts` — created
+- `backend/nest/src/entities/policy-section.entity.ts` — created
+- `backend/nest/src/entities/policy-section-coverage.entity.ts` — created (2 entities)
+- `backend/nest/src/entities/lookup.entity.ts` — created (27 entities; LookupCurrency PK fixed)
+- `backend/nest/src/entities/rating.entity.ts` — created (5 entities)
+- `backend/nest/src/entities/location.entity.ts` — created (4 entities)
+- `backend/nest/src/entities/party-entity.entity.ts` — created
+- `backend/nest/src/entities/participation.entity.ts` — created (3 entities)
+- `backend/nest/src/entities/submission-extras.entity.ts` — created (2 entities)
+- `backend/nest/src/entities/quote-section-risk-code.entity.ts` — created
+- `backend/nest/src/entities/auth-security.entity.ts` — created (3 entities)
+- `backend/nest/src/entities/measure-definition-history.entity.ts` — created
+- `backend/nest/src/entities/financial-section-transaction.entity.ts` — created (2 entities)
+- `backend/nest/src/entities/notification-extras.entity.ts` — created (4 entities)
+- `backend/nest/src/entities/organisation.entity.ts` — created (4 org entities + ClearanceQueue)
+- `backend/nest/src/database/db-sync.ts` — created (fresh-install synchronise script)
+- `backend/nest/src/config/typeorm.config.ts` — all entities registered, migrationsRun removed
+- `backend/nest/src/entities/index.ts` — full export list updated
+- `package.json` (root) — db:migrate → db:sync; db:setup and db:reset updated
+- `.github/workflows/ci.yml` — db:migrate → db:sync step
+- `db/schema/01–29` — deleted (29 files)
+- `backend/nest/src/migrations/1710000000000–1740000000004` — deleted (5 files)
+
+**Open Questions / Deferred:**
+- Production schema for UAT/prod environments: `db:sync` is for fresh installs only. Future column/table additions must be delivered via explicit TypeORM migrations (one per release). No migration tooling set up yet — deferred.
+
+---
+
 ### [2026-05-07] [Today] — Remove Legacy Migration Files / Schema-First Transition
 
 **Request:**
@@ -921,3 +963,44 @@ Fixed payload overwrite bug in updateSection � ody.written_order/ody.signed_
 - E2E (Playwright) test coverage for section field display and Add button placement not yet written
 
 ---
+
+### [2026-05-08] � Fix CI failures: remove audit defaultMode, LIMIT 200?2000, fix quotes test
+
+**Request:**
+Fix two pre-existing backend CI failures (T-SRCH-BE-NE-R02c, T-SRCH-BE-NE-R02e in search.spec.ts) and one frontend CI failure (T-quotes-view-R19 in quotes.test.tsx). User confirmed plan: delete defaultMode method, replace LIMIT 200 with LIMIT 2000, update search.requirements.md, fix the quotes test.
+
+**Outcome:**
+Removed defaultMode and etchWithAuditOrFallback dead code from search.service.ts (both were already unreachable � search() had previously been changed to always call ilterMode directly). Removed unused hasFilters variable. Updated search() signature to remove userId and userName params (now unused); updated controller call site to match. Replaced all 6 LIMIT 200 occurrences in filterMode queries with LIMIT 2000. Updated search.requirements.md: revised �2 Recommended Approach, Potential Flaws 1 and 3, audit_events table role. Deleted T-SRCH-BE-NE-R02c (tested dead audit-first behaviour). Rewrote T-SRCH-BE-NE-R02e to verify no audit ordering query is made. Added new T-SRCH-BE-NE-R02d to verify filterMode returns most recently created submissions. Fixed T-quotes-view-R19 � FieldGroup title changed from "Quote & Referencing" to "Contract & Reference" in QuoteViewPage.tsx; test updated to match. All 13 backend search tests pass; T-quotes-view-R19 passes.
+
+**Files Changed:**
+- backend/nest/src/search/search.service.ts � removed defaultMode, fetchWithAuditOrFallback, hasFilters; updated search() signature; LIMIT 200?2000
+- backend/nest/src/search/search.controller.ts � removed userId/userName from search() call
+- backend/nest/src/search/search.spec.ts � deleted R02c, rewrote R02d and R02e, updated all search() call signatures
+- frontend/src/search/search.requirements.md � updated �2 approach, flaw 1, flaw 3, DB table role, added changelog entry
+- frontend/src/quotes/quotes.test.tsx � T-quotes-view-R19 updated to match renamed FieldGroup title
+
+**Open Questions / Deferred:**
+- None
+
+---
+
+### [2026-05-08] --- Fix CI db:seed failures: missing TypeORM entity columns
+
+**Request:**
+CI backend job was failing at step 8 (db:seed) in every run. Previous session had fixed db:sync (step 7) and added the SystemErrorCatalog entity (seed 023), but step 8 continued to fail in exactly 3 seconds. Objective: identify and fix all remaining seed failures so CI goes fully green.
+
+**Outcome:**
+Reproduced the CI conditions locally by creating a fresh policyforge_test_ci database, running db:sync against it, then running all 32 seed scripts sequentially. Identified three seeds that failed and four entity fixes required:
+- Seed 029 (quote_section_coverages): QuoteSectionCoverage entity was missing days_on_cover column.
+- Seed 031 (binding_authority_transactions): BATransaction entity was missing deleted_at and sequence_number columns; BindingAuthority entity was missing deleted_at (seed 031 queries binding_authorities WHERE deleted_at IS NULL).
+- Seed 032 (measure_definitions): MeasureDefinition entity was missing @Unique(['key','orgCode']) composite constraint required for the seed's ON CONFLICT (key, org_code) DO NOTHING clause.
+All 4 fixes applied, all 32 seeds confirmed passing locally, committed as 3ba2203 and pushed to origin/development. CI run #60 completed with conclusion: success.
+
+**Files Changed:**
+- backend/nest/src/entities/policy-section-coverage.entity.ts -- QuoteSectionCoverage: add daysOnCover column
+- backend/nest/src/entities/ba-transaction.entity.ts -- BATransaction: add deletedAt and sequenceNumber columns
+- backend/nest/src/entities/binding-authority.entity.ts -- BindingAuthority: add deletedAt column
+- backend/nest/src/measures/measure-definition.entity.ts -- MeasureDefinition: add @Unique(['key','orgCode'])
+
+**Open Questions / Deferred:**
+- None
