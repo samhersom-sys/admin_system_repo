@@ -788,12 +788,12 @@ describe('QuoteViewPage', () => {
         })
     })
 
-    // REQ-QUO-FE-F-037 — Quote & Referencing FieldGroup
-    test('T-quotes-view-R19 — Quote & Referencing FieldGroup contains reference text', async () => {
+    // REQ-QUO-FE-F-037 — Contract & Reference FieldGroup
+    test('T-quotes-view-R19 — Contract & Reference FieldGroup contains reference text', async () => {
         renderView()
         await waitFor(() => {
             expect(screen.getByText('QUO-DEMO-20260601-001')).toBeInTheDocument()
-            expect(screen.getByText(/quote.*referencing/i)).toBeInTheDocument()
+            expect(screen.getByText(/contract.*reference/i)).toBeInTheDocument()
         })
     })
 

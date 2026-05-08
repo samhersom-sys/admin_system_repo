@@ -890,3 +890,21 @@ Fixed payload overwrite bug in updateSection ï¿½ ody.written_order/ody.signed_
 - E2E (Playwright) test coverage for section field display and Add button placement not yet written
 
 ---
+
+### [2026-05-08] — Fix CI failures: remove audit defaultMode, LIMIT 200?2000, fix quotes test
+
+**Request:**
+Fix two pre-existing backend CI failures (T-SRCH-BE-NE-R02c, T-SRCH-BE-NE-R02e in search.spec.ts) and one frontend CI failure (T-quotes-view-R19 in quotes.test.tsx). User confirmed plan: delete defaultMode method, replace LIMIT 200 with LIMIT 2000, update search.requirements.md, fix the quotes test.
+
+**Outcome:**
+Removed defaultMode and etchWithAuditOrFallback dead code from search.service.ts (both were already unreachable — search() had previously been changed to always call ilterMode directly). Removed unused hasFilters variable. Updated search() signature to remove userId and userName params (now unused); updated controller call site to match. Replaced all 6 LIMIT 200 occurrences in filterMode queries with LIMIT 2000. Updated search.requirements.md: revised §2 Recommended Approach, Potential Flaws 1 and 3, audit_events table role. Deleted T-SRCH-BE-NE-R02c (tested dead audit-first behaviour). Rewrote T-SRCH-BE-NE-R02e to verify no audit ordering query is made. Added new T-SRCH-BE-NE-R02d to verify filterMode returns most recently created submissions. Fixed T-quotes-view-R19 — FieldGroup title changed from "Quote & Referencing" to "Contract & Reference" in QuoteViewPage.tsx; test updated to match. All 13 backend search tests pass; T-quotes-view-R19 passes.
+
+**Files Changed:**
+- backend/nest/src/search/search.service.ts — removed defaultMode, fetchWithAuditOrFallback, hasFilters; updated search() signature; LIMIT 200?2000
+- backend/nest/src/search/search.controller.ts — removed userId/userName from search() call
+- backend/nest/src/search/search.spec.ts — deleted R02c, rewrote R02d and R02e, updated all search() call signatures
+- frontend/src/search/search.requirements.md — updated §2 approach, flaw 1, flaw 3, DB table role, added changelog entry
+- frontend/src/quotes/quotes.test.tsx — T-quotes-view-R19 updated to match renamed FieldGroup title
+
+**Open Questions / Deferred:**
+- None
