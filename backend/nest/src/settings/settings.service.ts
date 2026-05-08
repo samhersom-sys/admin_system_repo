@@ -165,16 +165,39 @@ export class SettingsService {
 
     async getAdminUsers(): Promise<any[]> {
         return this.dataSource.query(
-            `SELECT id, username, email,
-                    full_name   AS "fullName",
-                    org_code    AS "orgCode",
-                    role,
-                    is_active   AS "isActive",
-                    last_login  AS "lastLogin",
-                    created_at  AS "createdAt"
-             FROM   users
-             ORDER  BY role DESC, COALESCE(full_name, username)`,
+            `SELECT u.id, u.username, u.email,
+                    u.full_name   AS "fullName",
+                    u.org_code    AS "orgCode",
+                    oe.entity_name AS "orgName",
+                    u.role,
+                    u.is_active   AS "isActive",
+                    u.last_login  AS "lastLogin",
+                    u.created_at  AS "createdAt"
+             FROM   users u
+             LEFT JOIN organisation_entities oe ON oe.entity_code = u.org_code
+             ORDER  BY u.role DESC, COALESCE(u.full_name, u.username)`,
         )
+    }
+
+    async getUserById(id: number): Promise<any> {
+        const rows = await this.dataSource.query(
+            `SELECT u.id, u.username, u.email,
+                    u.full_name   AS "fullName",
+                    u.org_code    AS "orgCode",
+                    oe.entity_name AS "orgName",
+                    u.role,
+                    u.is_active   AS "isActive",
+                    u.last_login  AS "lastLogin",
+                    u.created_at  AS "createdAt"
+             FROM   users u
+             LEFT JOIN organisation_entities oe ON oe.entity_code = u.org_code
+             WHERE  u.id = $1`,
+            [id],
+        )
+        if (!rows.length) {
+            throw new NotFoundException({ error: 'User not found.' })
+        }
+        return rows[0]
     }
 
     async updateUser(
@@ -230,3 +253,4 @@ export class SettingsService {
         return rows[0]
     }
 }
+

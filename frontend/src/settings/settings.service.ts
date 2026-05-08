@@ -122,6 +122,7 @@ export interface AdminUser {
     email: string
     fullName: string | null
     orgCode: string | null
+    orgName: string | null
     role: string
     isActive: boolean
     lastLogin: string | null
@@ -231,6 +232,10 @@ export async function getUsers(): Promise<User[]> {
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
     return apiClient.get<AdminUser[]>('/api/settings/users')
+}
+
+export async function getUserById(id: number): Promise<AdminUser> {
+    return apiClient.get<AdminUser>(`/api/settings/users/${id}`)
 }
 
 export async function updateUser(

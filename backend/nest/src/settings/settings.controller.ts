@@ -93,6 +93,12 @@ export class SettingsController {
         return this.settingsService.getAdminUsers()
     }
 
+    @Get('users/:id')
+    @Roles('internal_admin')
+    async getUserById(@Param('id', ParseIntPipe) id: number) {
+        return this.settingsService.getUserById(id)
+    }
+
     @Patch('users/:id')
     @Roles('internal_admin')
     @HttpCode(HttpStatus.OK)

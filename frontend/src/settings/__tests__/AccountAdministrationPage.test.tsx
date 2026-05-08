@@ -5,7 +5,7 @@
  */
 
 import React from 'react'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import AccountAdministrationPage from '../AccountAdministrationPage'
@@ -14,20 +14,14 @@ import AccountAdministrationPage from '../AccountAdministrationPage'
 // Mocks
 // ---------------------------------------------------------------------------
 
+const mockNavigate = jest.fn()
+jest.mock('react-router-dom', () => ({
+    ...jest.requireActual('react-router-dom'),
+    useNavigate: () => mockNavigate,
+}))
+
 jest.mock('../settings.service', () => ({
     getAdminUsers: jest.fn(),
-    updateUser: jest.fn(),
-}))
-
-jest.mock('@/shared/lib/auth-session/auth-session', () => ({
-    getSession: jest.fn(() => ({
-        token: 'tok',
-        user: { id: 1, email: 'admin@policyforge.com', orgCode: 'DEMO', role: 'internal_admin' },
-    })),
-}))
-
-jest.mock('@/shell/NotificationDock', () => ({
-    useNotifications: () => ({ addNotification: mockAddNotification }),
 }))
 
 jest.mock('@/shell/SidebarContext', () => ({
@@ -64,8 +58,6 @@ jest.mock('@/shared/components/ResizableGrid/ResizableGrid', () => {
     }
 })
 
-const mockAddNotification = jest.fn()
-
 import * as settingsService from '../settings.service'
 
 const MOCK_USERS = [
@@ -74,7 +66,8 @@ const MOCK_USERS = [
         username: 'admin',
         email: 'admin@policyforge.com',
         fullName: 'Policy Forge Admin',
-        orgCode: 'DEMO',
+        orgCode: 'PF',
+        orgName: 'Policy Forge',
         role: 'internal_admin',
         isActive: true,
         lastLogin: '2026-05-01T10:00:00Z',
@@ -86,6 +79,7 @@ const MOCK_USERS = [
         email: 'admin@company.com',
         fullName: 'Company Admin',
         orgCode: 'DEMO',
+        orgName: 'Demo Corp',
         role: 'client_admin',
         isActive: true,
         lastLogin: '2026-04-15T09:00:00Z',
@@ -97,6 +91,7 @@ const MOCK_USERS = [
         email: 'testauth@example.com',
         fullName: null,
         orgCode: 'TESTORG',
+        orgName: 'Test Organisation',
         role: 'user',
         isActive: false,
         lastLogin: null,
@@ -114,8 +109,7 @@ function renderPage() {
 
 beforeEach(() => {
     jest.clearAllMocks();
-    (settingsService.getAdminUsers as jest.Mock).mockResolvedValue(MOCK_USERS);
-    (settingsService.updateUser as jest.Mock).mockResolvedValue(MOCK_USERS[1])
+    (settingsService.getAdminUsers as jest.Mock).mockResolvedValue(MOCK_USERS)
 })
 
 // ---------------------------------------------------------------------------
@@ -148,42 +142,25 @@ describe('T-SETTINGS-USERS-R01: loads users from API', () => {
 })
 
 // ---------------------------------------------------------------------------
-// R02 — Two user groups
+// R02 — Single unified table with all users
 // ---------------------------------------------------------------------------
 
-describe('T-SETTINGS-USERS-R02: users split into correct sections', () => {
-    it('renders an Internal Accounts card', async () => {
+describe('T-SETTINGS-USERS-R02: unified table shows all accounts', () => {
+    it('renders all users in a single table', async () => {
         renderPage()
         await waitFor(() => {
-            expect(screen.getByText('Internal Accounts')).toBeInTheDocument()
+            expect(screen.getByText('Policy Forge Admin')).toBeInTheDocument()
+            expect(screen.getByText('admin@company.com')).toBeInTheDocument()
+            expect(screen.getByText('testauth@example.com')).toBeInTheDocument()
         })
     })
 
-    it('renders a Company Accounts card', async () => {
+    it('does not render separate Internal/Company section headings', async () => {
         renderPage()
         await waitFor(() => {
-            expect(screen.getByText('Company Accounts')).toBeInTheDocument()
+            expect(screen.queryByText('Internal Accounts')).not.toBeInTheDocument()
+            expect(screen.queryByText('Company Accounts')).not.toBeInTheDocument()
         })
-    })
-
-    it('places internal_admin user in Internal Accounts section', async () => {
-        renderPage()
-        await waitFor(() => {
-            expect(screen.getByText('Internal Accounts')).toBeInTheDocument()
-        })
-        const internalCard = screen.getByText('Internal Accounts').closest('[class*="rounded-lg"]') as HTMLElement
-        expect(within(internalCard).getByText('Policy Forge Admin')).toBeInTheDocument()
-    })
-
-    it('places client_admin and user in Company Accounts section', async () => {
-        renderPage()
-        await waitFor(() => {
-            expect(screen.getByText('Company Accounts')).toBeInTheDocument()
-        })
-        const companyCard = screen.getByText('Company Accounts').closest('[class*="rounded-lg"]') as HTMLElement
-        // Check by email to avoid matching <option> elements with the same text
-        expect(within(companyCard).getByText('admin@company.com')).toBeInTheDocument()
-        expect(within(companyCard).getByText('testauth@example.com')).toBeInTheDocument()
     })
 
     it('shows username as fallback when fullName is null', async () => {
@@ -193,149 +170,170 @@ describe('T-SETTINGS-USERS-R02: users split into correct sections', () => {
         })
     })
 
-    it('shows "No accounts." placeholder in empty section when no internal users', async () => {
-        (settingsService.getAdminUsers as jest.Mock).mockResolvedValue([MOCK_USERS[1]])
+    it('shows organisation name from orgName field', async () => {
         renderPage()
         await waitFor(() => {
-            expect(screen.getByText('No accounts.')).toBeInTheDocument()
+            expect(screen.getByText('Demo Corp')).toBeInTheDocument()
+            expect(screen.getByText('Policy Forge')).toBeInTheDocument()
         })
+    })
+
+    it('shows role badges (not dropdowns)', async () => {
+        renderPage()
+        await waitFor(() => {
+            // Role badges appear as non-interactive spans — check at least one per role
+            const internalItems = screen.queryAllByText('Internal Admin')
+            const companyItems  = screen.queryAllByText('Company Admin')
+            expect(internalItems.length).toBeGreaterThanOrEqual(1)
+            expect(companyItems.length).toBeGreaterThanOrEqual(1)
+        })
+        // Filter selects are the only comboboxes — no per-row dropdowns
+        const combos = screen.queryAllByRole('combobox')
+        // All comboboxes should be filter controls (role + status = 2), not per-row editors
+        expect(combos.every(el => {
+            const label = el.getAttribute('aria-label') ?? ''
+            return label.startsWith('Filter by')
+        })).toBe(true)
+    })
+
+    it('shows status badges (not toggle buttons)', async () => {
+        renderPage()
+        await waitFor(() => {
+            // At least one Inactive badge from the inactive user row
+            const inactiveItems = screen.queryAllByText('Inactive')
+            expect(inactiveItems.length).toBeGreaterThanOrEqual(1)
+        })
+        // Status is read-only badges — no toggle buttons
+        expect(screen.queryAllByRole('button', { name: /deactivate/i })).toHaveLength(0)
+        expect(screen.queryAllByRole('button', { name: /^activate/i })).toHaveLength(0)
+    })
+
+    it('shows view action button for each row', async () => {
+        renderPage()
+        await waitFor(() => {
+            const viewBtns = screen.getAllByRole('button', { name: /view account/i })
+            expect(viewBtns).toHaveLength(3)
+        })
+    })
+
+    it('navigates to account detail page when view button clicked', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getAllByRole('button', { name: /view account/i })).toHaveLength(3)
+        })
+        const viewBtn = screen.getByRole('button', { name: /view account company admin/i })
+        await userEvent.click(viewBtn)
+        expect(mockNavigate).toHaveBeenCalledWith('/settings/account/2')
     })
 })
 
 // ---------------------------------------------------------------------------
-// R04 — Change role
+// R03 — Search and filter
 // ---------------------------------------------------------------------------
 
-describe('T-SETTINGS-USERS-R04: role change calls updateUser', () => {
-    it('calls updateUser with new role when dropdown changes', async () => {
-        (settingsService.updateUser as jest.Mock).mockResolvedValue({ ...MOCK_USERS[1], role: 'user' })
+describe('T-SETTINGS-USERS-R03: search filters reduce displayed rows', () => {
+    it('renders name filter input', async () => {
         renderPage()
         await waitFor(() => {
-            expect(screen.getAllByRole('combobox')).not.toHaveLength(0)
-        })
-
-        // Find the role dropdown for Company Admin (id: 2)
-        const roleSelect = screen.getByRole('combobox', { name: /role for company admin/i })
-        await userEvent.selectOptions(roleSelect, 'user')
-
-        await waitFor(() => {
-            expect(settingsService.updateUser).toHaveBeenCalledWith(2, { role: 'user' })
+            expect(screen.getByLabelText('Filter by name')).toBeInTheDocument()
         })
     })
 
-    it('shows error notification and reverts role on API failure', async () => {
-        (settingsService.updateUser as jest.Mock).mockRejectedValue(new Error('Update failed'))
+    it('renders email filter input', async () => {
         renderPage()
         await waitFor(() => {
-            expect(screen.getAllByRole('combobox')).not.toHaveLength(0)
-        })
-
-        const roleSelect = screen.getByRole('combobox', { name: /role for company admin/i })
-        await userEvent.selectOptions(roleSelect, 'user')
-
-        await waitFor(() => {
-            expect(mockAddNotification).toHaveBeenCalledWith('Update failed', 'error')
-        })
-        // Role should revert to client_admin
-        expect(roleSelect).toHaveValue('client_admin')
-    })
-
-    it('does not offer internal_admin as a selectable option', async () => {
-        renderPage()
-        await waitFor(() => {
-            expect(screen.getAllByRole('combobox')).not.toHaveLength(0)
-        })
-        const selects = screen.getAllByRole('combobox')
-        selects.forEach(sel => {
-            const internalOption = Array.from(sel.querySelectorAll('option'))
-                .find(o => o.value === 'internal_admin' && !(o as HTMLOptionElement).disabled)
-            expect(internalOption).toBeUndefined()
-        })
-    })
-})
-
-// ---------------------------------------------------------------------------
-// R05 — Toggle active status
-// ---------------------------------------------------------------------------
-
-describe('T-SETTINGS-USERS-R05: active toggle calls updateUser', () => {
-    it('calls updateUser with isActive: false when Active button clicked', async () => {
-        (settingsService.updateUser as jest.Mock).mockResolvedValue({ ...MOCK_USERS[1], isActive: false })
-        renderPage()
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: /deactivate company admin/i })).toBeInTheDocument()
-        })
-
-        const btn = screen.getByRole('button', { name: /deactivate company admin/i })
-        await userEvent.click(btn)
-
-        await waitFor(() => {
-            expect(settingsService.updateUser).toHaveBeenCalledWith(2, { isActive: false })
+            expect(screen.getByLabelText('Filter by email')).toBeInTheDocument()
         })
     })
 
-    it('calls updateUser with isActive: true when Inactive button clicked', async () => {
-        (settingsService.updateUser as jest.Mock).mockResolvedValue({ ...MOCK_USERS[2], isActive: true })
+    it('renders organisation filter input', async () => {
         renderPage()
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /activate testauth/i })).toBeInTheDocument()
-        })
-
-        const btn = screen.getByRole('button', { name: /activate testauth/i })
-        await userEvent.click(btn)
-
-        await waitFor(() => {
-            expect(settingsService.updateUser).toHaveBeenCalledWith(3, { isActive: true })
+            expect(screen.getByLabelText('Filter by organisation')).toBeInTheDocument()
         })
     })
 
-    it('shows error notification and reverts state on API failure', async () => {
-        (settingsService.updateUser as jest.Mock).mockRejectedValue(new Error('Toggle failed'))
+    it('renders role filter select', async () => {
         renderPage()
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /deactivate company admin/i })).toBeInTheDocument()
+            expect(screen.getByLabelText('Filter by role')).toBeInTheDocument()
         })
-
-        const btn = screen.getByRole('button', { name: /deactivate company admin/i })
-        await userEvent.click(btn)
-
-        await waitFor(() => {
-            expect(mockAddNotification).toHaveBeenCalledWith('Toggle failed', 'error')
-        })
-        // State should revert — button should be Active again
-        expect(screen.getByRole('button', { name: /deactivate company admin/i })).toBeInTheDocument()
-    })
-})
-
-// ---------------------------------------------------------------------------
-// R06 — Own account locked
-// ---------------------------------------------------------------------------
-
-describe('T-SETTINGS-USERS-R06: own account controls are disabled', () => {
-    it('disables the role dropdown for the current user\'s row', async () => {
-        renderPage()
-        await waitFor(() => {
-            expect(screen.getByRole('combobox', { name: /role for policy forge admin/i })).toBeInTheDocument()
-        })
-        const ownSelect = screen.getByRole('combobox', { name: /role for policy forge admin/i })
-        expect(ownSelect).toBeDisabled()
     })
 
-    it('disables the status button for the current user\'s row', async () => {
+    it('renders status filter select', async () => {
         renderPage()
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /deactivate policy forge admin/i })).toBeInTheDocument()
+            expect(screen.getByLabelText('Filter by status')).toBeInTheDocument()
         })
-        const ownBtn = screen.getByRole('button', { name: /deactivate policy forge admin/i })
-        expect(ownBtn).toBeDisabled()
     })
 
-    it('does not disable role dropdown for other users', async () => {
+    it('filters table by name input', async () => {
         renderPage()
         await waitFor(() => {
-            expect(screen.getByRole('combobox', { name: /role for company admin/i })).toBeInTheDocument()
+            expect(screen.getByLabelText('Filter by name')).toBeInTheDocument()
         })
-        const otherSelect = screen.getByRole('combobox', { name: /role for company admin/i })
-        expect(otherSelect).not.toBeDisabled()
+        const nameInput = screen.getByLabelText('Filter by name')
+        await userEvent.type(nameInput, 'Company Admin')
+        await waitFor(() => {
+            // Policy Forge Admin row should be gone (checked via unique email)
+            expect(screen.queryByText('admin@policyforge.com')).not.toBeInTheDocument()
+            // Company Admin row should still be visible
+            expect(screen.getByText('admin@company.com')).toBeInTheDocument()
+        })
+    })
+
+    it('filters table by role dropdown', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Filter by role')).toBeInTheDocument()
+        })
+        const roleSelect = screen.getByLabelText('Filter by role')
+        await userEvent.selectOptions(roleSelect, 'internal_admin')
+        await waitFor(() => {
+            expect(screen.getByText('Policy Forge Admin')).toBeInTheDocument()
+            expect(screen.queryByText('admin@company.com')).not.toBeInTheDocument()
+        })
+    })
+
+    it('filters table by status dropdown', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Filter by status')).toBeInTheDocument()
+        })
+        const statusSelect = screen.getByLabelText('Filter by status')
+        await userEvent.selectOptions(statusSelect, 'inactive')
+        await waitFor(() => {
+            expect(screen.getByText('testauth')).toBeInTheDocument()
+            expect(screen.queryByText('Policy Forge Admin')).not.toBeInTheDocument()
+        })
+    })
+
+    it('shows empty message when no users match filters', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Filter by name')).toBeInTheDocument()
+        })
+        const nameInput = screen.getByLabelText('Filter by name')
+        await userEvent.type(nameInput, 'zzznomatch')
+        await waitFor(() => {
+            expect(screen.getByText('No accounts match your filters.')).toBeInTheDocument()
+        })
+    })
+
+    it('shows Clear button when a filter is active and clears on click', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Filter by name')).toBeInTheDocument()
+        })
+        const nameInput = screen.getByLabelText('Filter by name')
+        await userEvent.type(nameInput, 'Admin')
+        await waitFor(() => {
+            expect(screen.getByLabelText('Clear filters')).toBeInTheDocument()
+        })
+        await userEvent.click(screen.getByLabelText('Clear filters'))
+        await waitFor(() => {
+            expect(screen.queryByLabelText('Clear filters')).not.toBeInTheDocument()
+            expect(nameInput).toHaveValue('')
+        })
     })
 })
