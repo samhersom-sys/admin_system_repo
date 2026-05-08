@@ -3,6 +3,7 @@ import {
     Get,
     Post,
     Put,
+    Patch,
     Param,
     Body,
     Req,
@@ -80,5 +81,32 @@ export class SettingsController {
     async saveDataQualitySettings(@Body() body: any, @Req() req: any) {
         await this.settingsService.saveDataQualitySettings(req.user.orgCode, body)
         return { message: 'Data quality settings saved successfully' }
+    }
+
+    // -------------------------------------------------------------------------
+    // User Management: REQ-SETTINGS-USERS-BE-001 through BE-004
+    // -------------------------------------------------------------------------
+
+    @Get('users')
+    @Roles('internal_admin')
+    async getAdminUsers() {
+        return this.settingsService.getAdminUsers()
+    }
+
+    @Get('users/:id')
+    @Roles('internal_admin')
+    async getUserById(@Param('id', ParseIntPipe) id: number) {
+        return this.settingsService.getUserById(id)
+    }
+
+    @Patch('users/:id')
+    @Roles('internal_admin')
+    @HttpCode(HttpStatus.OK)
+    async updateUser(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: { role?: string; isActive?: boolean },
+        @Req() req: any,
+    ) {
+        return this.settingsService.updateUser(req.user.id, id, body)
     }
 }

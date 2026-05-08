@@ -100,13 +100,19 @@ export class AuthService {
       })
     }
 
-    // Success â€” reset counters, record last_login, increment token_version
+    // Success — reset counters, record last_login, increment token_version
     const newVersion = (user.tokenVersion ?? 1) + 1
     user.failedLoginAttempts = 0
     user.lockedUntil = null
     user.lastLogin = new Date()
     user.tokenVersion = newVersion
     await this.userRepo.save(user)
+
+    // Non-blocking: record login to login_history — failure must never block auth
+    this.dataSource.query(
+      `INSERT INTO login_history (user_id, user_name, org_code) VALUES ($1, $2, $3)`,
+      [user.id, user.fullName ?? user.username ?? user.email, user.orgCode ?? null],
+    ).catch(() => { /* swallow — login history is best-effort */ })
 
     const token = jwt.sign(
       {

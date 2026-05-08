@@ -116,6 +116,19 @@ export interface User {
     email: string
 }
 
+export interface AdminUser {
+    id: number
+    username: string
+    email: string
+    fullName: string | null
+    orgCode: string | null
+    orgName: string | null
+    role: string
+    isActive: boolean
+    lastLogin: string | null
+    createdAt: string
+}
+
 // ---------------------------------------------------------------------------
 // Rating Rules
 // ---------------------------------------------------------------------------
@@ -215,6 +228,21 @@ export async function saveOrgHierarchyLinks(
 
 export async function getUsers(): Promise<User[]> {
     return apiClient.get<User[]>('/api/users')
+}
+
+export async function getAdminUsers(): Promise<AdminUser[]> {
+    return apiClient.get<AdminUser[]>('/api/settings/users')
+}
+
+export async function getUserById(id: number): Promise<AdminUser> {
+    return apiClient.get<AdminUser>(`/api/settings/users/${id}`)
+}
+
+export async function updateUser(
+    id: number,
+    patch: { role?: string; isActive?: boolean },
+): Promise<AdminUser> {
+    return apiClient.patch<AdminUser>(`/api/settings/users/${id}`, patch)
 }
 
 export async function getGlobalHierarchyLevels(): Promise<GlobalLevel[]> {

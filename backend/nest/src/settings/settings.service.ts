@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common'
 import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
 import { logError } from '../shared/log-error'
@@ -158,4 +158,99 @@ export class SettingsService {
             )
         }
     }
+
+    // -------------------------------------------------------------------------
+    // User Management: REQ-SETTINGS-USERS-BE-001 through BE-004
+    // -------------------------------------------------------------------------
+
+    async getAdminUsers(): Promise<any[]> {
+        return this.dataSource.query(
+            `SELECT u.id, u.username, u.email,
+                    u.full_name   AS "fullName",
+                    u.org_code    AS "orgCode",
+                    oe.entity_name AS "orgName",
+                    u.role,
+                    u.is_active   AS "isActive",
+                    u.last_login  AS "lastLogin",
+                    u.created_at  AS "createdAt"
+             FROM   users u
+             LEFT JOIN organisation_entities oe ON oe.entity_code = u.org_code
+             ORDER  BY u.role DESC, COALESCE(u.full_name, u.username)`,
+        )
+    }
+
+    async getUserById(id: number): Promise<any> {
+        const rows = await this.dataSource.query(
+            `SELECT u.id, u.username, u.email,
+                    u.full_name   AS "fullName",
+                    u.org_code    AS "orgCode",
+                    oe.entity_name AS "orgName",
+                    u.role,
+                    u.is_active   AS "isActive",
+                    u.last_login  AS "lastLogin",
+                    u.created_at  AS "createdAt"
+             FROM   users u
+             LEFT JOIN organisation_entities oe ON oe.entity_code = u.org_code
+             WHERE  u.id = $1`,
+            [id],
+        )
+        if (!rows.length) {
+            throw new NotFoundException({ error: 'User not found.' })
+        }
+        return rows[0]
+    }
+
+    async updateUser(
+        requestingUserId: number,
+        userId: number,
+        body: { role?: string; isActive?: boolean },
+    ): Promise<any> {
+        if (requestingUserId === userId) {
+            throw new ForbiddenException({ error: 'You cannot modify your own account.' })
+        }
+
+        const ALLOWED_ROLES = ['user', 'client_admin']
+        if (body.role !== undefined && !ALLOWED_ROLES.includes(body.role)) {
+            throw new BadRequestException({ error: `Role must be one of: ${ALLOWED_ROLES.join(', ')}` })
+        }
+
+        const setClauses: string[] = []
+        const values: unknown[] = []
+        let idx = 1
+
+        if (body.role !== undefined) {
+            setClauses.push(`role = $${idx++}`)
+            values.push(body.role)
+        }
+        if (body.isActive !== undefined) {
+            setClauses.push(`is_active = $${idx++}`)
+            values.push(body.isActive)
+        }
+        if (setClauses.length === 0) {
+            throw new BadRequestException({ error: 'Nothing to update.' })
+        }
+
+        setClauses.push(`updated_at = CURRENT_TIMESTAMP`)
+        values.push(userId)
+
+        const rows = await this.dataSource.query(
+            `UPDATE users
+             SET    ${setClauses.join(', ')}
+             WHERE  id = $${idx}
+             RETURNING id, username, email,
+                       full_name  AS "fullName",
+                       org_code   AS "orgCode",
+                       role,
+                       is_active  AS "isActive",
+                       last_login AS "lastLogin",
+                       created_at AS "createdAt"`,
+            values,
+        )
+
+        if (!rows.length) {
+            throw new NotFoundException({ error: 'User not found.' })
+        }
+        return rows[0]
+    }
 }
+
