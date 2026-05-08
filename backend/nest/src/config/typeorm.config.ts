@@ -75,6 +75,9 @@ import { QuoteSectionRiskCode } from '../entities/quote-section-risk-code.entity
 import { MeasureDefinition } from '../measures/measure-definition.entity'
 import { MeasureDefinitionHistory } from '../entities/measure-definition-history.entity'
 
+// Login history
+import { LoginHistory } from '../entities/login-history.entity'
+
 // Claims
 import { Claim } from '../entities/claim.entity'
 
@@ -149,6 +152,9 @@ export const typeOrmOptions: DataSourceOptions = {
 
     // Measures
     MeasureDefinition, MeasureDefinitionHistory,
+
+    // Login history
+    LoginHistory,
   ],
 
   // NEVER synchronize automatically — use db-sync.ts for fresh installs only

@@ -14,6 +14,8 @@ import {
 } from '@nestjs/common'
 import { ReportingService } from './reporting.service'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RolesGuard } from '../auth/roles.guard'
+import { Roles } from '../auth/roles.decorator'
 
 /**
  * ReportingController — /api/report-templates and /api/report-field-mappings
@@ -99,10 +101,12 @@ export class ReportingController {
         return this.reportingService.getDateBasisOptions()
     }
 
-    // R10 — User login activity datasource for core reports
+    // R10 — User login activity datasource for core reports (org admins and internal admins only)
     @Get('login-activity')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('client_admin', 'internal_admin')
     getLoginActivity(@Req() req: any) {
-        return this.reportingService.getLoginActivity(req.user.orgCode)
+        return this.reportingService.getLoginActivity(req.user.orgCode, req.user.role)
     }
 
     @Post('dashboards/widgets/data')

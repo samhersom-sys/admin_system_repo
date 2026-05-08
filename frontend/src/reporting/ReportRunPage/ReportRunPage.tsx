@@ -49,7 +49,7 @@ const CORE_REPORT_TEMPLATES: Record<string, ReportTemplate> = {
     quotes: { id: -2, name: 'New Business Report', description: 'New policies written in the selected period.', type: 'core', data_source: 'quotes', created_by: 'System' },
     parties: { id: -3, name: 'Parties Report', description: 'Party directory with roles and contact info.', type: 'core', data_source: 'parties', created_by: 'System' },
     policies: { id: -4, name: 'Policies Report', description: 'All policies with premium and expiry data.', type: 'core', data_source: 'policies', created_by: 'System' },
-    'login-activity': { id: -5, name: 'User Login Activity Report', description: 'Users, latest login timestamp, and login duration.', type: 'core', data_source: 'login-activity', created_by: 'System' },
+    'login-activity': { id: -5, name: 'User Login Activity Report', description: 'Full login history for users in your organisation, ordered by most recent login. Internal admins see all organisations.', type: 'core', data_source: 'login-activity', created_by: 'System' },
 }
 
 function toCsv(headers: string[], rows: Record<string, unknown>[]): string {

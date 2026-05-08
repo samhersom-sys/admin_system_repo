@@ -371,31 +371,52 @@ export class ReportingService {
     // -------------------------------------------------------------------------
     // R10 — GET /api/login-activity  (core report datasource)
     // -------------------------------------------------------------------------
-    async getLoginActivity(orgCode: string | null | undefined): Promise<Array<Record<string, unknown>>> {
-        const rows: Array<{ user: string; loggedInDate: Date | string | null; durationSeconds: number | string | null }> =
-            await this.dataSource.query(
-                `SELECT
-                    COALESCE(NULLIF(full_name, ''), username) AS "user",
-                    last_login AS "loggedInDate",
-                    EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_login))::bigint AS "durationSeconds"
-                 FROM users
-                 WHERE last_login IS NOT NULL
-                   AND org_code IS NOT DISTINCT FROM $1
-                 ORDER BY last_login DESC`,
-                [orgCode ?? null],
-            )
+    async getLoginActivity(
+        orgCode: string | null | undefined,
+        role: string,
+    ): Promise<Array<Record<string, unknown>>> {
+        const isAdmin = role === 'internal_admin'
+
+        let sql: string
+        let params: unknown[]
+
+        if (isAdmin) {
+            sql = `
+                SELECT
+                    user_name  AS "user",
+                    org_code   AS "orgCode",
+                    logged_in_at AS "loggedInAt"
+                FROM login_history
+                ORDER BY logged_in_at DESC
+            `
+            params = []
+        } else {
+            sql = `
+                SELECT
+                    user_name  AS "user",
+                    org_code   AS "orgCode",
+                    logged_in_at AS "loggedInAt"
+                FROM login_history
+                WHERE org_code = $1
+                ORDER BY logged_in_at DESC
+            `
+            params = [orgCode ?? null]
+        }
+
+        const rows: Array<{ user: string; orgCode: string | null; loggedInAt: Date | string | null }> =
+            await this.dataSource.query(sql, params)
 
         return rows.map((row) => {
-            const loginDate = row.loggedInDate
-                ? row.loggedInDate instanceof Date
-                    ? row.loggedInDate.toISOString()
-                    : String(row.loggedInDate)
+            const loggedInAt = row.loggedInAt
+                ? row.loggedInAt instanceof Date
+                    ? row.loggedInAt.toISOString()
+                    : String(row.loggedInAt)
                 : null
 
             return {
                 user: row.user,
-                loggedInDate: loginDate,
-                durationOfLogin: formatDuration(Number(row.durationSeconds ?? 0)),
+                orgCode: row.orgCode ?? null,
+                loggedInAt,
             }
         })
     }

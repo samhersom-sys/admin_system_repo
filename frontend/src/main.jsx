@@ -58,6 +58,7 @@ import ProductConfigPage from '@/settings/ProductConfigPage'
 import DashboardReportingSettingsPage from '@/settings/DashboardReportingSettingsPage'
 import DataQualitySettingsPage from '@/settings/DataQualitySettingsPage'
 import OrganisationDetailPage from '@/settings/OrganisationDetailPage'
+import AccountAdministrationPage from '@/settings/AccountAdministrationPage'
 import PartyListPage from '@/parties/PartyListPage/PartyListPage'
 import CreatePartyPage from '@/parties/CreatePartyPage/CreatePartyPage'
 import PartyViewPage from '@/parties/PartyViewPage/PartyViewPage'
@@ -162,7 +163,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/settings"              element={<SettingsPage />} />
           <Route path="/settings/module-licensing"           element={<CompanyListPage />} />
           <Route path="/settings/module-licensing/:orgCode"  element={<CompanyConfigPage />} />
-          <Route path="/settings/account"      element={<NotFound />} />
+          <Route path="/settings/account"      element={<AccountAdministrationPage />} />
           <Route path="/settings/products"     element={<ProductListPage />} />
           <Route path="/settings/products/:id" element={<ProductConfigPage />} />
           <Route path="/settings/organisation" element={<OrganisationDetailPage />} />

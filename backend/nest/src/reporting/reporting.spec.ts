@@ -499,46 +499,65 @@ describe('ReportingService', () => {
     })
 
     describe('getLoginActivity', () => {
-        it('returns org-scoped login activity rows ordered by latest login', async () => {
+        it('client_admin receives org-scoped rows from login_history', async () => {
             mockDataSource.query.mockResolvedValue([
-                {
-                    user: 'System Administrator',
-                    loggedInDate: '2026-05-07T10:00:00.000Z',
-                    durationSeconds: 3900,
-                },
+                { user: 'Alice', orgCode: 'TST', loggedInAt: '2026-05-07T10:00:00.000Z' },
             ])
 
-            const result = await service.getLoginActivity('TST')
+            const result = await service.getLoginActivity('TST', 'client_admin')
 
             expect(result).toEqual([
-                {
-                    user: 'System Administrator',
-                    loggedInDate: '2026-05-07T10:00:00.000Z',
-                    durationOfLogin: '1h 5m',
-                },
+                { user: 'Alice', orgCode: 'TST', loggedInAt: '2026-05-07T10:00:00.000Z' },
             ])
             expect(mockDataSource.query).toHaveBeenCalledWith(
-                expect.stringContaining('org_code IS NOT DISTINCT FROM $1'),
+                expect.stringContaining('FROM login_history'),
                 ['TST'],
             )
         })
 
-        it('formats short durations as minutes only', async () => {
-            mockDataSource.query.mockResolvedValue([
-                {
-                    user: 'Alice',
-                    loggedInDate: '2026-05-07T10:00:00.000Z',
-                    durationSeconds: 540,
-                },
-            ])
-
-            const result = await service.getLoginActivity('TST')
-            expect(result[0]).toMatchObject({ durationOfLogin: '9m' })
+        it('client_admin SQL includes WHERE org_code = $1', async () => {
+            mockDataSource.query.mockResolvedValue([])
+            await service.getLoginActivity('TST', 'client_admin')
+            const sql: string = mockDataSource.query.mock.calls[0][0]
+            expect(sql).toContain('WHERE org_code = $1')
         })
 
-        it('returns an empty list when no users have logged in', async () => {
+        it('internal_admin receives cross-org rows with no org filter', async () => {
+            mockDataSource.query.mockResolvedValue([
+                { user: 'Alice', orgCode: 'TST', loggedInAt: '2026-05-07T10:00:00.000Z' },
+                { user: 'Bob', orgCode: 'ORG2', loggedInAt: '2026-05-06T09:00:00.000Z' },
+            ])
+
+            const result = await service.getLoginActivity(null, 'internal_admin')
+
+            expect(result).toHaveLength(2)
+            expect(result[0]).toMatchObject({ orgCode: 'TST' })
+            expect(result[1]).toMatchObject({ orgCode: 'ORG2' })
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('FROM login_history'),
+                [],
+            )
+        })
+
+        it('internal_admin SQL does not include a WHERE clause for org_code', async () => {
             mockDataSource.query.mockResolvedValue([])
-            await expect(service.getLoginActivity('TST')).resolves.toEqual([])
+            await service.getLoginActivity(null, 'internal_admin')
+            const sql: string = mockDataSource.query.mock.calls[0][0]
+            expect(sql).not.toContain('WHERE org_code')
+        })
+
+        it('returns empty list when no login history rows exist', async () => {
+            mockDataSource.query.mockResolvedValue([])
+            await expect(service.getLoginActivity('TST', 'client_admin')).resolves.toEqual([])
+        })
+
+        it('maps a Date object loggedInAt to ISO string', async () => {
+            mockDataSource.query.mockResolvedValue([
+                { user: 'Carol', orgCode: 'TST', loggedInAt: new Date('2026-05-07T10:00:00.000Z') },
+            ])
+
+            const result = await service.getLoginActivity('TST', 'client_admin')
+            expect(result[0]).toMatchObject({ loggedInAt: '2026-05-07T10:00:00.000Z' })
         })
     })
 
