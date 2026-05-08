@@ -116,8 +116,8 @@ jobs:
         working-directory: backend/nest
         run: npm ci
 
-      - name: Run database migrations
-        run: npm run db:migrate
+      - name: Sync database schema
+        run: npm run db:sync
 
       - name: Seed ephemeral CI database
         env:
