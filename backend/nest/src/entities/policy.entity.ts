@@ -71,6 +71,9 @@ export class Policy {
   @Column({ name: 'status_id', type: 'int', nullable: true })
   statusId: number | null
 
+  @Column({ type: 'text', nullable: true })
+  renewable: string | null
+
   @Column({ name: 'business_type', type: 'text', nullable: true })
   businessType: string | null
 

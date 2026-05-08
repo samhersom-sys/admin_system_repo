@@ -19,6 +19,7 @@
 - `PolicyEndorsementPage` at `/policies/:id/endorsements/:endorsementId/edit` — endorsement edit view
 - `PolicyCoverageDetailPage` at `/policies/:policyId/sections/:sectionId/coverages/:coverageId` — location schedule breakdown grouped by CoverageType
 - `PolicyCoverageSubDetailPage` at `/policies/:policyId/sections/:sectionId/coverages/:coverageId/details/:detailName` — location breakdown by CoverageType + CoverageSubType
+- `PolicyTransactionViewPage` at `/policies/:id/transactions/:transactionId` — read-only transaction summary view (BA-style)
 - `policies.service.ts` — all API calls for the policies domain
 - `policies.module.ts` — barrel export
 - NestJS `policies/` module — `PoliciesController` + `PoliciesService`
@@ -45,6 +46,7 @@
 - `frontend/src/policies/PolicyCoverageDetailPage/PolicyCoverageDetailPage.tsx` — coverage detail with location schedule
 - `frontend/src/policies/PolicyCoverageSubDetailPage/PolicyCoverageSubDetailPage.tsx` — coverage sub-detail breakdown
 - `frontend/src/policies/PoliciesListPage/PoliciesListPage.tsx` — policy list grid
+- `frontend/src/policies/PolicyTransactionViewPage/PolicyTransactionViewPage.tsx` — read-only transaction summary page
 - `frontend/src/policies/policies.service.ts` — all API adapters
 
 ### API Impact
@@ -69,6 +71,7 @@
 | POST | `/api/policies/:id/endorsements` | Existing |
 | PUT | `/api/policies/:id/endorsements/:endorsementId/issue` | Existing |
 | GET | `/api/policies/:policyId/locations` | Existing |
+| GET | `/api/policies/:id/transactions/:txId/sections/:sectionId` | New — section snapshot for transaction summary view |
 
 ### Database Impact
 None — all required tables and columns already exist.
@@ -87,7 +90,7 @@ None — all required tables and columns already exist.
 
 **REQ-POL-FE-F-003:** The system shall expose a `PolicyViewPage` component at route `/policies/:id` that calls `GET /api/policies/:id` on mount, renders a loading indicator while the request is in flight, and renders the policy record when the request resolves.
 
-**REQ-POL-FE-F-004:** `PolicyViewPage` shall render a header displaying: Reference, a Status badge colour-coded as Active=green / Expired=grey / Cancelled=red, Insured name, Class of Business, Inception Date, and Expiry Date.
+**REQ-POL-FE-F-004:** `PolicyViewPage` shall render a header card displaying: Reference (large text), Insured name (subtitle), a Status badge colour-coded as Active=green / Expired=grey / Cancelled=red. Below the reference row the header shall be split into labelled groups aligned with Quote structure: **Contract & Reference** (Class of Business, Business Type, New or Renewal, Currency, Placing Broker), **Dates** (Inception Date, Inception Time, Expiry Date, Expiry Time, LTA Applicable indicator), **Contract / Placement** (Contract Type, Method of Placement, Unique Market Reference), and **Renewal** (Renewable indicator, Renewal Date, Renewal Status). Group headings shall use the same `text-xs font-semibold text-gray-500 uppercase tracking-wide` style used on the Binding Authority header.
 
 ### 2.3 PolicyViewPage — Sidebar
 
@@ -99,7 +102,7 @@ None — all required tables and columns already exist.
 
 ### 2.5 Sections Tab
 
-**REQ-POL-FE-F-007:** The Sections tab shall display a `ResizableGrid` with the following columns matching the BackUp PolicySections table (using current PolicySection data model fields): Reference (navigation link to `/policies/:policyId/sections/:sectionId`), Class of Business, Inception Date, Expiry Date, Limit Currency, Limit Loss Qualifier, Limit Amount, Excess Currency, Excess Loss Qualifier, Excess Amount, Sum Insured Currency, Sum Insured, Premium Currency, Gross Gross Premium, Gross Premium, Deductions, Net Premium, Annual Rated Gross Premium (`annual_gross` field), Annual Rated Net Premium (`annual_net` field), Written Order, Signed Order. Deferred columns (not in current data model — Block 3): Effective Date, Time Basis, Days on Cover, Tax Receivable. The FiSearch icon in each Reference cell navigates to the section detail. Add/delete actions are deferred until `createPolicySection`/`deletePolicySection` service functions are added.
+**REQ-POL-FE-F-007:** The Sections tab shall display a `ResizableGrid` with the same column structure and ordering used in Quote Sections for shared fields, plus policy navigation semantics: **Action**, Reference, Class of Business, Inception Date, Effective Date, Expiry Date, Days on Cover, Limit Currency, Limit Amount, Limit Loss Qualifier, Excess Currency, Excess Amount, Excess Loss Qualifier, Sum Insured Currency, Sum Insured, Premium Currency, Gross Gross Premium, Gross Premium, Deductions, Net Premium, Tax Receivable, Annual Rated GP, Annual Rated NP, Written Order %, Signed Order %. The Action column shall provide section navigation to `/policies/:policyId/sections/:sectionId`; header labels and widths shall be consistent with Quote table conventions.
 
 ### 2.6 PolicySectionViewPage
 
@@ -113,9 +116,15 @@ None — all required tables and columns already exist.
 
 **REQ-POL-FE-F-012:** The Invoices tab shall display a `ResizableGrid` loaded from `GET /api/policies/:policyId/invoices` with columns: Invoice Number, Date, Amount, Status, Due Date.
 
-**REQ-POL-FE-F-013:** The Transactions tab shall display a `ResizableGrid` loaded from `GET /api/policies/:policyId/transactions` with columns: Transaction Date, Type, Amount, Reference.
+**REQ-POL-FE-F-013:** The Transactions tab shall display a `ResizableGrid` loaded from `GET /api/policies/:policyId/transactions` with the following columns in order: `#` (computed sequential transaction number), `Type` (`transaction_type` with `sub_type` appended when present, e.g. "Contractual - Mid Term Adjustment"), `Effective Date`, `Status` (colour-coded badge: Draft=amber, Endorsed=green, Cancelled=red, all other statuses=grey), `Created By`, `Created Date`, `Description`, `Actions` (header-less icon column).
 
-**REQ-POL-FE-F-014:** The Audit tab shall display an `AuditTable` component loaded from `GET /api/policies/:id/audit`. On the first activation of the Audit tab, the page shall POST `{ action: 'Policy Opened', entityType: 'Policy', entityId: id }` to `POST /api/policies/:id/audit`.
+The Actions column shall render:
+- A pencil icon (`FiEdit2`, `aria-label="Edit endorsement"`) navigating to `/policies/:id/endorsements/:transactionId/edit` when the transaction `status` is `Draft` or `Bound` AND `transaction_type` is `Administrative` or `Contractual`.
+- A magnifier icon (`FiSearch`, `aria-label="View transaction"`) navigating to `/policies/:id/transactions/:transactionId` for all other status/type combinations.
+
+The transaction list shall be sorted most-recent-first by computed transaction number. Transaction numbers shall be assigned chronologically: the Initial Transaction (lowest id / earliest created_at) receives number 1; subsequent transactions are numbered in ascending order by `created_at`, `effective_date`, `id`.
+
+**REQ-POL-FE-F-014:** `PolicyViewPage` shall POST `{ action: 'Policy Opened', entityType: 'Policy', entityId: id }` to `POST /api/policies/:id/audit` on initial page load (once per mount), then refresh audit rows so the newly created Opened event appears without manual page reload. The Audit tab shall display an `AuditTable` loaded from `GET /api/policies/:id/audit` and shall refresh data when activated.
 
 **REQ-POL-FE-F-015:** `PolicySectionViewPage` shall display a section details header showing: Section Reference, Class of Business, Inception Date, Expiry Date, Limit fields, Excess fields, and Premium fields. These fields shall be read-only when the parent policy status is `Active` and editable when the status is `Draft`.
 
@@ -218,7 +227,7 @@ None — all required tables and columns already exist.
 
 **REQ-POL-FE-F-025:** The system shall expose a `PolicyEndorsementPage` component at route `/policies/:id/endorsements/:endorsementId/edit`. On mount it shall fetch the policy by `id` via `GET /api/policies/:id` and the endorsement transaction via `GET /api/policies/:id/endorsements`. If the policy is not found it shall render an error message; if the endorsement is not found it shall render an error message; it shall not throw an uncaught exception in either case.
 
-**REQ-POL-FE-F-026:** `PolicyEndorsementPage` shall render the full policy detail view and all policy tabs in editable mode, pre-populated with the current policy field values. The page header shall display the endorsement transaction number and effective date as a subtitle.
+**REQ-POL-FE-F-026:** `PolicyEndorsementPage` shall render the full policy detail view in editable mode, pre-populated with the current policy and endorsement field values. The page header shall display the endorsement transaction type, sub-type (if present), and effective date as a subtitle, and shall expose the same policy summary groups used on `PolicyViewPage` (`Contract & Reference`, `Dates`, `Contract / Placement`, `Renewal`) using available policy fields. The tab strip shall contain the following seven tabs in order: **Sections**, **Broker**, **Additional Insureds**, **Financial Summary**, **Invoices**, **Endorsement**, **Audit**. The **Transactions** tab shall **not** appear on this page (matches the BA endorsement pattern — a mid-term adjustment edits the living policy record, it does not browse historical transactions). The **Sections** tab shall expose an add action in the table header (`FiPlus`, title `Add Section`) that creates a section via `POST /api/policies/:id/sections`, refreshes the sections grid, and displays an error notification on failure. The **Endorsement** tab shall contain an Effective Date date input and a Description textarea, both pre-populated from the loaded endorsement record and editable. The **Invoices** tab shall display a placeholder message `"Invoices will be available here."` until the invoices implementation is complete. The **Audit** tab shall load `GET /api/policies/:id/audit` and POST `Policy Opened` on first activation. On component unmount, the page shall POST `Policy Closed` to keep recent activity in sync.
 
 **REQ-POL-FE-F-027:** The sidebar on `PolicyEndorsementPage` shall display an `Issue Endorsement` action (`FiCheckCircle` icon). Activating this action shall call `PUT /api/policies/:id/endorsements/:endorsementId/issue`. On a successful response: the page shall display a success notification; if the endorsement type is `Cancellation` the policy status in the UI shall update to `Cancelled`; otherwise the policy status shall update to `Active`. The page shall then navigate to `/policies/:id`.
 
@@ -240,11 +249,26 @@ The component shall render a read-only `FieldGroup` header with: Policy Referenc
 
 The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail, Number of Locations, Sum Insured. Rows shall be grouped by `CoverageSubType` (falling back to `"No Sub-Detail"` when absent), sorted alphabetically with `"No Sub-Detail"` always last. A totals `<tfoot>` row shall display the aggregate Sum Insured. An empty state `"No locations found."` shall be rendered when no rows match.
 
+### 2.19 PolicyTransactionViewPage
+
+**REQ-POL-FE-F-041:** The system shall expose a `PolicyTransactionViewPage` component at route `/policies/:id/transactions/:transactionId`. On mount it shall fetch in parallel: the policy via `GET /api/policies/:id`; the policy sections list via `GET /api/policies/:id/sections`; and all policy transactions via `GET /api/policies/:id/transactions`. While loading, a loading indicator shall be rendered. If the transaction matching `:transactionId` is not found in the transactions list, the component shall render a `text-red-600` error message `"Transaction not found"`; it shall not throw an uncaught exception.
+
+**REQ-POL-FE-F-042:** `PolicyTransactionViewPage` shall render a read-only three-column `FieldGroup` header comprising:
+- **Policy Summary:** Reference, Insured, Class of Business, Placing Broker
+- **Dates:** Inception Date, Expiry Date, Effective Date (from the transaction record)
+- **Transaction Details:** Transaction Number (sequential, computed by `buildTransactionNumberMap`), Type (with `sub_type` appended if present, e.g. "Contractual - Mid Term Adjustment"), Status (coloured badge), Description
+
+The page `h2` heading shall display `Transaction {number}: {transaction_type}` (with `sub_type` appended when present).
+
+**REQ-POL-FE-F-043:** Below the header, `PolicyTransactionViewPage` shall render a `ResizableGrid` with one row per policy section. For each section it shall call `GET /api/policies/:id/transactions/:transactionId/sections/:sectionId` and use the `current` object in the response as the snapshot values for that row. Where a snapshot value is available it shall take precedence over the live section value; live section values shall be used as fallback when no snapshot is available. The columns displayed shall match the Sections tab columns on `PolicyViewPage`: reference, class of business, inception/expiry dates, limit currency/amount/qualifier, excess currency/amount/qualifier, sum insured currency/amount, premium currency, gross gross premium, gross premium, written order, signed order.
+
+**REQ-POL-FE-F-044:** The sidebar on `PolicyTransactionViewPage` shall display exactly one action: `Back to Policy` (`FiArrowLeft` icon) navigating to `/policies/:id`. No write, issue, or endorse actions shall appear on this page.
+
 ---
 
 ## 3. Service Layer Requirements
 
-**REQ-POL-FE-S-001:** A `policies.service.ts` file shall exist at `frontend/src/policies/policies.service.ts` and shall export the following functions, each calling the corresponding API endpoint via the `api-client` module: `getPolicies()`, `getPolicy(id)`, `createPolicy(data)`, `updatePolicy(id, data)`, `getPolicySections(policyId)`, `getPolicySectionDetails(policyId, sectionId)`, `getPolicyInvoices(policyId)`, `getPolicyTransactions(policyId)`, `getPolicyAudit(policyId)`, `postPolicyAudit(policyId, event)`, `getPolicyEndorsements(policyId)`, `createEndorsement(policyId, data)`, `issueEndorsement(policyId, endorsementId)`, `getPolicyCoverages(policyId, sectionId)`, `getPolicyLocations(policyId)`.
+**REQ-POL-FE-S-001:** A `policies.service.ts` file shall exist at `frontend/src/policies/policies.service.ts` and shall export the following functions, each calling the corresponding API endpoint via the `api-client` module: `getPolicies()`, `getPolicy(id)`, `createPolicy(data)`, `updatePolicy(id, data)`, `getPolicySections(policyId)`, `createPolicySection(policyId, input)`, `getPolicySectionDetails(policyId, sectionId)`, `getPolicyInvoices(policyId)`, `getPolicyTransactions(policyId)`, `getPolicyAudit(policyId)`, `postPolicyAudit(policyId, event)`, `getPolicyEndorsements(policyId)`, `createEndorsement(policyId, data)`, `issueEndorsement(policyId, endorsementId)`, `getPolicyCoverages(policyId, sectionId)`, `getPolicyLocations(policyId)`, `getPolicySectionTransaction(policyId, transactionId, sectionId)`.
 
 ---
 
@@ -298,6 +322,8 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 
 **REQ-POL-BE-F-015:** `PoliciesController` shall expose `PUT /api/policies/:id/endorsements/:endorsementId/issue` (JWT-guarded) which shall: update the endorsement `policy_transactions` row `status` to `Endorsed`; update the parent policy `status` to `Cancelled` if `transaction_type = 'Cancellation'`, or to `Active` otherwise. It shall return `{ data: { policy, endorsement } }`. It shall return `HTTP 404` if the endorsement does not exist or belongs to a different policy.
 
+**REQ-POL-BE-F-016:** `PoliciesController` shall expose `GET /api/policies/:id/transactions/:txId/sections/:sectionId` (JWT-guarded, orgCode-scoped) returning `{ data: { current: PolicySection, previous: PolicySection | null, movements: Record<string, number> } }`. The `current` object shall contain the policy section field values snapshotted at the time of transaction `txId`. The `previous` object shall contain the equivalent snapshot from the directly preceding transaction, or `null` if `txId` is the first transaction. The `movements` object shall contain the numeric delta between `current` and `previous` for each applicable financial field. It shall return `HTTP 404` if the section or transaction does not exist or belongs to a different policy.
+
 ---
 
 ## 5. Router Requirements
@@ -308,6 +334,8 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 
 **REQ-POL-FE-C-003:** The application router shall register `PolicyCoverageDetailPage` at path `/policies/:policyId/sections/:sectionId/coverages/:coverageId` and `PolicyCoverageSubDetailPage` at path `/policies/:policyId/sections/:sectionId/coverages/:coverageId/details/:detailName`. Both routes shall be declared after `/policies/:policyId/sections/:sectionId`.
 
+**REQ-POL-FE-C-004:** The application router shall register `PolicyTransactionViewPage` at path `/policies/:id/transactions/:transactionId`. This route shall be declared after the endorsement routes and after the coverage detail routes, but still within the authenticated layout, ensuring the `:transactionId` segment is not captured by the general `/policies/:id` wildcard.
+
 ---
 
 ## 6. Traceability
@@ -317,17 +345,17 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | REQ-POL-FE-F-001 | PoliciesListPage at `/policies`, GET on mount, ResizableGrid | T-POL-FE-F-R001 |
 | REQ-POL-FE-F-002 | Reference cell links to `/policies/:id` | T-POL-FE-F-R002 |
 | REQ-POL-FE-F-003 | PolicyViewPage at `/policies/:id`, loading state | T-POL-FE-F-R003 |
-| REQ-POL-FE-F-004 | Header: Reference, Status badge colours, Insured, CoB, dates | T-POL-FE-F-R004 |
+| REQ-POL-FE-F-004 | Header: Reference, Status badge, Insured; Quote-aligned groups: Contract & Reference, Dates, Contract / Placement, Renewal | T-POL-FE-F-R004, T-POL-FE-F-R004e |
 | REQ-POL-FE-F-005 | Sidebar: Edit, Generate Document, Endorse, Audit | T-POL-FE-F-R005 |
 | REQ-POL-FE-F-006 | TabsNav with 7 tabs in order | T-POL-FE-F-R006 |
-| REQ-POL-FE-F-007 | Sections tab ResizableGrid with 22 columns + add/delete actions | T-POL-FE-F-R007 |
+| REQ-POL-FE-F-007 | Sections tab ResizableGrid quote-parity columns/order including Action, Effective Date, Days on Cover, Tax Receivable | T-POL-FE-F-R007 |
 | REQ-POL-FE-F-008 | PolicySectionViewPage at `/policies/:policyId/sections/:sectionId` | T-POL-FE-F-R008 |
 | REQ-POL-FE-F-009 | Broker tab: BrokerSearch fields, PUT on save | T-POL-FE-F-R009 |
 | REQ-POL-FE-F-010 | Additional Insureds tab: list, add, delete with confirmation | T-POL-FE-F-R010 |
 | REQ-POL-FE-F-011 | Financial Summary: Gross, Net, Commission=Gross-Net, read-only | T-POL-FE-F-R011 |
 | REQ-POL-FE-F-012 | Invoices tab ResizableGrid from GET invoices | T-POL-FE-F-R012 |
-| REQ-POL-FE-F-013 | Transactions tab ResizableGrid from GET transactions | T-POL-FE-F-R013 |
-| REQ-POL-FE-F-014 | Audit tab + Policy Opened POST on first activation | T-POL-FE-F-R014 |
+| REQ-POL-FE-F-013 | Transactions tab: sequential #, type+sub_type, status badge, Created By/Date, action routing (edit vs view) | T-POL-FE-F-R013, T-POL-FE-F-R013b |
+| REQ-POL-FE-F-014 | Policy Opened POST on page mount + audit refresh; Audit tab displays/refreshes history | T-POL-FE-F-R014, T-POL-FE-F-R014b |
 | REQ-POL-FE-F-015 | Section details header, editable for Draft / read-only for Active | T-POL-FE-F-R015 |
 | REQ-POL-FE-F-016 | PolicySectionViewPage TabsNav: Coverages, Deductions, Participations | T-POL-FE-F-R016 |
 | REQ-POL-FE-F-017 | Policy Closed POST on unmount (useEffect cleanup) | T-POL-FE-F-R017 |
@@ -339,10 +367,10 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | REQ-POL-FE-F-023 | Endorsement Save calls POST and navigates to edit page | T-POL-FE-F-R023 |
 | REQ-POL-FE-F-024 | PolicyEndorsePage dirty-tracking navigation guard | T-POL-FE-F-R024 |
 | REQ-POL-FE-F-025 | PolicyEndorsementPage at endorsement edit route, loads policy + endorsement | T-POL-FE-F-R025 |
-| REQ-POL-FE-F-026 | PolicyEndorsementPage renders policy in editable mode with endorsement subtitle | T-POL-FE-F-R026 |
+| REQ-POL-FE-F-026 | PolicyEndorsementPage: 7 tabs (no Transactions), policy summary parity groups, Sections add action, Endorsement fields, Invoices placeholder, audit open/close lifecycle | T-POL-FE-F-R026, T-POL-FE-F-R026a, T-POL-FE-F-R026d, T-POL-FE-F-R026e |
 | REQ-POL-FE-F-027 | Issue Endorsement calls PUT issue, updates status, navigates | T-POL-FE-F-R027 |
 | REQ-POL-FE-F-028 | PolicyEndorsementPage dirty-tracking navigation guard | T-POL-FE-F-R028 |
-| REQ-POL-FE-S-001 | policies.service.ts exports all API functions incl. endorsement functions | T-POL-FE-S-R001 |
+| REQ-POL-FE-S-001 | policies.service.ts exports all API functions incl. createPolicySection, endorsement functions, and getPolicySectionTransaction | T-POL-FE-S-R001 |
 | REQ-POL-BE-F-001 | NestJS module created, registered in app.module.ts | T-POL-BE-R001 |
 | REQ-POL-BE-F-002 | GET /api/policies returns scoped Policy[] | T-POL-BE-R002 |
 | REQ-POL-BE-F-003 | GET /api/policies/:id returns Policy or 404 | T-POL-BE-R003 |
@@ -373,6 +401,12 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | REQ-POL-FE-F-039 | Broker tab: BrokerSearch + InsurerSearch fields | T-POL-FE-F-R039 |
 | REQ-POL-FE-F-040 | Policy header: ref, status, insured, linked quote/sub, YoA, dates+times, LTA | T-POL-FE-F-R040 |
 | REQ-POL-FE-C-003 | Router: coverage detail routes registered after sections route | T-POL-FE-C-R003 |
+| REQ-POL-FE-F-041 | PolicyTransactionViewPage at transaction route, loads policy/sections/transactions in parallel, not-found error | T-POL-FE-F-R026b, T-POL-FE-F-R026c |
+| REQ-POL-FE-F-042 | Transaction view: 3-column summary header, h2 heading | T-POL-FE-F-R026b |
+| REQ-POL-FE-F-043 | Transaction view: section snapshot grid via getSectionTransaction endpoint | T-POL-FE-F-R026b |
+| REQ-POL-FE-F-044 | Transaction view sidebar: Back to Policy only | (visual — no dedicated test) |
+| REQ-POL-BE-F-016 | GET /api/policies/:id/transactions/:txId/sections/:sectionId returns snapshot | (Layer 2 deferred) |
+| REQ-POL-FE-C-004 | Router: PolicyTransactionViewPage route registered | (implied by T-POL-FE-F-R026b route render) |
 
 ---
 
@@ -391,3 +425,8 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | 2026-04-04 | Added Quote-to-Bind (REQ-POL-FE-F-018/019, REQ-POL-BE-F-012) and Endorsement Flow (REQ-POL-FE-F-020-028, REQ-POL-BE-F-013-015, REQ-POL-FE-C-002) based on backup analysis. Scope updated. |
 | 2026-04-04 | Added PolicyCoverageDetailPage (REQ-POL-FE-F-029, F-030) and PolicyCoverageSubDetailPage (REQ-POL-FE-F-031, REQ-POL-FE-C-003). Service updated with getPolicyCoverages() and getPolicyLocations(). Scope updated. Location schedule uses GET /api/policies/:policyId/locations. |
 | 2026-04-05 | Gap-closing update: added Impact Analysis section. Added section header field-level detail (F-032), deductions tab with tax calc (F-033, F-034), risk codes tab (F-035), movement indicators (F-036), expanded financial summary (F-037), expanded additional insureds (F-038), expanded broker tab with InsurerSearch (F-039), policy header field detail (F-040). Updated PolicySectionViewPage tabs from 3 to 5 (added Risk Codes, Invoices). |
+| 2026-04-29 | REQ-POL-FE-F-004 updated — header restructured with Contract & Reference / Dates column headings (aligned with BA). REQ-POL-FE-F-026 rewritten — PolicyEndorsementPage now renders full 7-tab layout (Sections, Broker, Additional Insureds, Financial Summary, Invoices placeholder, Endorsement, Audit); Transactions tab excluded per BA endorsement pattern. REQ-QUO-FE-F-035/036/037 rename "Quote & Referencing" → "Contract & Reference" (cross-domain in quotes.requirements.md). |
+| 2026-04-29 | Quote parity update: REQ-POL-FE-F-004 expanded to include Contract / Placement and Renewal fields (plus times/LTA indicator) in Policy header. Endorsement parity update: REQ-POL-FE-F-026 expanded with Sections add action (`FiPlus` -> `POST /api/policies/:id/sections`) and endorsement audit lifecycle (`Policy Opened` on first Audit activation, `Policy Closed` on unmount). REQ-POL-FE-S-001 expanded with `createPolicySection(policyId, input)`. |
+| 2026-04-29 | Parity refinement: REQ-POL-FE-F-007 updated to enforce Quote-aligned section table column order/labels (including Effective Date, Days on Cover, Tax Receivable, Action). REQ-POL-FE-F-014 updated to require immediate audit refresh after posting `Policy Opened` so the entry is visible in the active tab. |
+| 2026-04-29 | Audit lifecycle refinement: REQ-POL-FE-F-014 moved `Policy Opened` audit post to page mount so open/close events are paired even when users never click the Audit tab. Audit tab remains read/display with refresh on activation. |
+| 2026-04-29 | BA-style policy transaction UX: rewrote REQ-POL-FE-F-013 (transaction tab columns, status badge, action routing); added REQ-POL-FE-F-041–044 (PolicyTransactionViewPage); updated REQ-POL-FE-S-001 (added getPolicySectionTransaction); added REQ-POL-BE-F-016 (section snapshot endpoint); added REQ-POL-FE-C-004 (router entry). Updated scope, Impact Analysis, and traceability table. Entry backfilled to comply with Three-Artifact Rule — code was written before requirements in error. |

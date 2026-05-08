@@ -276,13 +276,14 @@ describe('ReportsListPage — /reports', () => {
     })
 
     // REQ-RPT-FE-F-008
-    it('T-RPT-FE-F-R008 — always displays four core report templates', async () => {
+    it('T-RPT-FE-F-R008 — always displays five core report templates', async () => {
         mockGetReportTemplates.mockResolvedValue([])
         renderListPage()
         expect(await screen.findByText('Submissions Report')).toBeInTheDocument()
         expect(screen.getByText('New Business Report')).toBeInTheDocument()
         expect(screen.getByText('Parties Report')).toBeInTheDocument()
         expect(screen.getByText('Policies Report')).toBeInTheDocument()
+        expect(screen.getByText('User Login Activity Report')).toBeInTheDocument()
     })
 
     it('T-RPT-FE-F-R008b — core reports have no Edit or Delete controls', async () => {
@@ -739,11 +740,17 @@ describe('ReportRunPage — /reports/run/:reportId', () => {
     })
 
     // REQ-RPT-FE-F-025
-    it('T-RPT-FE-F-R025 — Export CSV button appears after results load', async () => {
+    it('T-RPT-FE-F-R025 — Export CSV is exposed via sidebar action and no inline export button is rendered', async () => {
         renderRunPage('42')
         await screen.findByText('Sales Report')
         await userEvent.click(screen.getByRole('button', { name: /run report/i }))
-        expect(await screen.findByRole('button', { name: /export csv/i })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /export csv/i })).not.toBeInTheDocument()
+        expect(mockUseSidebarSection).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Report',
+            items: expect.arrayContaining([
+                expect.objectContaining({ label: 'Export CSV', event: 'report:export' }),
+            ]),
+        }))
     })
 
     // REQ-RPT-FE-F-026
@@ -832,6 +839,13 @@ describe('ReportRunPage — core report slug navigation', () => {
         await screen.findByText('Submissions Report')
         await userEvent.click(screen.getByRole('button', { name: /run report/i }))
         expect(await screen.findByText('SUB-001')).toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R005a-d — login activity core slug calls runCoreReport with login-activity', async () => {
+        renderRunPageSlug('login-activity')
+        expect(await screen.findByText('User Login Activity Report')).toBeInTheDocument()
+        await userEvent.click(screen.getByRole('button', { name: /run report/i }))
+        await waitFor(() => expect(mockRunCoreReport).toHaveBeenCalledWith('login-activity'))
     })
 })
 

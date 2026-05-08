@@ -1,19 +1,22 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { get } from '@/shared/lib/api-client/api-client'
 import { number, currency } from '@/shared/lib/formatters/formatters'
 import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
 import Card from '@/shared/Card/Card'
 
 /**
- * KpiWidget � dual-scope key performance indicators.
+ * KpiWidget — dual-scope key performance indicators.
  *
  * Displays both organisation-wide totals and the current user's totals
- * for open submissions, quotes, bound policies, binding authorities, and YTD GWP.
+ * for submissions, quotes, active policies, binding authorities, and YTD GWP.
  *
  * Architecture rules:
- *   - No raw HTTP calls � uses api-client.get() for all requests.
- *   - No hardcoded hex colour values � Tailwind classes only.
+ *   - No raw HTTP calls — uses api-client.get() for all requests.
+ *   - No hardcoded hex colour values — Tailwind classes only.
  *   - No imports from domains/ or sharedmodules/.
+ *   - Single API call to GET /api/home/kpi-summary (REQ-HOME-F-020).
+ *     Count predicates on the backend are resolved from the field-mappings
+ *     semantic layer (REQ-HOME-F-019) so measure changes propagate here automatically.
  */
 
 interface KpiData {
@@ -93,59 +96,31 @@ export default function KpiWidget({ orgCode, userId }: { orgCode: string; userId
   useEffect(() => {
     let cancelled = false
 
-    // Helper � backend returns raw arrays for list endpoints
-    function arrayLen(result: PromiseSettledResult<unknown>) {
-      return result.status === 'fulfilled' && Array.isArray(result.value)
-        ? result.value.length
-        : null
-    }
-
-    // Helper — gwp-summary returns { orgTotal, userTotal }.
-    // Falls back to { total } shape used by test mocks.
-    function gwpTotal(result: PromiseSettledResult<unknown>, key: 'orgTotal' | 'userTotal') {
-      if (result.status !== 'fulfilled') return null
-      const val = result.value as Record<string, unknown>
-      if (typeof val?.[key] === 'number') return val[key] as number
-      if (typeof val?.total === 'number') return val.total as number
-      return null
-    }
-
     async function fetchAll() {
       try {
-        const results = await Promise.allSettled([
-          get(`/api/submissions?orgCode=${orgCode}`, {}),
-          get(`/api/submissions?assignedTo=${userId}`, {}),
-          get(`/api/quotes?orgCode=${orgCode}`, {}),
-          get(`/api/quotes?assignedTo=${userId}`, {}),
-          get(`/api/policies?orgCode=${orgCode}&status=bound`, {}),
-          get(`/api/policies?assignedTo=${userId}&status=bound`, {}),
-          get(`/api/binding-authorities?orgCode=${orgCode}`, {}),
-          get(`/api/policies/gwp-summary?orgCode=${orgCode}`, {}),
-          get(`/api/policies/gwp-summary?userId=${userId}`, {}),
-        ])
-
-        const [orgSubs, userSubs, orgQts, userQts, orgPols, userPols, orgBAs, orgGwpRes, userGwpRes] = results
-
-        const allFailed = results.every((r) => r.status === 'rejected')
-        if (allFailed) {
-          if (!cancelled) setError('Unable to load KPI data. Please refresh.')
-          return
+        // REQ-HOME-F-020 — single call; scope derived from JWT on the backend
+        const summary = await get('/api/home/kpi-summary', {}) as {
+          submissions: { org: number; user: number }
+          quotes: { org: number; user: number }
+          policies: { org: number; user: number }
+          bindingAuthorities: { org: number }
+          gwp: { org: number; user: number }
         }
 
         if (!cancelled) {
           setData({
-            orgSubmissions: arrayLen(orgSubs),
-            userSubmissions: arrayLen(userSubs),
-            orgQuotes: arrayLen(orgQts),
-            userQuotes: arrayLen(userQts),
-            orgPolicies: arrayLen(orgPols),
-            userPolicies: arrayLen(userPols),
-            orgBindingAuthorities: arrayLen(orgBAs),
-            orgGwp: gwpTotal(orgGwpRes, 'orgTotal'),
-            userGwp: gwpTotal(userGwpRes, 'userTotal'),
+            orgSubmissions: summary?.submissions?.org ?? null,
+            userSubmissions: summary?.submissions?.user ?? null,
+            orgQuotes: summary?.quotes?.org ?? null,
+            userQuotes: summary?.quotes?.user ?? null,
+            orgPolicies: summary?.policies?.org ?? null,
+            userPolicies: summary?.policies?.user ?? null,
+            orgBindingAuthorities: summary?.bindingAuthorities?.org ?? null,
+            orgGwp: summary?.gwp?.org ?? null,
+            userGwp: summary?.gwp?.user ?? null,
           })
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setError('Unable to load KPI data. Please refresh.')
         }
@@ -156,7 +131,7 @@ export default function KpiWidget({ orgCode, userId }: { orgCode: string; userId
 
     fetchAll()
     return () => { cancelled = true }
-  }, [orgCode, userId])
+  }, [])
 
   return (
     <div data-testid="kpi-widget">

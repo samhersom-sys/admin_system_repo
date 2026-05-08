@@ -12,7 +12,7 @@ import { brandClasses } from '@/shared/lib/design-tokens/brandClasses'
  * RecentActivityWidget � unified list of recent records matching the backup RecentRecords table.
  *
  * Columns: Reference, Record Type, Submission Type, Policy Status, Record Status,
- *          Insured, Broker, Last Opened, Action
+ *          Insured, Broker, Audit Time Stamp, User, Action
  * All columns are sortable.  Shows at most 50 records.
  * Architecture rules: no hex literals, no direct fetch, no domains/ imports.
  */
@@ -33,7 +33,8 @@ const COLUMNS = [
   { key: 'recordStatus', label: 'Record Status', sortable: true, defaultWidth: 120 },
   { key: 'insured', label: 'Insured', sortable: true, defaultWidth: 160 },
   { key: 'broker', label: 'Broker', sortable: true, defaultWidth: 150 },
-  { key: 'lastOpened', label: 'Last Opened', sortable: true, defaultWidth: 130 },
+  { key: 'auditTimestamp', label: 'Audit Time Stamp', sortable: true, defaultWidth: 150 },
+  { key: 'user', label: 'User', sortable: true, defaultWidth: 140 },
   { key: 'action', label: 'Action', sortable: false, defaultWidth: 70 },
 ]
 
@@ -46,7 +47,8 @@ interface ActivityItem {
   status: string
   insuredName: string
   broker: string
-  lastUpdated: string | null
+  auditTimestamp: string | null
+  auditUser: string | null
 }
 
 function buildHref(item: ActivityItem) {
@@ -68,7 +70,7 @@ export default function RecentActivityWidget({ orgCode }: { orgCode: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [items, setItems] = useState<ActivityItem[]>([])
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'lastOpened', direction: 'desc' })
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'auditTimestamp', direction: 'desc' })
 
   useEffect(() => {
     let cancelled = false
@@ -89,7 +91,8 @@ export default function RecentActivityWidget({ orgCode }: { orgCode: string }) {
               status: String(row.status ?? ''),
               insuredName: String(row.insuredName ?? row.insured ?? row.name ?? ''),
               broker: String(row.placingBroker ?? row.broker ?? row.placingBrokerName ?? ''),
-              lastUpdated: (row.lastOpenedDate ?? row.lastOpened ?? row.createdDate) as string | null,
+              auditTimestamp: (row.lastAuditTimestamp ?? row.lastOpenedDate ?? row.lastOpened ?? row.createdDate) as string | null,
+              auditUser: (row.lastAuditUser ?? row.user ?? row.performed_by ?? null) as string | null,
             }
           })
 
@@ -99,8 +102,8 @@ export default function RecentActivityWidget({ orgCode }: { orgCode: string }) {
           ...flatten(res.policies, 'policy'),
           ...flatten(res.bindingAuthorities, 'binding-authority'),
         ].sort((a, b) => {
-          const ta = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0
-          const tb = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0
+          const ta = a.auditTimestamp ? new Date(a.auditTimestamp).getTime() : 0
+          const tb = b.auditTimestamp ? new Date(b.auditTimestamp).getTime() : 0
           return tb - ta
         })
 
@@ -113,7 +116,24 @@ export default function RecentActivityWidget({ orgCode }: { orgCode: string }) {
     }
 
     fetchActivity()
-    return () => { cancelled = true }
+
+    // Keep recents current when users return to Home without a full remount.
+    const onFocus = () => { void fetchActivity() }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchActivity()
+      }
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    const intervalId = window.setInterval(() => { void fetchActivity() }, 30000)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.clearInterval(intervalId)
+    }
   }, [orgCode])
 
   const getValue = (item: ActivityItem, key: string): string => {
@@ -125,14 +145,15 @@ export default function RecentActivityWidget({ orgCode }: { orgCode: string }) {
       case 'recordStatus': return formatRecordStatus(item)
       case 'insured': return item.insuredName ?? ''
       case 'broker': return item.broker ?? ''
-      case 'lastOpened': return item.lastUpdated ?? ''
+      case 'auditTimestamp': return item.auditTimestamp ?? ''
+      case 'user': return item.auditUser ?? ''
       default: return ''
     }
   }
 
   const sorted = useMemo(() => {
     const arr = [...items]
-    const isDate = sortConfig.key === 'lastOpened'
+    const isDate = sortConfig.key === 'auditTimestamp'
     arr.sort((a, b) => {
       const va = getValue(a, sortConfig.key)
       const vb = getValue(b, sortConfig.key)
@@ -197,7 +218,8 @@ export default function RecentActivityWidget({ orgCode }: { orgCode: string }) {
               )
               if (key === 'insured') return item.insuredName || '—'
               if (key === 'broker') return <span className="text-gray-600">{item.broker || '—'}</span>
-              if (key === 'lastOpened') return <span className="text-gray-500">{relativeTime(item.lastUpdated ?? '')}</span>
+              if (key === 'auditTimestamp') return <span className="text-gray-500">{relativeTime(item.auditTimestamp ?? '')}</span>
+              if (key === 'user') return <span className="text-gray-600">{item.auditUser || '—'}</span>
               if (key === 'action') return (
                 <a
                   href={buildHref(item)}

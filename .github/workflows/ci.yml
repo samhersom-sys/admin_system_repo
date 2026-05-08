@@ -94,7 +94,6 @@ jobs:
 
     env:
       DATABASE_URL: postgres://policyforge:changeme@127.0.0.1:5432/policyforge_cleaned
-      BACKEND_URL: http://127.0.0.1:5000
       JWT_SECRET: ci-jwt-secret
 
     steps:
@@ -125,43 +124,9 @@ jobs:
           NODE_ENV: development
         run: npm run db:seed
 
-      - name: Start Express backend for integration tests
-        env:
-          PORT: 5000
-          NODE_ENV: test
-        run: |
-          nohup node backend/server.js > backend.log 2>&1 &
-          echo $! > backend.pid
-
-      - name: Wait for backend health
-        run: |
-          for i in {1..30}; do
-            if curl -sSf http://127.0.0.1:5000/api/health > /dev/null; then
-              echo "Backend is ready"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Backend failed to start"
-          cat backend.log
-          exit 1
-
-      - name: Run backend integration tests
-        run: npm run test:backend
+      - name: Run NestJS unit tests
+        working-directory: backend/nest
+        run: npm test
 
       - name: Build Nest backend
         run: npm run build:backend
-
-      - name: Show backend log
-        if: always()
-        run: |
-          if [ -f backend.log ]; then
-            sed -n '1,200p' backend.log
-          fi
-
-      - name: Stop backend
-        if: always()
-        run: |
-          if [ -f backend.pid ]; then
-            kill $(cat backend.pid) || true
-          fi

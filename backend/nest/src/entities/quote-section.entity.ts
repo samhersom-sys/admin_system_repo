@@ -116,6 +116,46 @@ export class QuoteSection {
     @Column({ name: 'annual_net_premium', type: 'numeric', precision: 18, scale: 2, nullable: true })
     annualNetPremium: string | null
 
+    // Financial view columns (from schema 29 / migration 123)
+    @Column({ name: 'gross_premium_whole', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    grossPremiumWhole: string | null
+
+    @Column({ name: 'gross_premium_market', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    grossPremiumMarket: string | null
+
+    @Column({ name: 'gross_premium_line', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    grossPremiumLine: string | null
+
+    @Column({ name: 'net_premium_whole', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    netPremiumWhole: string | null
+
+    @Column({ name: 'net_premium_market', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    netPremiumMarket: string | null
+
+    @Column({ name: 'net_premium_line', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    netPremiumLine: string | null
+
+    @Column({ name: 'annual_gross_premium_whole', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    annualGrossPremiumWhole: string | null
+
+    @Column({ name: 'annual_gross_premium_market', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    annualGrossPremiumMarket: string | null
+
+    @Column({ name: 'annual_gross_premium_line', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    annualGrossPremiumLine: string | null
+
+    @Column({ name: 'annual_net_premium_whole', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    annualNetPremiumWhole: string | null
+
+    @Column({ name: 'annual_net_premium_market', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    annualNetPremiumMarket: string | null
+
+    @Column({ name: 'annual_net_premium_line', type: 'numeric', precision: 18, scale: 2, nullable: true })
+    annualNetPremiumLine: string | null
+
+    @Column({ name: 'tax_overrides', type: 'jsonb', nullable: true })
+    taxOverrides: Record<string, unknown> | null
+
     @Column({ name: 'delegated_authority_id', type: 'int', nullable: true })
     delegatedAuthorityId: number | null
 

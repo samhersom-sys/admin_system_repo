@@ -141,12 +141,12 @@ The database schema lives in `db/` at the project root.  It is a separate compon
 
 ```
 db/
-  migrations/   ← schema changes only (run before starting the app)
-  seeds/        ← reference/test data (run after migrations)
+  schema/       ← schema changes only (run before starting the app)
+  seeds/        ← reference/test data (run after schema)
 ```
 
 **Key rules:**
-- Schema changes (new tables, column changes) go in `db/migrations/` — never in `backend/`
+- Schema changes (new tables, column changes) go in `db/schema/` — never in `backend/`
 - Run migrations: `npm run db:migrate`
 - A developer working on schema must not need to understand the API layer
 - A developer working on the API must not need to write migrations
@@ -272,6 +272,26 @@ A stub route (in `backend/routes/dashboard-stubs.js` or similar) is a **temporar
 3. **A stub must be removed the moment the real route file is registered in `server.js`.** Do not leave a stub in place alongside a real route.
 
 4. **A stub must return the correct shape for the eventually-real API response** (empty arrays / zeros / empty objects — never `null`), so frontend components do not need to change their null-handling when the stub is replaced.
+
+5. **REAL DOMAIN LOGIC MUST NEVER LIVE IN A STUB FILE.** If a route handler queries a real database table, performs business logic, or was designed to be permanent — it is not a stub. It must have its own route file (`backend/routes/[domain].js`) from the moment it is written. Placing production logic inside `dashboard-stubs.js` (or any stub file) is forbidden because:
+   - A syntax error anywhere in the stub file silently kills all routes in that file
+   - The mismatch between file name and content makes regression testing harder to reason about
+   - It implies the route is temporary when it is not
+
+   **Rule of thumb:** If it hits a real DB table → it needs its own route file.
+
+---
+
+## 13. Backend Route Change Protocol
+
+Whenever a route file is added, removed, or its mount path in `server.js` changes, the following steps are **mandatory before calling the task done**:
+
+1. **Syntax-check all modified files:** `node --check backend/routes/[file].js` must exit 0
+2. **Restart the dev server** — Node does not hot-reload route changes. A running server will keep serving the old registered routes until it is restarted. A green browser result from before the change is not evidence the new routes work.
+3. **Manually verify the changed endpoints in the browser (or with curl/Postman)** before marking the session complete
+4. **Run Layer 2 backend tests:** `npm run test:backend` must pass
+
+These steps exist because frontend tests mock the API — they can pass even when every backend endpoint is broken. The only way to know a route works is to call it against a running server.
 
 ---
 

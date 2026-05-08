@@ -8,16 +8,34 @@
  *
  * SECURITY: Only fields present in this map may appear in generated SQL.
  * User-supplied field names that do not match an entry are silently dropped.
+ *
+ * MULTI-TENANCY CONTRACT — MANDATORY:
+ *   Every `SourceConfig` carries an `orgCol` field. Any service that executes a
+ *   measure derived from this file MUST include `WHERE {orgCol} = :orgCode` in
+ *   the generated SQL, where `:orgCode` comes from the authenticated user's JWT.
+ *
+ *   `filterExpr` values are business-logic predicates ONLY (e.g. "status = 'Active'").
+ *   They must NEVER contain an org_code clause. Tenant scoping is always the
+ *   responsibility of the executing service, not the measure definition.
+ *
+ *   Violation of this contract is a multi-tenancy breach (§5.10.5 of AI Guidelines).
  */
 
 export interface FieldDef {
     key: string
     label: string
     col: string
-    type?: 'text' | 'lookup' | 'date' | 'number' | 'count'
+    type?: 'text' | 'lookup' | 'date' | 'number' | 'count' | 'ratio'
     lookupValues?: string[]
-    /** SQL predicate injected as CASE/WHEN for filtered count measures. Only valid when type = 'count'. */
+    /** SQL predicate injected as CASE/WHEN for filtered count measures. Only valid when type = 'count'.
+     *  MUST NOT contain an org_code clause — tenant scoping is always added by the executing service via `orgCol`. */
     filterExpr?: string
+    /** SQL predicate for the numerator of a ratio measure. Only valid when type = 'ratio'.
+     *  MUST NOT contain an org_code clause — tenant scoping is always added by the executing service via `orgCol`. */
+    ratioNumerator?: string
+    /** SQL predicate for the denominator of a ratio measure. Only valid when type = 'ratio'.
+     *  MUST NOT contain an org_code clause — tenant scoping is always added by the executing service via `orgCol`. */
+    ratioDenominator?: string
 }
 
 export interface SourceConfig {
@@ -31,9 +49,7 @@ export const DATA_SOURCES: Record<string, SourceConfig> = {
         table: 'submission',
         orgCol: '"createdByOrgCode"',
         fields: [
-            // Measures (REQ-RPT-BE-F-049)
-            { key: 'countAll', label: 'Count of Submissions', col: '*', type: 'count' },
-            // Dimension attributes
+            // Dimension attributes (measures live in measure_definitions — see §5.10.5)
             { key: 'reference', label: 'Reference', col: 'reference' },
             { key: 'insured', label: 'Insured', col: 'insured' },
             { key: 'status', label: 'Status', col: 'status', type: 'lookup', lookupValues: ['open', 'bound', 'declined', 'closed', 'referred', 'quoted'] },
@@ -50,14 +66,12 @@ export const DATA_SOURCES: Record<string, SourceConfig> = {
         table: 'policies',
         orgCol: 'created_by_org_code',
         fields: [
-            // Measures (REQ-RPT-BE-F-049)
-            { key: 'countAll', label: 'Count of Policies', col: '*', type: 'count' },
-            { key: 'countActive', label: 'Count of Active Policies', col: '*', type: 'count', filterExpr: "status = 'active'" },
+            // Dimension attributes (measures live in measure_definitions — see §5.10.5)
             { key: 'grossWrittenPremium', label: 'Gross Net Written Premium', col: 'gross_written_premium', type: 'number' },
-            // Dimension attributes
             { key: 'reference', label: 'Reference', col: 'reference' },
             { key: 'insured', label: 'Insured', col: 'insured' },
-            { key: 'status', label: 'Status', col: 'status', type: 'lookup', lookupValues: ['active', 'expired', 'cancelled', 'pending'] },
+            { key: 'status', label: 'Status', col: 'status', type: 'lookup', lookupValues: ['Active', 'Expired', 'Cancelled', 'Renewed', 'Lapsed', 'Disbanded'] },
+            { key: 'renewable', label: 'Renewable', col: 'renewable', type: 'lookup', lookupValues: ['Renewable', 'Non-Renewable'] },
             { key: 'placingBroker', label: 'Placing Broker', col: 'placing_broker' },
             { key: 'inceptionDate', label: 'Inception Date', col: 'inception_date', type: 'date' },
             { key: 'expiryDate', label: 'Expiry Date', col: 'expiry_date', type: 'date' },
@@ -70,12 +84,7 @@ export const DATA_SOURCES: Record<string, SourceConfig> = {
         table: 'quotes',
         orgCol: 'created_by_org_code',
         fields: [
-            // Measures (REQ-RPT-BE-F-049)
-            { key: 'countAll', label: 'Count of Quotes', col: '*', type: 'count' },
-            { key: 'countDeclined', label: 'Count of Declined Quotes', col: '*', type: 'count', filterExpr: "status = 'declined'" },
-            { key: 'countRenewable', label: 'Count of Renewable Quotes', col: '*', type: 'count', filterExpr: "renewable_indicator = 'Yes'" },
-            { key: 'countRenewed', label: 'Count of Renewed Quotes', col: '*', type: 'count', filterExpr: "renewal_status = 'renewed'" },
-            // Dimension attributes
+            // Dimension attributes (measures live in measure_definitions — see §5.10.5)
             { key: 'reference', label: 'Reference', col: 'reference' },
             { key: 'insured', label: 'Insured', col: 'insured' },
             { key: 'status', label: 'Status', col: 'status', type: 'lookup', lookupValues: ['draft', 'submitted', 'accepted', 'declined', 'expired'] },
@@ -119,9 +128,7 @@ export const DATA_SOURCES: Record<string, SourceConfig> = {
         table: 'binding_authorities',
         orgCol: 'created_by_org_code',
         fields: [
-            // Measures (REQ-RPT-BE-F-049)
-            { key: 'countAll', label: 'Count of Binding Authorities', col: '*', type: 'count' },
-            // Dimension attributes
+            // Dimension attributes (measures live in measure_definitions — see §5.10.5)
             { key: 'reference', label: 'Reference', col: 'reference' },
             { key: 'status', label: 'Status', col: 'status' },
             { key: 'inceptionDate', label: 'Inception Date', col: 'inception_date', type: 'date' },

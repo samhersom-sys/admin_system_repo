@@ -44,7 +44,8 @@ export default function PolicyEndorsePage() {
     const [policy, setPolicy] = useState<Policy | null>(null)
     const [endorsements, setEndorsements] = useState<PolicyTransaction[]>([])
 
-    const [endorsementType, setEndorsementType] = useState('Mid Term Adjustment')
+    const [endorsementType, setEndorsementType] = useState('Administrative')
+    const [endorsementSubType, setEndorsementSubType] = useState('Mid Term Adjustment')
     const [effectiveDate, setEffectiveDate] = useState('')
     const [description, setDescription] = useState('')
 
@@ -124,7 +125,7 @@ export default function PolicyEndorsePage() {
         }
 
         const openEndorsement = endorsements.find(
-            (e) => e.status === 'Endorsement Created'
+            (e) => e.status === 'Draft' && e.transaction_type === endorsementType
         )
         if (openEndorsement) {
             addNotification({
@@ -137,6 +138,7 @@ export default function PolicyEndorsePage() {
         try {
             const newEnd = await createEndorsement(id!, {
                 transactionType: endorsementType,
+                transactionSubType: endorsementType === 'Contractual' ? endorsementSubType : null,
                 effectiveDate,
                 description: description || undefined,
             })
@@ -173,23 +175,48 @@ export default function PolicyEndorsePage() {
             <Card>
                 <FieldGroup title="Endorsement Details">
                     <div className="flex flex-col gap-4">
-                        <div>
-                            <label
-                                htmlFor="endorse-type"
-                                className="block text-xs text-gray-500 mb-1"
-                            >
-                                Endorsement Type
-                            </label>
-                            <select
-                                id="endorse-type"
-                                aria-label="Endorsement Type"
-                                className="block w-full border border-gray-300 rounded px-3 py-1.5 text-sm"
-                                value={endorsementType}
-                                onChange={(e) => setEndorsementType(e.target.value)}
-                            >
-                                <option>Mid Term Adjustment</option>
-                                <option>Cancellation</option>
-                            </select>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label
+                                    htmlFor="endorse-type"
+                                    className="block text-xs text-gray-500 mb-1"
+                                >
+                                    Endorsement Type
+                                </label>
+                                <select
+                                    id="endorse-type"
+                                    aria-label="Endorsement Type"
+                                    className="block w-full border border-gray-300 rounded px-3 py-1.5 text-sm"
+                                    value={endorsementType}
+                                    onChange={(e) => {
+                                        setEndorsementType(e.target.value)
+                                        setEndorsementSubType('Mid Term Adjustment')
+                                    }}
+                                >
+                                    <option value="Administrative">Administrative</option>
+                                    <option value="Contractual">Contractual</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label
+                                    htmlFor="endorse-subtype"
+                                    className="block text-xs text-gray-500 mb-1"
+                                >
+                                    Endorsement Sub Type
+                                </label>
+                                <select
+                                    id="endorse-subtype"
+                                    aria-label="Endorsement Sub Type"
+                                    className="block w-full border border-gray-300 rounded px-3 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                    value={endorsementSubType}
+                                    disabled={endorsementType === 'Administrative'}
+                                    onChange={(e) => setEndorsementSubType(e.target.value)}
+                                >
+                                    <option value="Mid Term Adjustment">Mid Term Adjustment</option>
+                                    <option value="Cancellation">Cancellation</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div>

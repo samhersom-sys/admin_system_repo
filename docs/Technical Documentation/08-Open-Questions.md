@@ -618,6 +618,30 @@ Invoicing components (`InvoiceLineItems`, `InvoiceSummary`) are shared and may b
 
 ---
 
+## OQ-050: BordereauRunPage — live data vs illustrative data
+
+- **Raised:** 2026-04-17
+- **Status:** Open
+- **Context:** REQ-BA-FE-F-122b specifies a `BordereauRunPage` that renders bordereau output. The page currently uses illustrative/hardcoded sample data matching the `BordereauConfigModal` Step 4 preview. No data pipeline exists yet.
+- **Question:** What data source should drive the BordereauRunPage output — is it live DB data filtered by BA (policies/claims linked to this BA), or should it remain illustrative until a dedicated back-end data pipeline is built?
+- **Why it matters:** If live data is required, a new API endpoint must be designed (`GET /api/binding-authorities/:id/bordereaux/:configId/run`) and the data aggregation logic specified. This has significant backend impact and should be planned before implementation begins.
+- **Affects:** REQ-BA-FE-F-122b; potentially new `bordereaux.requirements.md` backend section.
+
+---
+
+## OQ-051: BAEndorsePage — backdated endorsements
+
+- **Raised:** 2026-04-17
+- **Status:** Open
+- **Context:** REQ-BA-FE-F-125 validates that the Effective Date on `BAEndorsePage` falls between the BA inception and expiry dates; it does not restrict past dates.
+- **Question:** Should endorsements be allowed to have an effective date in the past (backdating), or should the date be restricted to today or a future date?
+- **Why it matters:** Backdated endorsements are common in Lloyd's market practice (e.g., agreed MTA effective 3 months ago). If backdating is prohibited, the validation rule must be tightened. If allowed, no change needed.
+- **Affects:** REQ-BA-FE-F-125 (validation logic).
+
+---
+
+---
+
 ## OQ-QUO-BE-NE-003: `findOne` — 403 ForbiddenException for org mismatch
 
 - **Raised:** 2026-03-25

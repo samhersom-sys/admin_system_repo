@@ -370,6 +370,10 @@ export async function getCurrencies(): Promise<string[]> {
     return get<string[]>('/api/lookups/currencies')
 }
 
+export async function getClassesOfBusiness(): Promise<string[]> {
+    return get<string[]>('/api/lookups/classesOfBusiness')
+}
+
 export async function getRiskCodes(): Promise<string[]> {
     return get<string[]>('/api/lookups/riskCodes')
 }

@@ -9,6 +9,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { FiChevronDown, FiX } from 'react-icons/fi'
+import SearchableSelect from '@/shared/components/SearchableSelect/SearchableSelect'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ export interface SearchFilters {
   status: string
   insured: string            // REQ-SEARCH-FE-F-016
   broker: string             // REQ-SEARCH-FE-F-017
+  coverholder: string
   yearOfAccount: string      // REQ-SEARCH-FE-F-018
   inceptionFrom: string
   inceptionTo: string
@@ -47,6 +49,7 @@ export const EMPTY_FILTERS: SearchFilters = {
   status: '',
   insured: '',
   broker: '',
+  coverholder: '',
   yearOfAccount: '',
   inceptionFrom: '',
   inceptionTo: '',
@@ -61,12 +64,13 @@ export const EMPTY_FILTERS: SearchFilters = {
 
 interface SearchFormProps {
   filters: SearchFilters
+  createdByOptions: string[]
   onChange: (filters: SearchFilters) => void
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function SearchForm({ filters, onChange }: SearchFormProps) {
+export default function SearchForm({ filters, createdByOptions, onChange }: SearchFormProps) {
   const [isTypeOpen, setIsTypeOpen] = useState(false)
   const [typeSearch, setTypeSearch] = useState('')
   const typeDropdownRef = useRef<HTMLDivElement>(null)
@@ -233,6 +237,20 @@ export default function SearchForm({ filters, onChange }: SearchFormProps) {
           />
         </div>
 
+        {/* Coverholder */}
+        <div>
+          <label htmlFor="sf-coverholder" className={labelCls}>Coverholder</label>
+          <input
+            id="sf-coverholder"
+            aria-label="Coverholder"
+            type="text"
+            className={inputCls}
+            value={filters.coverholder}
+            onChange={set('coverholder')}
+            placeholder="Coverholder name…"
+          />
+        </div>
+
         {/* Year of Account (REQ-SEARCH-FE-F-018) */}
         <div>
           <label htmlFor="sf-yoa" className={labelCls}>Year of Account</label>
@@ -299,7 +317,14 @@ export default function SearchForm({ filters, onChange }: SearchFormProps) {
 
         <div className="flex flex-col gap-2">
           <label htmlFor="sf-created-by" className={labelCls}>Created By</label>
-          <input id="sf-created-by" aria-label="Created By" type="text" className={inputCls} value={filters.createdBy} onChange={set('createdBy')} placeholder="User name…" />
+          <SearchableSelect
+            id="sf-created-by"
+            ariaLabel="Created By"
+            value={filters.createdBy}
+            options={createdByOptions}
+            placeholder="Select or type user..."
+            onChange={(nextValue) => onChange({ ...filters, createdBy: nextValue })}
+          />
         </div>
 
       </div>

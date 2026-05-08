@@ -56,9 +56,11 @@ const mockGetPolicy = jest.fn()
 const mockCreatePolicy = jest.fn()
 const mockUpdatePolicy = jest.fn()
 const mockGetPolicySections = jest.fn()
+const mockCreatePolicySection = jest.fn()
 const mockGetPolicySectionDetails = jest.fn()
 const mockGetPolicyInvoices = jest.fn()
 const mockGetPolicyTransactions = jest.fn()
+const mockGetPolicySectionTransaction = jest.fn()
 const mockGetPolicyAudit = jest.fn()
 const mockPostPolicyAudit = jest.fn()
 const mockGetPolicyEndorsements = jest.fn()
@@ -66,6 +68,7 @@ const mockCreateEndorsement = jest.fn()
 const mockIssueEndorsement = jest.fn()
 const mockGetPolicyCoverages = jest.fn()
 const mockGetPolicyLocations = jest.fn()
+const mockGetClassesOfBusiness = jest.fn()
 
 jest.mock('@/policies/policies.service', () => ({
     getPolicies: (...args: unknown[]) => mockGetPolicies(...args),
@@ -73,9 +76,11 @@ jest.mock('@/policies/policies.service', () => ({
     createPolicy: (...args: unknown[]) => mockCreatePolicy(...args),
     updatePolicy: (...args: unknown[]) => mockUpdatePolicy(...args),
     getPolicySections: (...args: unknown[]) => mockGetPolicySections(...args),
+    createPolicySection: (...args: unknown[]) => mockCreatePolicySection(...args),
     getPolicySectionDetails: (...args: unknown[]) => mockGetPolicySectionDetails(...args),
     getPolicyInvoices: (...args: unknown[]) => mockGetPolicyInvoices(...args),
     getPolicyTransactions: (...args: unknown[]) => mockGetPolicyTransactions(...args),
+    getPolicySectionTransaction: (...args: unknown[]) => mockGetPolicySectionTransaction(...args),
     getPolicyAudit: (...args: unknown[]) => mockGetPolicyAudit(...args),
     postPolicyAudit: (...args: unknown[]) => mockPostPolicyAudit(...args),
     getPolicyEndorsements: (...args: unknown[]) => mockGetPolicyEndorsements(...args),
@@ -83,6 +88,7 @@ jest.mock('@/policies/policies.service', () => ({
     issueEndorsement: (...args: unknown[]) => mockIssueEndorsement(...args),
     getPolicyCoverages: (...args: unknown[]) => mockGetPolicyCoverages(...args),
     getPolicyLocations: (...args: unknown[]) => mockGetPolicyLocations(...args),
+    getClassesOfBusiness: (...args: unknown[]) => mockGetClassesOfBusiness(...args),
 }))
 
 // ---------------------------------------------------------------------------
@@ -144,6 +150,7 @@ import PolicyViewPage from '../PolicyViewPage/PolicyViewPage'
 import PolicySectionViewPage from '../PolicySectionViewPage/PolicySectionViewPage'
 import PolicyEndorsePage from '../PolicyEndorsePage/PolicyEndorsePage'
 import PolicyEndorsementPage from '../PolicyEndorsementPage/PolicyEndorsementPage'
+import PolicyTransactionViewPage from '../PolicyTransactionViewPage/PolicyTransactionViewPage'
 import PolicyCoverageDetailPage from '../PolicyCoverageDetailPage/PolicyCoverageDetailPage'
 import PolicyCoverageSubDetailPage from '../PolicyCoverageSubDetailPage/PolicyCoverageSubDetailPage'
 
@@ -165,6 +172,17 @@ function makePolicy(overrides: Record<string, unknown> = {}) {
         gross_premium: 100000,
         net_premium: 90000,
         policy_currency: 'GBP',
+        business_type: 'Liability',
+        new_or_renewal: 'New',
+        inception_time: null,
+        expiry_time: null,
+        lta_applicable: false,
+        contract_type: 'Open Market',
+        method_of_placement: null,
+        unique_market_reference: null,
+        renewable_indicator: 'No',
+        renewal_date: null,
+        renewal_status: null,
         quote_id: null,
         ...overrides,
     }
@@ -221,10 +239,11 @@ function makeEndorsement(overrides: Record<string, unknown> = {}) {
     return {
         id: 10,
         policy_id: 1,
-        transaction_type: 'Endorsement',
+        transaction_type: 'Administrative',
+        sub_type: null,
         effective_date: '2026-06-01',
         description: 'Mid-term change',
-        status: 'Endorsed',
+        status: 'Draft',
         reference: 'END-001',
         ...overrides,
     }
@@ -285,6 +304,19 @@ function renderPolicyEndorsementPage(policyId = '1', endorsementId = '10') {
                 <Route
                     path="/policies/:id/endorsements/:endorsementId/edit"
                     element={<PolicyEndorsementPage />}
+                />
+            </Routes>
+        </MemoryRouter>
+    )
+}
+
+function renderPolicyTransactionViewPage(policyId = '1', transactionId = '10') {
+    return render(
+        <MemoryRouter initialEntries={[`/policies/${policyId}/transactions/${transactionId}`]}>
+            <Routes>
+                <Route
+                    path="/policies/:id/transactions/:transactionId"
+                    element={<PolicyTransactionViewPage />}
                 />
             </Routes>
         </MemoryRouter>
@@ -404,9 +436,22 @@ describe('PolicyViewPage', () => {
         renderPolicyViewPage()
         await waitFor(() => {
             expect(screen.getByText('POL-1')).toBeInTheDocument()
-            expect(screen.getByText('Acme Corp')).toBeInTheDocument()
-            expect(screen.getByText('Property')).toBeInTheDocument()
+            expect(screen.getAllByText('Acme Corp').length).toBeGreaterThan(0)
+            expect(screen.getAllByText('Property').length).toBeGreaterThan(0)
             expect(screen.getByText('Active')).toBeInTheDocument()
+        })
+    })
+
+    test('T-POL-FE-F-R004e — header includes Contract / Placement and Renewal groups for quote-policy parity', async () => {
+        renderPolicyViewPage()
+        await waitFor(() => {
+            expect(screen.getByText('Contract / Placement')).toBeInTheDocument()
+            expect(screen.getByText('Renewal')).toBeInTheDocument()
+            expect(screen.getByText('Business Type')).toBeInTheDocument()
+            expect(screen.getByText('New or Renewal')).toBeInTheDocument()
+            expect(screen.getByText('Method of Placement')).toBeInTheDocument()
+            expect(screen.getByText('Unique Market Reference')).toBeInTheDocument()
+            expect(screen.getByText('Renewable')).toBeInTheDocument()
         })
     })
 
@@ -437,7 +482,7 @@ describe('PolicyViewPage', () => {
     })
 
     // REQ-POL-FE-F-005
-    test('T-POL-FE-F-R005 — sidebar registers Edit, Generate Document, Endorse, Audit items', async () => {
+    test('T-POL-FE-F-R005 — sidebar registers Edit, Generate Document, Endorse Policy, Audit items', async () => {
         renderPolicyViewPage()
         await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
 
@@ -448,7 +493,7 @@ describe('PolicyViewPage', () => {
         // Required items (positive assertions — §6.4B)
         expect(labels).toContain('Edit')
         expect(labels).toContain('Generate Document')
-        expect(labels).toContain('Endorse')
+        expect(labels).toContain('Endorse Policy')
         expect(labels).toContain('Audit')
 
         // Items that must NOT appear (negative assertions — §6.4B)
@@ -489,14 +534,18 @@ describe('PolicyViewPage', () => {
         renderPolicyViewPage()
         await waitFor(() => expect(mockGetPolicySections).toHaveBeenCalled())
         await waitFor(() => {
+            expect(screen.getByRole('columnheader', { name: /action/i })).toBeInTheDocument()
             expect(screen.getByRole('columnheader', { name: /reference/i })).toBeInTheDocument()
             expect(screen.getByRole('columnheader', { name: /class of business/i })).toBeInTheDocument()
             expect(screen.getByRole('columnheader', { name: /inception date/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /effective date/i })).toBeInTheDocument()
             expect(screen.getByRole('columnheader', { name: /expiry date/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /days on cover/i })).toBeInTheDocument()
             expect(screen.getByRole('columnheader', { name: /limit currency/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /tax receivable/i })).toBeInTheDocument()
             expect(screen.getByRole('columnheader', { name: /sum insured currency/i })).toBeInTheDocument()
-            expect(screen.getByRole('columnheader', { name: /annual rated gross premium/i })).toBeInTheDocument()
-            expect(screen.getByRole('columnheader', { name: /annual rated net premium/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /annual rated gp/i })).toBeInTheDocument()
+            expect(screen.getByRole('columnheader', { name: /annual rated np/i })).toBeInTheDocument()
             expect(screen.getByText('POL-1-S01')).toBeInTheDocument()
         })
     })
@@ -563,29 +612,52 @@ describe('PolicyViewPage', () => {
     // REQ-POL-FE-F-013
     test('T-POL-FE-F-R013 — Transactions tab calls GET transactions', async () => {
         mockGetPolicyTransactions.mockResolvedValue([
-            { id: 1, transaction_date: '2026-01-01', type: 'Premium', amount: 100000, reference: 'TXN-001' },
+            makeEndorsement({ id: 10, transaction_type: 'Administrative', status: 'Draft', created_by: 'Jane Smith' }),
         ])
         renderPolicyViewPage()
         await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
         fireEvent.click(screen.getByRole('button', { name: 'Transactions' }))
         await waitFor(() => {
             expect(mockGetPolicyTransactions).toHaveBeenCalledWith(1)
-            expect(screen.getByText('TXN-001')).toBeInTheDocument()
+            expect(screen.getByText('Administrative')).toBeInTheDocument()
+            expect(screen.getByLabelText('Edit endorsement')).toBeInTheDocument()
         })
     })
 
+    test('T-POL-FE-F-R013b — endorsed transactions navigate to read-only transaction summary view', async () => {
+        mockGetPolicyTransactions.mockResolvedValue([
+            makeEndorsement({ id: 11, transaction_type: 'Contractual', sub_type: 'Cancellation', status: 'Endorsed' }),
+        ])
+        renderPolicyViewPage()
+        await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
+        fireEvent.click(screen.getByRole('button', { name: 'Transactions' }))
+        await waitFor(() => expect(screen.getByLabelText('View transaction')).toBeInTheDocument())
+        fireEvent.click(screen.getByLabelText('View transaction'))
+        expect(mockNavigate).toHaveBeenCalledWith('/policies/1/transactions/11')
+    })
+
     // REQ-POL-FE-F-014
-    test('T-POL-FE-F-R014 — Audit tab renders AuditTable and posts Policy Opened on first activation', async () => {
+    test('T-POL-FE-F-R014 — page mount posts Policy Opened and refreshes audit rows', async () => {
+        mockGetPolicyAudit.mockResolvedValue([])
+        renderPolicyViewPage()
+        await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
+        await waitFor(() => {
+            expect(mockPostPolicyAudit).toHaveBeenCalledWith(
+                1,
+                expect.objectContaining({ action: 'Policy Opened', entityType: 'Policy', entityId: 1 })
+            )
+            expect(mockGetPolicyAudit).toHaveBeenCalled()
+        })
+    })
+
+    test('T-POL-FE-F-R014b — Audit tab renders AuditTable using refreshed audit history', async () => {
         mockGetPolicyAudit.mockResolvedValue([])
         renderPolicyViewPage()
         await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
         fireEvent.click(screen.getByRole('button', { name: 'Audit' }))
         await waitFor(() => {
             expect(screen.getByTestId('audit-table')).toBeInTheDocument()
-            expect(mockPostPolicyAudit).toHaveBeenCalledWith(
-                1,
-                expect.objectContaining({ action: 'Policy Opened', entityType: 'Policy', entityId: 1 })
-            )
+            expect(mockGetPolicyAudit).toHaveBeenCalled()
         })
     })
 
@@ -619,6 +691,7 @@ describe('PolicySectionViewPage', () => {
         mockGetPolicy.mockResolvedValue(makePolicy())
         mockGetPolicySectionDetails.mockResolvedValue(makePolicySection())
         mockGetPolicyCoverages.mockResolvedValue([makeCoverage()])
+        mockGetClassesOfBusiness.mockResolvedValue(['Property', 'Marine'])
     })
 
     // REQ-POL-FE-F-008
@@ -695,13 +768,17 @@ describe('PolicyEndorsePage', () => {
         expect(screen.getByText(/POL-1/)).toBeInTheDocument()
     })
 
-    test('T-POL-FE-F-R021b — type dropdown has Mid Term Adjustment and Cancellation options', async () => {
+    test('T-POL-FE-F-R021b — type dropdown has Administrative and Contractual options; sub type has Mid Term Adjustment and Cancellation', async () => {
         renderPolicyEndorsePage()
         await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
         const select = screen.getByRole('combobox', { name: /endorsement type/i })
         const options = Array.from(select.querySelectorAll('option')).map(o => o.textContent)
-        expect(options).toContain('Mid Term Adjustment')
-        expect(options).toContain('Cancellation')
+        expect(options).toContain('Administrative')
+        expect(options).toContain('Contractual')
+        const subtype = screen.getByRole('combobox', { name: /endorsement sub type/i })
+        const subOptions = Array.from(subtype.querySelectorAll('option')).map(o => o.textContent)
+        expect(subOptions).toContain('Mid Term Adjustment')
+        expect(subOptions).toContain('Cancellation')
     })
 
     // REQ-POL-FE-F-022
@@ -736,7 +813,7 @@ describe('PolicyEndorsePage', () => {
 
     test('T-POL-FE-F-R022c — validation rejects save when an open endorsement exists', async () => {
         mockGetPolicyEndorsements.mockResolvedValue([
-            makeEndorsement({ status: 'Endorsement Created' }),
+            makeEndorsement({ status: 'Draft', transaction_type: 'Administrative' }),
         ])
         renderPolicyEndorsePage()
         await waitFor(() => expect(mockGetPolicyEndorsements).toHaveBeenCalled())
@@ -763,7 +840,11 @@ describe('PolicyEndorsePage', () => {
         await waitFor(() => {
             expect(mockCreateEndorsement).toHaveBeenCalledWith(
                 '1',
-                expect.objectContaining({ effectiveDate: '2026-06-01' })
+                expect.objectContaining({
+                    transactionType: 'Administrative',
+                    transactionSubType: null,
+                    effectiveDate: '2026-06-01',
+                })
             )
             expect(mockNavigate).toHaveBeenCalledWith('/policies/1/endorsements/10/edit')
         })
@@ -796,6 +877,8 @@ describe('PolicyEndorsementPage', () => {
         mockGetPolicy.mockResolvedValue(makePolicy())
         mockGetPolicyEndorsements.mockResolvedValue([makeEndorsement({ id: 10 })])
         mockGetPolicySections.mockResolvedValue([makePolicySection()])
+        mockCreatePolicySection.mockResolvedValue(makePolicySection({ id: 2, reference: 'POL-1-S02' }))
+        mockPostPolicyAudit.mockResolvedValue(undefined)
         mockIssueEndorsement.mockResolvedValue({
             policy: makePolicy({ status: 'Active' }),
             endorsement: makeEndorsement({ status: 'Endorsed' }),
@@ -821,12 +904,71 @@ describe('PolicyEndorsementPage', () => {
     })
 
     // REQ-POL-FE-F-026
-    test('T-POL-FE-F-R026 — renders policy detail with endorsement subtitle showing effective date', async () => {
+    test('T-POL-FE-F-R026 — renders policy reference and endorsement subtitle; all 7 tabs visible; no Transactions tab', async () => {
         renderPolicyEndorsementPage()
         await waitFor(() => {
             expect(screen.getByText('POL-1')).toBeInTheDocument()
-            // Endorsement subtitle (effective date)
-            expect(screen.getByText(/2026-06-01|endorsement/i)).toBeInTheDocument()
+            // Endorsement subtitle contains effective date
+            expect(screen.getByText(/Effective 2026-06-01/i)).toBeInTheDocument()
+        })
+        // All 7 required tabs
+        expect(screen.getByRole('button', { name: 'Sections' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Broker' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Additional Insureds' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Financial Summary' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Invoices' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Endorsement' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Audit' })).toBeInTheDocument()
+        // Transactions tab must NOT appear
+        expect(screen.queryByRole('button', { name: 'Transactions' })).not.toBeInTheDocument()
+    })
+
+    // REQ-POL-FE-F-026 — Endorsement tab
+    test('T-POL-FE-F-R026a — Endorsement tab contains Effective Date and Description fields pre-populated', async () => {
+        renderPolicyEndorsementPage()
+        await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
+        fireEvent.click(screen.getByRole('button', { name: 'Endorsement' }))
+        await waitFor(() => {
+            expect(screen.getByRole('textbox', { name: /description/i })).toBeInTheDocument()
+        })
+        // Description is pre-populated from the mock endorsement
+        expect((screen.getByRole('textbox', { name: /description/i }) as HTMLTextAreaElement).value).toBe('Mid-term change')
+    })
+
+    test('T-POL-FE-F-R026d — Sections tab add action creates section and refreshes list', async () => {
+        renderPolicyEndorsementPage()
+        await waitFor(() => expect(mockGetPolicySections).toHaveBeenCalledWith('1'))
+        fireEvent.click(screen.getByTitle('Add Section'))
+        await waitFor(() => {
+            expect(mockCreatePolicySection).toHaveBeenCalledWith(
+                '1',
+                expect.objectContaining({
+                    class_of_business: 'Property',
+                    inception_date: '2026-01-01',
+                    expiry_date: '2027-01-01',
+                })
+            )
+            expect(mockGetPolicySections).toHaveBeenCalledTimes(2)
+        })
+    })
+
+    test('T-POL-FE-F-R026e — mount posts Policy Opened once and unmount posts Policy Closed', async () => {
+        mockGetPolicyAudit.mockResolvedValue([])
+        const rendered = renderPolicyEndorsementPage()
+        await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
+        await waitFor(() => {
+            expect(mockPostPolicyAudit).toHaveBeenCalledWith(
+                1,
+                expect.objectContaining({ action: 'Policy Opened', entityType: 'Policy', entityId: 1 })
+            )
+        })
+
+        rendered.unmount()
+        await waitFor(() => {
+            expect(mockPostPolicyAudit).toHaveBeenCalledWith(
+                1,
+                expect.objectContaining({ action: 'Policy Closed', entityType: 'Policy', entityId: 1 })
+            )
         })
     })
 
@@ -852,7 +994,7 @@ describe('PolicyEndorsementPage', () => {
 
     test('T-POL-FE-F-R027b — Cancellation endorsement updates policy status display to Cancelled', async () => {
         mockGetPolicyEndorsements.mockResolvedValue([
-            makeEndorsement({ id: 10, transaction_type: 'Cancellation' }),
+            makeEndorsement({ id: 10, transaction_type: 'Contractual', sub_type: 'Cancellation' }),
         ])
         mockIssueEndorsement.mockResolvedValue({
             policy: makePolicy({ status: 'Cancelled' }),
@@ -870,18 +1012,75 @@ describe('PolicyEndorsementPage', () => {
     test('T-POL-FE-F-R028 — dirty tracking fires warning notification on back navigation with unsaved changes', async () => {
         renderPolicyEndorsementPage()
         await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
-        // Make a field change (triggering dirty state)
-        const inputs = screen.getAllByRole('textbox').filter(
-            el => !(el as HTMLInputElement).disabled && !(el as HTMLInputElement).readOnly
-        )
-        if (inputs.length > 0) {
-            fireEvent.change(inputs[0], { target: { value: 'changed-value' } })
-        }
+        // Navigate to the Endorsement tab to access the editable fields
+        fireEvent.click(screen.getByRole('button', { name: 'Endorsement' }))
+        // Change the Description textarea (triggers dirty state)
+        await waitFor(() => expect(screen.getByRole('textbox', { name: /description/i })).toBeInTheDocument())
+        fireEvent.change(screen.getByRole('textbox', { name: /description/i }), { target: { value: 'changed-value' } })
         fireEvent(window, new PopStateEvent('popstate', { state: null }))
         await waitFor(() => {
             expect(mockAddNotification).toHaveBeenCalledWith(
                 expect.objectContaining({ message: expect.stringMatching(/unsaved|discard/i) })
             )
+        })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// PolicyTransactionViewPage
+// ---------------------------------------------------------------------------
+
+describe('PolicyTransactionViewPage', () => {
+    beforeEach(() => {
+        jest.clearAllMocks()
+        mockGetPolicy.mockResolvedValue(makePolicy())
+        mockGetPolicySections.mockResolvedValue([makePolicySection()])
+        mockGetPolicyTransactions.mockResolvedValue([
+            { id: 1, policy_id: 1, transaction_type: 'Initial Transaction', status: 'Active', effective_date: '2026-01-01' },
+            makeEndorsement({ id: 10, transaction_type: 'Contractual', sub_type: 'Mid Term Adjustment', status: 'Endorsed', created_by: 'Jane Smith' }),
+        ])
+        mockGetPolicySectionTransaction.mockResolvedValue({
+            id: 900,
+            transaction_id: 10,
+            section_id: 1,
+            section_reference: 'POL-1-S01',
+            policy_reference: 'POL-1',
+            transaction_type: 'Contractual',
+            effective_date: '2026-06-01',
+            current: {
+                limit_amount: 1250000,
+                excess_amount: 10000,
+                sum_insured: 5500000,
+                gross_premium: 110000,
+                net_premium: 99000,
+                deductions: 11000,
+                annual_gross_premium: 110000,
+                annual_net_premium: 99000,
+            },
+            previous: {},
+            movements: {},
+        })
+    })
+
+    test('T-POL-FE-F-R026b — policy transaction view renders summary and section snapshot', async () => {
+        renderPolicyTransactionViewPage('1', '10')
+        await waitFor(() => {
+            expect(mockGetPolicy).toHaveBeenCalledWith('1')
+            expect(mockGetPolicyTransactions).toHaveBeenCalledWith('1')
+            expect(mockGetPolicySectionTransaction).toHaveBeenCalledWith('1', '10', 1)
+            expect(screen.getByText(/Transaction 2/i)).toBeInTheDocument()
+            expect(screen.getAllByText(/Contractual - Mid Term Adjustment/i).length).toBeGreaterThan(0)
+            expect(screen.getByText(/1,250,000|1250000/)).toBeInTheDocument()
+        })
+    })
+
+    test('T-POL-FE-F-R026c — missing transaction renders not found state', async () => {
+        mockGetPolicyTransactions.mockResolvedValue([
+            { id: 1, policy_id: 1, transaction_type: 'Initial Transaction', status: 'Active', effective_date: '2026-01-01' },
+        ])
+        renderPolicyTransactionViewPage('1', '99')
+        await waitFor(() => {
+            expect(screen.getByText(/transaction not found/i)).toBeInTheDocument()
         })
     })
 })
@@ -1054,9 +1253,11 @@ describe('policies.service.ts', () => {
             'createPolicy',
             'updatePolicy',
             'getPolicySections',
+            'createPolicySection',
             'getPolicySectionDetails',
             'getPolicyInvoices',
             'getPolicyTransactions',
+            'getPolicySectionTransaction',
             'getPolicyAudit',
             'postPolicyAudit',
             'getPolicyEndorsements',

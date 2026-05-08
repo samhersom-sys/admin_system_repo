@@ -79,6 +79,21 @@ export class PoliciesController {
         return this.policiesService.getSections(id, req.user.orgCode)
     }
 
+    // REQ-POL-BE-F-005b — POST /api/policies/:id/sections
+    @Post(':id/sections')
+    @HttpCode(HttpStatus.CREATED)
+    createSection(
+        @Param('id', ParseIntPipe) id: number,
+        @Req() req: any,
+        @Body() body: any,
+    ) {
+        return this.policiesService.createSection(
+            id,
+            req.user.orgCode,
+            body,
+        )
+    }
+
     // REQ-POL-BE-F-006 — GET /api/policies/:id/sections/:sectionId
     @Get(':id/sections/:sectionId')
     getSectionDetail(
@@ -99,6 +114,33 @@ export class PoliciesController {
     @Get(':id/transactions')
     getTransactions(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
         return this.policiesService.getTransactions(id, req.user.orgCode)
+    }
+
+    // REQ-POL-BE-F-008b — POST /api/policies/:id/transactions
+    @Post(':id/transactions')
+    @HttpCode(HttpStatus.CREATED)
+    createTransaction(
+        @Param('id', ParseIntPipe) id: number,
+        @Req() req: any,
+        @Body() body: any,
+    ) {
+        return this.policiesService.createTransaction(
+            id,
+            req.user.orgCode,
+            body,
+            req.user.name ?? req.user.username ?? null,
+        )
+    }
+
+    // REQ-POL-BE-F-008c — GET /api/policies/:id/transactions/:txId/sections/:sectionId
+    @Get(':id/transactions/:txId/sections/:sectionId')
+    getSectionTransaction(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('txId', ParseIntPipe) txId: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Req() req: any,
+    ) {
+        return this.policiesService.getSectionTransaction(id, txId, sectionId, req.user.orgCode)
     }
 
     // REQ-POL-BE-F-009 — GET /api/policies/:id/audit

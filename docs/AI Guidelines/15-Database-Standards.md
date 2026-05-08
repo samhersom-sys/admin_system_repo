@@ -6,17 +6,25 @@ This document covers structure and process only. It does not contain business lo
 
 ---
 
-## 15.1  Migrations and Seeds — The Distinction
+## 15.1  Schema and Seeds — The Distinction
 
-Every contributor must understand what belongs in a migration and what belongs in a seed script. These are two separate concerns and must never be mixed.
+The project uses a **TypeORM entity-first model**. TypeORM `@Entity()` files under `backend/nest/src/entities/` are the single source of truth for all table definitions. There are no raw SQL schema files.
 
-| | Migration (`db/migrations/`) | Seed (`db/seeds/`) |
+| | Entity (`backend/nest/src/entities/`) | Seed (`db/seeds/`) |
 |---|---|---|
-| **Purpose** | Change the database structure | Populate tables with development data |
-| **Contains** | Table creation, column changes, indexes, constraints, views, enums | INSERT statements only |
-| **When it runs** | Once per environment, in sequence, when deploying a schema change | On demand, in a development environment, to reset or populate data |
+| **Purpose** | Define the current full database structure | Populate tables with development data |
+| **Contains** | TypeORM `@Entity()` classes with `@Column()`, `@Index()`, and relationship decorators | INSERT statements only |
+| **When it runs** | `db:setup` calls `db:sync` to synchronise the database via `DataSource.synchronize()` | On demand, in a development environment, to reset or populate data |
 | **May contain data?** | Never | Yes — this is its entire purpose |
-| **May contain schema changes?** | Yes | Never |
+| **May contain schema changes?** | Yes — edit the entity class in place | Never |
+
+### RULE 0 — TypeORM entities are the schema; no raw SQL schema files
+
+- All table definitions live in `backend/nest/src/entities/*.entity.ts`.
+- Do not create raw SQL schema files under `db/schema/`.
+- Do not create incremental TypeORM migration files for schema changes in development. Edit the entity in place.
+- For **production deployments only**: generate a single TypeORM migration per release to apply schema changes safely to live data.
+- Any data change must be applied in the appropriate seed file under `db/seeds/`.
 
 ---
 
@@ -116,7 +124,7 @@ The schema must meet a minimum of Third Normal Form (3NF).
 
 - Every non-key column must depend on the primary key only, not on another non-key column.
 - Repeated groups of columns (e.g., `address1`, `address2`, `address3`) should be replaced with a related table unless the number of values is fixed and small.
-- Denormalisation is only permitted when there is a documented and justified performance reason. The reason must be recorded in the migration file.
+- Denormalisation is only permitted when there is a documented and justified performance reason. The reason must be documented in the entity file or in linked Technical Documentation.
 
 ---
 
@@ -137,7 +145,7 @@ The platform uses soft deletes. Hard deletes are not permitted on domain tables 
 `JSONB` columns may only be used when the data is genuinely variable in structure and cannot be normalised without unacceptable complexity.
 
 **Rules:**
-- Every `JSONB` column must have its expected structure documented in the migration or in a linked specification.
+- Every `JSONB` column must have its expected structure documented in the entity file or in a linked specification.
 - No personally identifiable information (PII) or sensitive data may be stored in a `JSONB` column.
 - Do not use `JSONB` as a general-purpose storage field. If the structure is known, use relational columns.
 - `JSONB` fields used in queries must be indexed with a `GIN` or functional index.
@@ -145,49 +153,48 @@ The platform uses soft deletes. Hard deletes are not permitted on domain tables 
 
 ---
 
-## 15.10  Migration Rules
+## 15.10  TypeORM Entity Rules
 
-Migrations define schema changes and nothing else.
+TypeORM entity files define structure and nothing else.
 
-### What a migration may contain
+### What an entity file may contain
 
-- `CREATE TABLE`
-- `ALTER TABLE` (add column, modify column, rename column as part of a staged process — see §15.16)
-- `CREATE INDEX`
-- `CREATE UNIQUE INDEX`
-- `ALTER TABLE ADD CONSTRAINT`
-- `CREATE VIEW`
-- `CREATE TYPE` (enums)
-- `DROP TABLE`, `DROP COLUMN`, `DROP INDEX` — only when safe (see §15.16)
+- `@Entity()` class decoration with the table name
+- `@PrimaryGeneratedColumn()` or `@PrimaryColumn()` for the primary key
+- `@Column()` decorators with correct TypeScript types and database options
+- `@Index()` decorators at the class level for named indexes
+- `@CreateDateColumn()`, `@UpdateDateColumn()` for standard timestamp columns
+- `@ManyToOne()`, `@OneToMany()`, `@OneToOne()` relationship decorators where needed
 
-### What a migration must never contain
+### What an entity file must never contain
 
-- `INSERT`, `UPDATE`, or `DELETE` statements
+- Business logic or computed properties
+- `INSERT`, `UPDATE`, or `DELETE` operations
 - Seed or reference data
-- Business logic of any kind
 - Conditional logic based on environment variables
 - Tenant-specific logic
-- Workflow logic
 
-### RULE 1 — One logical change per migration
+### RULE 1 — One entity class per table
 
-Each migration file contains exactly one logical schema change — creating one table, adding one column, creating one index. Do not bundle unrelated changes.
+Each entity file represents one table. Related lookup tables with identical column shapes may be grouped in one file with separate `@Entity()` classes when that grouping improves clarity.
 
-### RULE 2 — Every migration must be idempotent
+### RULE 2 — Column names must match the database exactly
 
-All SQL in a migration must use `IF NOT EXISTS` or `IF EXISTS` guards so it is safe to run more than once.
+Use the `name` option on every `@Column()` where the TypeScript property name differs from the snake_case column name.
 
-```sql
-CREATE TABLE IF NOT EXISTS users ( ... )
-ALTER TABLE party ADD COLUMN IF NOT EXISTS phone VARCHAR(50)
-CREATE INDEX IF NOT EXISTS idx_party_reference ON party (reference)
+```typescript
+@Column({ name: 'created_by', type: 'text', nullable: true })
+createdBy: string | null
 ```
 
-### RULE 3 — Migrations run in numbered order. Never modify a past migration.
+### RULE 3 — Entity is edited in place; seeds stay single-file-per-table
 
-Filenames follow the pattern `NNN-description.js` where `NNN` is a zero-padded three-digit number starting at `001`. Numbers must be sequential with no gaps.
+When requirements change:
 
-If a change needs to be undone, add a new migration to reverse it. Never edit or delete a migration that has already been run.
+- Update the relevant `*.entity.ts` file in place.
+- Update the corresponding `db/seeds/*.js` file if reference/dev data changed.
+- Do not create a TypeORM migration to represent a development schema change — edit the entity directly.
+- For production releases only: generate one TypeORM migration per release to apply the diff safely to live data.
 
 ---
 
@@ -327,21 +334,21 @@ Changing an existing schema must follow a safe, staged approach to avoid breakin
 ## 15.18  Environment Parity
 
 - The database schema must be identical across all environments (development, staging, production).
-- Migrations run the same way in every environment. No environment-specific schema differences are permitted.
+- Consolidated schema scripts run the same way in every environment. No environment-specific schema differences are permitted.
 - Seed scripts must never run in staging or production. The `db:seed` npm script is for development only.
-- Any data required in staging or production (e.g., lookup values) must be introduced through a migration using a controlled, reviewed process — not a seed script.
+- Any data required in staging or production (e.g., lookup values) must be introduced through a controlled, reviewed deployment process — not a development seed script.
 
 ---
 
 ## 15.20  TypeORM Standards
 
-TypeORM is the ORM for all NestJS backend modules. It replaces direct `pg.Pool` usage in feature modules. The raw `db/migrations/*.js` scripts are the historical schema source of truth; TypeORM does not re-apply them.
+TypeORM is the ORM for all NestJS backend modules. It replaces direct `pg.Pool` usage in feature modules. The consolidated `db/schema/*.js` scripts are the schema source of truth.
 
 ### 15.20.1  Configuration
 
 - TypeORM is configured in `backend/nest/src/config/typeorm.config.ts`.
 - `synchronize` must always be `false`. TypeORM must never auto-modify the database schema.
-- `migrationsRun` must always be `false`. Migrations are run explicitly via `npm run typeorm:migration:run`.
+- `migrationsRun` must always be `false`.
 - `migrationsTableName` is `typeorm_migrations`.
 - The `AppDataSource` export is used by the TypeORM CLI only.
 
@@ -354,7 +361,7 @@ TypeORM is the ORM for all NestJS backend modules. It replaces direct `pg.Pool` 
 - Column names in the DB that differ from the TypeScript property name must use the `name` option: `@Column({ name: 'created_at' })`.
 - `nullable: true` must be set for every column that the DB schema defines as nullable.
 - `NUMERIC` columns must be typed as `string` in TypeScript — Postgres returns `NUMERIC` as a string to avoid floating-point loss.
-- Never use `synchronize` or entity column changes to alter the live schema. Use a TypeORM migration instead.
+- Never use `synchronize` or entity column changes to alter the live schema. Update the relevant `db/schema/*.js` file instead.
 
 ### 15.20.3  Repositories
 
@@ -365,24 +372,13 @@ TypeORM is the ORM for all NestJS backend modules. It replaces direct `pg.Pool` 
 - Use `createQueryBuilder()` when filtering is conditional or the query is complex.
 - Never execute raw SQL via the Repository unless it cannot be expressed as a QueryBuilder query. If raw SQL is required, document the reason inline.
 
-### 15.20.4  Migrations (TypeORM-managed)
+### 15.20.4  Schema Evolution (Consolidated)
 
-Future schema changes after the baseline must be TypeORM migrations, not raw `.js` files.
+Future schema changes must be applied by editing `db/schema/*.js` and updating entities to match.
 
-```bash
-# Generate a migration from entity diffs
-npm run typeorm:migration:generate -- -n AddColumnToParty
-
-# Apply pending migrations
-npm run typeorm:migration:run
-
-# Revert the last migration
-npm run typeorm:migration:revert
-```
-
-- TypeORM migration files live in `backend/nest/src/migrations/`.
-- The baseline migration (`1710000000000-Baseline.ts`) has empty `up()` and `down()` methods. It marks the point where TypeORM took over from the raw `db/migrations/` scripts.
-- To initialise a fresh database: run `npm run db:migrate` (applies all 83+ raw SQL migrations) then `npm run typeorm:baseline` (records the baseline in `typeorm_migrations`), then `npm run typeorm:migration:run` (applies any subsequent TypeORM migrations).
+- Do not generate new incremental migration files for schema evolution.
+- Keep TypeORM entity definitions in sync with consolidated schema.
+- To initialise a fresh database: run `npm run db:migrate` then `npm run db:seed` (development only).
 
 ### 15.20.5  Transition Rules
 
@@ -407,18 +403,18 @@ During the period when both `DatabaseService` and TypeORM coexist:
 
 ## 15.19  npm Scripts — Required Set
 
-`package.json` must always contain these database scripts, kept in sync with all files in `db/migrations/` and `db/seeds/`:
+`package.json` must always contain these database scripts, kept in sync with all files in `db/schema/` and `db/seeds/`:
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| `db:migrate` | Chains all migration files in order | Applies schema changes |
+| `db:migrate` | Chains all schema files in order | Applies schema changes |
 | `db:seed` | Chains all seed files | Populates development data |
 | `db:setup` | `npm run db:migrate && npm run db:seed` | Full fresh development setup |
 
-When a new migration is added: append it to the end of `db:migrate` in the same change.
+When a new schema file is added: append it to the end of `db:migrate` in the same change.
 When a new seed is added: append it to the end of `db:seed` in the same change.
 
-A migration or seed file that is not listed in its npm script will never run and is invisible to the team.
+A schema or seed file that is not listed in its npm script will never run and is invisible to the team.
 
 ---
 
@@ -426,16 +422,16 @@ A migration or seed file that is not listed in its npm script will never run and
 
 When a new domain table is required, all of the following must be delivered in the same change:
 
-- [ ] `db/migrations/NNN-create-{table}-table.js` — schema only, idempotent, one logical change
-- [ ] Migration defines all columns with correct types, nullable rules, and defaults
-- [ ] Migration defines all foreign key constraints with explicit `ON DELETE` behaviour
-- [ ] Migration creates indexes on all foreign key columns and any frequently queried columns
+- [ ] `db/schema/NN-*.js` updated (or added) — schema only, idempotent, one logical concern
+- [ ] Schema file defines all columns with correct types, nullable rules, and defaults
+- [ ] Schema file defines all foreign key constraints with explicit `ON DELETE` behaviour
+- [ ] Schema file creates indexes on all foreign key columns and any frequently queried columns
 - [ ] All names follow the naming convention in §15.2
 - [ ] `db/seeds/NNN-{table}.js` — development data only, idempotent, self-contained, representative
-- [ ] `package.json` `db:migrate` — extended to include the new migration
+- [ ] `package.json` `db:migrate` — extended to include the new schema file (if new file added)
 - [ ] `package.json` `db:seed` — extended to include the new seed
 - [ ] Requirements documentation updated to record the new table and its retention period
-- [ ] If the table has soft delete: `deleted_at` column included in the migration
+- [ ] If the table has soft delete: `deleted_at` column included in the schema file
 
 No partial delivery is acceptable.
 

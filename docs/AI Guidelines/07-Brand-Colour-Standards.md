@@ -159,6 +159,19 @@ Symptom of violation: every `:root` CSS custom property (`--sidebar-bg`, `--colo
 
 **Enforcement:** After any change to `app/index.css`, run `npx vite build` and visually verify the app renders before marking the task done.
 
+### RULE 12 — Styling and interaction checkpoint before introducing a new field style
+
+For any newly introduced or changed interactive field styling pattern (for example searchable dropdown, combobox, multi-select, token input), the AI must stop at a checkpoint before rolling the pattern across the app.
+
+Checkpoint requirements:
+
+1. Name the proposed pattern and where it is implemented first.
+2. Confirm token alignment (`brandClasses` and `global.css` variables) and that layout behavior is anchored and consistent with existing patterns.
+3. Provide the user with concrete in-app examples/paths to compare.
+4. Obtain explicit user approval of the pattern before applying the style to additional screens.
+
+No mass rollout of a new field style is allowed without this checkpoint approval.
+
 If a component needs a different colour in the context of one domain (e.g. the Quotes domain uses a different badge colour), the override must be applied at the domain's component wrapper level — not inside the shared primitive component.
 
 ---

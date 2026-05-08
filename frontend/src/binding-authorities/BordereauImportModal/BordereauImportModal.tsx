@@ -123,7 +123,7 @@ export default function BordereauImportModal({ isOpen, onClose, bindingAuthority
     const [parsing, setParsing] = React.useState(false)
     const [error, setError] = React.useState('')
     const [usedSavedMapping, setUsedSavedMapping] = React.useState(false)
-    const [classesOfBusiness, setClassesOfBusiness] = React.useState<{ name: string }[]>([])
+    const [classesOfBusiness, setClassesOfBusiness] = React.useState<{ code: string; name: string }[]>([])
     const [validationIssues, setValidationIssues] = React.useState<ValidationIssue[]>([])
 
     // Resizable preview columns
@@ -219,8 +219,8 @@ export default function BordereauImportModal({ isOpen, onClose, bindingAuthority
     // Load COB lookup
     React.useEffect(() => {
         let active = true
-        apiGet<{ items?: string[] } | string[]>('/api/lookups/classesOfBusiness')
-            .then((data) => { if (active) setClassesOfBusiness(Array.isArray(data) ? data : (data as { items?: string[] })?.items ?? []) })
+        apiGet<{ code: string; name: string }[]>('/api/lookups/classesOfBusiness')
+            .then((data) => { if (active) setClassesOfBusiness(Array.isArray(data) ? data : []) })
             .catch(() => { })
         return () => { active = false }
     }, [])

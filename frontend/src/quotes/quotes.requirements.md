@@ -216,11 +216,11 @@ The Quote view page shall not register `All Quotes` or `Issue Policy` in its con
 
 **REQ-QUO-FE-F-034:** The `QuoteViewPage` shall render the complete editable form (all fields from REQ-QUO-FE-F-017 through REQ-QUO-FE-F-032) **unconditionally** — always visible at the top of the page, regardless of the active tab. Below the form, a `TabsNav` component shall be rendered. See **REQ-QUO-FE-F-045** for the authoritative tab set. The active tab shall default to `'sections'` on page load. There is no `'details'` tab.
 
-**REQ-QUO-FE-F-035:** The complete editable form (Quote & Referencing, Insured, Dates, Contract / Placement, Renewal field groups) shall be rendered above the tab strip at all times. It shall not be gated by any tab selection.
+**REQ-QUO-FE-F-035:** The complete editable form (Contract & Reference, Insured, Dates, Contract / Placement, Renewal field groups) shall be rendered above the tab strip at all times. It shall not be gated by any tab selection.
 
-**REQ-QUO-FE-F-036:** The always-visible form above the tab strip shall be laid out in two side-by-side columns. The left column shall contain the **Quote & Referencing** `FieldGroup` followed by the **Insured** `FieldGroup`. The right column shall contain the **Dates** `FieldGroup`, the **Contract / Placement** `FieldGroup`, and the **Renewal** `FieldGroup`.
+**REQ-QUO-FE-F-036:** The always-visible form above the tab strip shall be laid out in two side-by-side columns. The left column shall contain the **Contract & Reference** `FieldGroup` followed by the **Insured** `FieldGroup`. The right column shall contain the **Dates** `FieldGroup`, the **Contract / Placement** `FieldGroup`, and the **Renewal** `FieldGroup`.
 
-**REQ-QUO-FE-F-037:** The **Quote & Referencing** `FieldGroup` shall contain, in order: Reference (read-only display), Status badge, Submission ID (read-only, populated when a submission is linked) + Linked Submission Reference (search/confirm/clear — see REQ-QUO-FE-F-025), Year of Account input, Business Type select.
+**REQ-QUO-FE-F-037:** The **Contract & Reference** `FieldGroup` shall contain, in order: Reference (read-only display), Status badge, Submission ID (read-only, populated when a submission is linked) + Linked Submission Reference (search/confirm/clear — see REQ-QUO-FE-F-025), Year of Account input, Business Type select.
 
 **REQ-QUO-FE-F-038:** The **Insured** `FieldGroup` shall contain a single field: Insured Name (InsuredSearch modal with search and clear — see REQ-QUO-FE-F-024).
 
@@ -435,6 +435,7 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | 2026-04-07 | REQ-QUO-FE-F-023 REMOVED — delete quote from list page is not required per user confirmation. Backup coverage map row 8 updated to REMOVED. Scope §3 updated. |
 | 2026-04-07 | REQ-QUO-FE-F-076 added — insured-mismatch warning notification: fires when `insuredParty.name !== linkedSubmission.insured`, uses stable ID `quote-{id}-insured-mismatch`, cleared on resolution. Tests T-quotes-view-R20f/R20g added. |
 | 2026-04-07 | REQ-QUO-FE-F-024 and F-025 implemented — insured/submission unconfirmed state shows red border (`border-red-500 ring-1 ring-red-400`) + warning text. Tests T-quotes-view-R20b/c/d/e added. Traceability updated. |
+| 2026-04-29 | REQ-QUO-FE-F-035, F-036, F-037: renamed FieldGroup title from "Quote & Referencing" to "Contract & Reference" for consistency with Binding Authority and Policy headers. Code change in QuoteViewPage.tsx. |
 | 2026-04-07 | Block 4: REQ-QUO-FE-F-052 implemented — Days on Cover (computed), Inception Time, Expiry Time, Annual Net Premium added to section header. F-057 — Risk Code uses `<select>` from `GET /api/lookups/riskCodes` with free-text fallback. F-058 — Participations inline editing, Save Participations button, 100% validation for Written/Signed Line %. Tests R15–R23 added. `getRiskCodes` added to quotes.service.ts. |
 | 2026-04-07 | Block 5: REQ-QUO-FE-F-063 — QuoteCoverageDetailPage updated with currency filter, "Coverage Sub-Details" and "Number of Locations" columns. F-064 — QuoteCoverageSubDetailPage updated with currency filter and "Number of Locations" column. Tests R063d–R063f, R064e–R064f added. Traceability updated. |
 | 2026-04-07 | Block 6: REQ-QUO-FE-F-066 to F-073 implemented — QuoteSearchModal component at `frontend/src/quotes/QuoteSearchModal/QuoteSearchModal.tsx`. Tests R066–R073 added (8 tests). All 111 quotes tests pass. |

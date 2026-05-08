@@ -4,6 +4,7 @@ import { Repository, DataSource, IsNull } from 'typeorm'
 import { Quote } from '../entities/quote.entity'
 import { QuoteSection } from '../entities/quote-section.entity'
 import { AuditService } from '../audit/audit.service'
+import { logError } from '../shared/log-error'
 
 @Injectable()
 export class QuotesService {
@@ -16,29 +17,6 @@ export class QuotesService {
         private readonly dataSource: DataSource,
         private readonly auditService: AuditService,
     ) { }
-
-    // ---------------------------------------------------------------------------
-    // Error logger â€” writes to error_log table (Â§16-Error-Handling-Standards.md)
-    // No error_log entity yet; raw SQL used per Â§15.20.3
-    // ---------------------------------------------------------------------------
-    private async logError(
-        orgCode: string | null,
-        userName: string | null,
-        source: string,
-        errorCode: string,
-        description: string,
-        context: Record<string, unknown> = {},
-    ): Promise<void> {
-        try {
-            await this.dataSource.query(
-                `INSERT INTO error_log (org_code, user_name, source, error_code, description, context)
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-                [orgCode, userName, source, errorCode, description, JSON.stringify(context)],
-            )
-        } catch (logErr: any) {
-            console.error('[logError] Failed to write error_log:', logErr.message)
-        }
-    }
 
     // ---------------------------------------------------------------------------
     // Reference generator: QUO-{ORG}-{YYYYMMDD}-{NNN}
@@ -117,7 +95,7 @@ export class QuotesService {
         } = body
 
         if (!insured || !String(insured).trim()) {
-            await this.logError(orgCode, userName, 'POST /api/quotes', 'ERR_QUOTE_CREATE_MISSING_INSURED', 'insured is required', {})
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes', 'ERR_QUOTE_CREATE_MISSING_INSURED', 'insured is required', {})
             throw new BadRequestException('insured is required')
         }
 
@@ -151,7 +129,7 @@ export class QuotesService {
             })
             return this.quoteRepo.save(quote)
         } catch (err: any) {
-            await this.logError(orgCode, userName, 'POST /api/quotes', 'ERR_QUOTE_CREATE_500', err.message, {})
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes', 'ERR_QUOTE_CREATE_500', err.message, {})
             throw err
         }
     }
@@ -162,11 +140,11 @@ export class QuotesService {
     async findOne(id: number, orgCode: string, userName: string | null): Promise<Quote> {
         const quote = await this.quoteRepo.findOne({ where: { id } })
         if (!quote) {
-            await this.logError(orgCode, userName, 'GET /api/quotes/:id', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
+            await logError(this.dataSource, orgCode, userName, 'GET /api/quotes/:id', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
             throw new NotFoundException('Quote not found')
         }
         if (quote.createdByOrgCode !== orgCode) {
-            await this.logError(orgCode, userName, 'GET /api/quotes/:id', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
+            await logError(this.dataSource, orgCode, userName, 'GET /api/quotes/:id', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
             throw new ForbiddenException('Forbidden')
         }
         return quote
@@ -179,15 +157,15 @@ export class QuotesService {
     async update(id: number, orgCode: string, body: any, userName: string | null): Promise<Quote> {
         const quote = await this.quoteRepo.findOne({ where: { id } })
         if (!quote) {
-            await this.logError(orgCode, userName, 'PUT /api/quotes/:id', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
+            await logError(this.dataSource, orgCode, userName, 'PUT /api/quotes/:id', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
             throw new NotFoundException('Quote not found')
         }
         if (quote.createdByOrgCode !== orgCode) {
-            await this.logError(orgCode, userName, 'PUT /api/quotes/:id', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
+            await logError(this.dataSource, orgCode, userName, 'PUT /api/quotes/:id', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
             throw new ForbiddenException('Forbidden')
         }
         if (['Bound', 'Declined'].includes(String(quote.status))) {
-            await this.logError(orgCode, userName, 'PUT /api/quotes/:id', 'ERR_QUOTE_EDIT_LOCKED', 'Cannot edit a Bound or Declined quote', { id, status: quote.status })
+            await logError(this.dataSource, orgCode, userName, 'PUT /api/quotes/:id', 'ERR_QUOTE_EDIT_LOCKED', 'Cannot edit a Bound or Declined quote', { id, status: quote.status })
             throw new BadRequestException('Cannot edit a Bound or Declined quote')
         }
 
@@ -224,7 +202,7 @@ export class QuotesService {
             Object.assign(quote, mutable)
             return this.quoteRepo.save(quote)
         } catch (err: any) {
-            await this.logError(orgCode, userName, 'PUT /api/quotes/:id', 'ERR_QUOTE_UPDATE_500', err.message, { id })
+            await logError(this.dataSource, orgCode, userName, 'PUT /api/quotes/:id', 'ERR_QUOTE_UPDATE_500', err.message, { id })
             throw err
         }
     }
@@ -235,15 +213,15 @@ export class QuotesService {
     async markQuoted(id: number, orgCode: string, userName: string | null): Promise<Quote> {
         const quote = await this.quoteRepo.findOne({ where: { id } })
         if (!quote) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/quote', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/quote', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
             throw new NotFoundException('Quote not found')
         }
         if (quote.createdByOrgCode !== orgCode) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/quote', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/quote', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
             throw new ForbiddenException('Forbidden')
         }
         if (quote.status !== 'Draft') {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/quote', 'ERR_QUOTE_INVALID_TRANSITION', 'Only a Draft quote may be marked as Quoted', { id, status: quote.status })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/quote', 'ERR_QUOTE_INVALID_TRANSITION', 'Only a Draft quote may be marked as Quoted', { id, status: quote.status })
             throw new BadRequestException('Only a Draft quote may be marked as Quoted')
         }
         quote.status = 'Quoted'
@@ -256,15 +234,15 @@ export class QuotesService {
     async bind(id: number, orgCode: string, userName: string | null): Promise<Quote> {
         const quote = await this.quoteRepo.findOne({ where: { id } })
         if (!quote) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/bind', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/bind', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
             throw new NotFoundException('Quote not found')
         }
         if (quote.createdByOrgCode !== orgCode) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/bind', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/bind', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
             throw new ForbiddenException('Forbidden')
         }
         if (quote.status !== 'Quoted') {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/bind', 'ERR_QUOTE_INVALID_TRANSITION', 'Only a Quoted quote may be bound', { id, status: quote.status })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/bind', 'ERR_QUOTE_INVALID_TRANSITION', 'Only a Quoted quote may be bound', { id, status: quote.status })
             throw new BadRequestException('Only a Quoted quote may be bound')
         }
         quote.status = 'Bound'
@@ -280,21 +258,21 @@ export class QuotesService {
         const { reasonCode, reasonText } = body ?? {}
 
         if (!reasonCode) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_DECLINE_MISSING_REASON', 'reasonCode is required', { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_DECLINE_MISSING_REASON', 'reasonCode is required', { id })
             throw new BadRequestException('reasonCode is required')
         }
 
         const quote = await this.quoteRepo.findOne({ where: { id } })
         if (!quote) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
             throw new NotFoundException('Quote not found')
         }
         if (quote.createdByOrgCode !== orgCode) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
             throw new ForbiddenException('Forbidden')
         }
         if (quote.status === 'Bound') {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_INVALID_TRANSITION', 'Cannot decline a Bound quote', { id, status: quote.status })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_INVALID_TRANSITION', 'Cannot decline a Bound quote', { id, status: quote.status })
             throw new BadRequestException('Cannot decline a Bound quote')
         }
 
@@ -306,7 +284,7 @@ export class QuotesService {
             quote.payload = { ...existingPayload, declineReasonCode: reasonCode, declineReasonText: reasonText ?? '' } as any
             return this.quoteRepo.save(quote)
         } catch (err: any) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_DECLINE_500', err.message, { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/decline', 'ERR_QUOTE_DECLINE_500', err.message, { id })
             throw err
         }
     }
@@ -317,11 +295,11 @@ export class QuotesService {
     async getAudit(id: number, orgCode: string, userName: string | null): Promise<any[]> {
         const quote = await this.quoteRepo.findOne({ where: { id } })
         if (!quote) {
-            await this.logError(orgCode, userName, 'GET /api/quotes/:id/audit', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
+            await logError(this.dataSource, orgCode, userName, 'GET /api/quotes/:id/audit', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
             throw new NotFoundException('Quote not found')
         }
         if (quote.createdByOrgCode !== orgCode) {
-            await this.logError(orgCode, userName, 'GET /api/quotes/:id/audit', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
+            await logError(this.dataSource, orgCode, userName, 'GET /api/quotes/:id/audit', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
             throw new ForbiddenException('Forbidden')
         }
         return this.auditService.getHistory('Quote', id)
@@ -332,11 +310,11 @@ export class QuotesService {
     async listSections(id: number, orgCode: string, userName: string | null): Promise<QuoteSection[]> {
         const quote = await this.quoteRepo.findOne({ where: { id } })
         if (!quote) {
-            await this.logError(orgCode, userName, 'GET /api/quotes/:id/sections', 'ERR_SECTIONS_FETCH_404', 'Quote not found', { id })
+            await logError(this.dataSource, orgCode, userName, 'GET /api/quotes/:id/sections', 'ERR_SECTIONS_FETCH_404', 'Quote not found', { id })
             throw new NotFoundException('Quote not found')
         }
         if (quote.createdByOrgCode !== orgCode) {
-            await this.logError(orgCode, userName, 'GET /api/quotes/:id/sections', 'ERR_SECTIONS_FETCH_403', 'Forbidden', { id })
+            await logError(this.dataSource, orgCode, userName, 'GET /api/quotes/:id/sections', 'ERR_SECTIONS_FETCH_403', 'Forbidden', { id })
             throw new ForbiddenException('Forbidden')
         }
         return this.sectionRepo.find({
@@ -405,7 +383,7 @@ export class QuotesService {
             section.payload = { ...existingPayload, ...payloadPatch }
             return this.sectionRepo.save(section)
         } catch (err: any) {
-            await this.logError(orgCode, userName, 'PUT /api/quotes/:id/sections/:sectionId', 'ERR_SECTION_UPDATE_500', err.message, { id, sectionId })
+            await logError(this.dataSource, orgCode, userName, 'PUT /api/quotes/:id/sections/:sectionId', 'ERR_SECTION_UPDATE_500', err.message, { id, sectionId })
             throw err
         }
     }
@@ -441,7 +419,7 @@ export class QuotesService {
             })
             return this.sectionRepo.save(section)
         } catch (err: any) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/sections', 'ERR_SECTION_CREATE_500', err.message, { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/sections', 'ERR_SECTION_CREATE_500', err.message, { id })
             throw err
         }
     }
@@ -463,7 +441,7 @@ export class QuotesService {
             await this.sectionRepo.save(section)
             return { message: 'Section deleted' }
         } catch (err: any) {
-            await this.logError(orgCode, userName, 'DELETE /api/quotes/:id/sections/:sectionId', 'ERR_SECTION_DELETE_500', err.message, { id, sectionId })
+            await logError(this.dataSource, orgCode, userName, 'DELETE /api/quotes/:id/sections/:sectionId', 'ERR_SECTION_DELETE_500', err.message, { id, sectionId })
             throw err
         }
     }
@@ -476,11 +454,11 @@ export class QuotesService {
     async copy(id: number, orgCode: string, userName: string | null): Promise<Quote> {
         const source = await this.quoteRepo.findOne({ where: { id } })
         if (!source) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/copy', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/copy', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
             throw new NotFoundException('Quote not found')
         }
         if (source.createdByOrgCode !== orgCode) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/copy', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/copy', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
             throw new ForbiddenException('Forbidden')
         }
         try {
@@ -515,7 +493,7 @@ export class QuotesService {
             })
             return this.quoteRepo.save(copied)
         } catch (err: any) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/copy', 'ERR_QUOTE_COPY_500', err.message, { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/copy', 'ERR_QUOTE_COPY_500', err.message, { id })
             throw err
         }
     }
@@ -591,11 +569,11 @@ export class QuotesService {
         }
         const quote = await this.quoteRepo.findOne({ where: { id } })
         if (!quote) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/audit', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/audit', 'ERR_QUOTE_NOT_FOUND', 'Quote not found', { id })
             throw new NotFoundException('Quote not found')
         }
         if (quote.createdByOrgCode !== orgCode) {
-            await this.logError(orgCode, userName, 'POST /api/quotes/:id/audit', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
+            await logError(this.dataSource, orgCode, userName, 'POST /api/quotes/:id/audit', 'ERR_QUOTE_FORBIDDEN', 'Forbidden', { id })
             throw new ForbiddenException('Forbidden')
         }
         const writeResult = await this.auditService.writeEvent(

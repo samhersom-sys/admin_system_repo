@@ -9,11 +9,6 @@ import {
 /**
  * BATransaction entity — maps to `binding_authority_transactions` table.
  * Schema source: db/migrations/017-create-binding-authority-transactions-table.js
- *
- * Frontend field mapping:
- *   amount      → payload.amount
- *   currency    → payload.currency
- *   date        → effective_date column
  */
 @Entity('binding_authority_transactions')
 @Index('idx_ba_transactions_ba_id', ['bindingAuthorityId'])
@@ -24,11 +19,11 @@ export class BATransaction {
   @Column({ name: 'binding_authority_id', type: 'int' })
   bindingAuthorityId: number
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  type: string | null
+  @Column({ type: 'varchar', length: 50 })
+  type: string
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  status: string | null
+  @Column({ type: 'varchar', length: 50 })
+  status: string
 
   @Column({ name: 'effective_date', type: 'date', nullable: true })
   effectiveDate: string | null

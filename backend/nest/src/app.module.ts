@@ -17,6 +17,9 @@ import { RatingSchedulesModule } from './rating-schedules/rating-schedules.modul
 import { OrganisationModule } from './organisation/organisation.module'
 import { ClaimsModule } from './claims/claims.module'
 import { LocationsModule } from './locations/locations.module'
+import { NotificationsModule } from './notifications/notifications.module'
+import { HomeModule } from './home/home.module'
+import { MeasuresModule } from './measures/measures.module'
 import { HealthController } from './health.controller'
 import { typeOrmOptions } from './config/typeorm.config'
 
@@ -46,6 +49,9 @@ import { typeOrmOptions } from './config/typeorm.config'
     OrganisationModule,
     ClaimsModule,
     LocationsModule,
+    NotificationsModule,
+    HomeModule,
+    MeasuresModule,
   ],
   controllers: [HealthController],
 })

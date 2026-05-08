@@ -3,7 +3,7 @@
  *
  * Loads template → shows Filters tab by default → executes → displays dynamic results table.
  * 4-tab layout: Filters | Results | Execution History | Audit History
- * "Export CSV" downloads file named {reportName}_{YYYY-MM-DD}.csv
+ * "Export CSV" is exposed in sidebar actions and downloads {reportName}_{YYYY-MM-DD}.csv
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -49,6 +49,7 @@ const CORE_REPORT_TEMPLATES: Record<string, ReportTemplate> = {
     quotes: { id: -2, name: 'New Business Report', description: 'New policies written in the selected period.', type: 'core', data_source: 'quotes', created_by: 'System' },
     parties: { id: -3, name: 'Parties Report', description: 'Party directory with roles and contact info.', type: 'core', data_source: 'parties', created_by: 'System' },
     policies: { id: -4, name: 'Policies Report', description: 'All policies with premium and expiry data.', type: 'core', data_source: 'policies', created_by: 'System' },
+    'login-activity': { id: -5, name: 'User Login Activity Report', description: 'Users, latest login timestamp, and login duration.', type: 'core', data_source: 'login-activity', created_by: 'System' },
 }
 
 function toCsv(headers: string[], rows: Record<string, unknown>[]): string {
@@ -90,10 +91,13 @@ export default function ReportRunPage() {
     const [filterRows, setFilterRows] = useState<FilterRow[]>([])
     const [dateBasisOptions, setDateBasisOptions] = useState<string[]>([])
 
-    // Sidebar Run button
+    // Sidebar actions
     const sidebarSection = useMemo<SidebarSection>(() => ({
         title: 'Report',
-        items: [{ label: 'Run Report', icon: FiPlay, event: 'report:run' }],
+        items: [
+            { label: 'Run Report', icon: FiPlay, event: 'report:run' },
+            { label: 'Export CSV', icon: FiDownload, event: 'report:export' },
+        ],
     }), [])
     useSidebarSection(sidebarSection)
 
@@ -103,11 +107,17 @@ export default function ReportRunPage() {
         return () => window.removeEventListener('report:run', handler)
     })
 
+    useEffect(() => {
+        const handler = () => { handleExport() }
+        window.addEventListener('report:export', handler)
+        return () => window.removeEventListener('report:export', handler)
+    })
+
     const headers = results && results.length > 0 ? Object.keys(results[0]) : []
 
     useEffect(() => {
-        getDateBasisOptions()
-            .then(setDateBasisOptions)
+        Promise.resolve(getDateBasisOptions())
+            .then((options) => setDateBasisOptions(Array.isArray(options) ? options : []))
             .catch(() => setDateBasisOptions([]))
     }, [])
 
@@ -215,18 +225,6 @@ export default function ReportRunPage() {
                     <h2 className="text-2xl font-semibold text-gray-900">{template?.name ?? 'Report'}</h2>
                     {template?.description && (
                         <p className="text-sm text-gray-500">{template.description}</p>
-                    )}
-                </div>
-                <div className="flex gap-2">
-                    {results !== null && results.length > 0 && (
-                        <button
-                            type="button"
-                            onClick={handleExport}
-                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100"
-                        >
-                            <FiDownload size={14} />
-                            Export CSV
-                        </button>
                     )}
                 </div>
             </div>

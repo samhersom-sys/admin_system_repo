@@ -1,6 +1,7 @@
 ﻿import { Injectable, BadRequestException } from '@nestjs/common'
 import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
+import { logError } from '../shared/log-error'
 
 const VALID_TYPES = new Set(['Submission', 'Quote', 'Policy', 'Binding Authority', 'Party', 'Claim'])
 const DATE_PARAMS = ['inceptionFrom', 'inceptionTo', 'expiryFrom', 'expiryTo', 'lastOpenedFrom', 'lastOpenedTo', 'createdFrom', 'createdTo']
@@ -75,30 +76,49 @@ export class SearchService {
             : (q['type'] && VALID_TYPES.has(q['type']) ? [q['type']] : [])
 
         if (q['types'] && requestedTypes.length === 0) {
+            await logError(this.dataSource, orgCode, userName, 'GET /api/search', 'ERR_SEARCH_INVALID_TYPES', `Invalid types: ${q['types']}`, { query: q })
             throw new BadRequestException(`Invalid types. Each must be one of: ${[...VALID_TYPES].join(', ')}`)
         }
         if (q['type'] && !q['types'] && !VALID_TYPES.has(q['type'])) {
+            await logError(this.dataSource, orgCode, userName, 'GET /api/search', 'ERR_SEARCH_INVALID_TYPE', `Invalid type: ${q['type']}`, { query: q })
             throw new BadRequestException(`Invalid type. Must be one of: ${[...VALID_TYPES].join(', ')}`)
         }
 
         // REQ-SEARCH-BE-F-009 â€” validate date params
         for (const dp of DATE_PARAMS) {
             if (q[dp] && !isValidDate(q[dp])) {
+                await logError(this.dataSource, orgCode, userName, 'GET /api/search', 'ERR_SEARCH_INVALID_DATE', `Invalid date value for ${dp}`, { query: q, parameter: dp, value: q[dp] })
                 throw new BadRequestException(`Invalid date value for ${dp}: "${q[dp]}"`)
             }
         }
 
         const hasFilters = Boolean(
             requestedTypes.length > 0 || q['reference'] || q['status'] || q['insured'] || q['broker'] ||
+            q['coverholder'] ||
             q['yearOfAccount'] || q['inceptionFrom'] || q['inceptionTo'] || q['expiryFrom'] || q['expiryTo'] ||
             q['lastOpenedFrom'] || q['lastOpenedTo'] || q['createdFrom'] || q['createdTo'] || q['createdBy'],
         )
 
-        if (!hasFilters) {
-            return this.defaultMode(orgCode, userId, userName)
-        } else {
-            return this.filterMode(q, orgCode, requestedTypes)
-        }
+        // Always use filterMode so unfiltered results use the same LIMIT 200
+        // query as type-filtered results. defaultMode (15-cap, audit-based) was
+        // causing fewer results to appear when NO type filter was selected.
+        return this.filterMode(q, orgCode, requestedTypes)
+    }
+
+    async getCreatedByOptions(orgCode: string): Promise<string[]> {
+        const rows = await this.dataSource.query(
+            `SELECT DISTINCT
+                COALESCE(NULLIF(full_name, ''), NULLIF(username, ''), NULLIF(email, '')) AS name
+             FROM users
+             WHERE org_code = $1
+               AND COALESCE(is_active, true) = true
+             ORDER BY name ASC`,
+            [orgCode],
+        ).catch(() => [])
+
+        return rows
+            .map((r: any) => String(r.name ?? '').trim())
+            .filter((name: string) => name.length > 0)
     }
 
     // ---------------------------------------------------------------------------
@@ -298,6 +318,7 @@ export class SearchService {
             const statusColumn = columnName('status', 'status')
             const insuredColumn = columnName('insured', 'insured')
             const brokerColumn = columnName('broker', '"placingBroker"')
+            const coverholderColumn = columnName('coverholder', 'coverholder')
             const yearOfAccountColumn = columnName('yearOfAccount', '"yearOfAccount"')
             const inceptionDateColumn = columnName('inceptionDate', '"inceptionDate"')
             const expiryDateColumn = columnName('expiryDate', '"expiryDate"')
@@ -308,6 +329,7 @@ export class SearchService {
             if (statusColumn && q['status']) { params.push(`%${q['status']}%`); clauses.push(`LOWER(${statusColumn}) LIKE LOWER($${params.length})`) }
             if (insuredColumn && q['insured']) { params.push(`%${q['insured']}%`); clauses.push(`LOWER(${insuredColumn}) LIKE LOWER($${params.length})`) }
             if (brokerColumn && q['broker']) { params.push(`%${q['broker']}%`); clauses.push(`LOWER(${brokerColumn}) LIKE LOWER($${params.length})`) }
+            if (coverholderColumn && q['coverholder']) { params.push(`%${q['coverholder']}%`); clauses.push(`LOWER(${coverholderColumn}) LIKE LOWER($${params.length})`) }
             if (yearOfAccountColumn && q['yearOfAccount']) { params.push(q['yearOfAccount']); clauses.push(`${yearOfAccountColumn} = $${params.length}`) }
             if (inceptionDateColumn) {
                 if (q['inceptionFrom']) { params.push(q['inceptionFrom']); clauses.push(`${inceptionDateColumn} >= $${params.length}`) }
@@ -337,7 +359,7 @@ export class SearchService {
             })
         }
 
-        const allFields = { reference: true, status: true, insured: true, broker: true, yearOfAccount: true, inceptionDate: true, expiryDate: true, createdDate: true, createdBy: true }
+        const allFields = { reference: true, status: true, insured: true, broker: true, coverholder: false, yearOfAccount: true, inceptionDate: true, expiryDate: true, createdDate: true, createdBy: true }
 
         result.submissions = await runForType('Submission', async () => {
             const { where, params } = buildClause([orgCode], allFields)
@@ -424,6 +446,7 @@ export class SearchService {
             const { where, params } = buildClause([orgCode], {
                 reference: 'ba.reference',
                 status: 'ba.status',
+                coverholder: "ba.payload->>'coverholder'",
                 yearOfAccount: 'ba.year_of_account',
                 inceptionDate: 'ba.inception_date',
                 expiryDate: 'ba.expiry_date',

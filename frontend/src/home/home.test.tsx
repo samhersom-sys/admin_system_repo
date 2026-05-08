@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TESTS � HOME DASHBOARD
  * Second artifact. Requirements: app/pages/home/home.requirements.md
  * These tests must all pass before any homepage component code is considered done.
@@ -116,31 +116,16 @@ function setupMocks() {
     ; (getOrgCode as jest.Mock).mockReturnValue(MOCK_SESSION.orgCode)
         ; (getUserId as jest.Mock).mockReturnValue(MOCK_SESSION.userId)
 
-        // Map each API endpoint to its fixture.
-        // Shapes verified against real backend (see API CONTRACT comment at top of file):
-        //   - count endpoints  ? raw arrays  (widget reads array.length)
-        //   - gwp-summary      ? { total: number }
-        //   - recent-records   ? { submissions[], quotes[], policies[], bindingAuthorities[] }
-        //   - tasks            ? raw array
+        // Map each API endpoint to its fixture (REQ-HOME-F-020: single KPI endpoint).
         ; (apiGet as jest.Mock).mockImplementation((url: string) => {
-            if (url.includes('/api/submissions') && url.includes('orgCode'))
-                return Promise.resolve(Array(MOCK_KPI_ORG.submissions).fill({}))
-            if (url.includes('/api/submissions') && url.includes('assignedTo'))
-                return Promise.resolve(Array(MOCK_KPI_USER.submissions).fill({}))
-            if (url.includes('/api/quotes') && url.includes('orgCode'))
-                return Promise.resolve(Array(MOCK_KPI_ORG.quotes).fill({}))
-            if (url.includes('/api/quotes') && url.includes('assignedTo'))
-                return Promise.resolve(Array(MOCK_KPI_USER.quotes).fill({}))
-            if (url.includes('/api/policies') && url.includes('orgCode') && url.includes('status=bound'))
-                return Promise.resolve(Array(MOCK_KPI_ORG.policies).fill({}))
-            if (url.includes('/api/policies') && url.includes('assignedTo') && url.includes('status=bound'))
-                return Promise.resolve(Array(MOCK_KPI_USER.policies).fill({}))
-            if (url.includes('/api/binding-authorities'))
-                return Promise.resolve(Array(MOCK_KPI_ORG.bindingAuthorities).fill({}))
-            if (url.includes('/api/policies/gwp-summary') && url.includes('orgCode'))
-                return Promise.resolve({ total: MOCK_KPI_ORG.ytdGwp })
-            if (url.includes('/api/policies/gwp-summary') && url.includes('userId'))
-                return Promise.resolve({ total: MOCK_KPI_USER.ytdGwp })
+            if (url.includes('/api/home/kpi-summary'))
+                return Promise.resolve({
+                    submissions: { org: MOCK_KPI_ORG.submissions, user: MOCK_KPI_USER.submissions },
+                    quotes:      { org: MOCK_KPI_ORG.quotes,      user: MOCK_KPI_USER.quotes },
+                    policies:    { org: MOCK_KPI_ORG.policies,    user: MOCK_KPI_USER.policies },
+                    bindingAuthorities: { org: MOCK_KPI_ORG.bindingAuthorities },
+                    gwp:         { org: MOCK_KPI_ORG.ytdGwp,      user: MOCK_KPI_USER.ytdGwp },
+                })
             if (url.includes('/api/recent-records-data'))
                 return Promise.resolve(MOCK_RECENT_RECORDS)
             if (url.includes('/api/tasks'))
@@ -251,24 +236,23 @@ describe('KpiWidget', () => {
         })
     })
 
-    test('T-HOME-KPI-R4: passes orgCode to all org-scope API calls', async () => {
+    test('T-HOME-KPI-R4: fetches KPI data from the single /api/home/kpi-summary endpoint (REQ-HOME-F-020)', async () => {
         const { default: KpiWidget } = require('./HomeWidgets/KpiWidget')
         render(<KpiWidget orgCode="ORG-001" userId="USR-001" />)
         await waitFor(() => expect(apiGet).toHaveBeenCalled())
-        const orgCalls = (apiGet as jest.Mock).mock.calls.filter(([url]: [string]) =>
-            url.includes('orgCode=ORG-001')
+        const kpiCall = (apiGet as jest.Mock).mock.calls.find(([url]: [string]) =>
+            url.includes('/api/home/kpi-summary')
         )
-        expect(orgCalls.length).toBeGreaterThan(0)
+        expect(kpiCall).toBeDefined()
     })
 
-    test('T-HOME-KPI-R5: passes userId to all user-scope API calls', async () => {
+    test('T-HOME-KPI-R5: makes exactly one API call for all KPI data (REQ-HOME-F-020 — no multi-call fan-out)', async () => {
         const { default: KpiWidget } = require('./HomeWidgets/KpiWidget')
         render(<KpiWidget orgCode="ORG-001" userId="USR-001" />)
         await waitFor(() => expect(apiGet).toHaveBeenCalled())
-        const userCalls = (apiGet as jest.Mock).mock.calls.filter(([url]: [string]) =>
-            url.includes('assignedTo=USR-001') || url.includes('userId=USR-001')
-        )
-        expect(userCalls.length).toBeGreaterThan(0)
+        // KpiWidget must issue exactly one GET /api/home/kpi-summary call
+        expect((apiGet as jest.Mock).mock.calls).toHaveLength(1)
+        expect((apiGet as jest.Mock).mock.calls[0][0]).toBe('/api/home/kpi-summary')
     })
 
     test('T-HOME-KPI-R6: shows an inline error message when an API call fails � does not crash', async () => {

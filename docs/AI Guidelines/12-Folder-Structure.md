@@ -19,8 +19,7 @@ Cleaned/
     Project Documentation/       ← Architecture, domain, and workflow docs
     Technical Documentation/     ← Migration notes, plans, and open questions
   db/
-    migrations/                  ← Numbered schema migration scripts (run in order)
-    seeds/                       ← Reference and test data scripts
+    seeds/                       ← Reference and test data scripts (run via db:seed)
   developertools/                ← Developer utilities shared across all sub-projects (see §12.8)
     jest.backend.config.js       ← Jest config for backend integration tests (testEnvironment: node)
     check-all-types.js           ← DB type introspection script

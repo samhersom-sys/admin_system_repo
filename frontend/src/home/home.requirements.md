@@ -36,15 +36,19 @@ It does not cover:
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/submissions?status=open&orgCode={orgCode}` | KPI — open submission count |
-| GET | `/api/quotes?status=active&orgCode={orgCode}` | KPI — active quote count |
-| GET | `/api/policies?status=bound&orgCode={orgCode}` | KPI — bound policy count |
-| GET | `/api/binding-authorities?status=active&orgCode={orgCode}` | KPI — active BA count |
-| GET | `/api/policies/gwp-summary?orgCode={orgCode}` | GWP summary data for bar chart |
+| GET | `/api/home/kpi-summary` | KPI — all counts + GWP for `KpiWidget` (single call, org + user scope, REQ-HOME-F-019) |
+| GET | `/api/policies/gwp-monthly?years=3` | Monthly GWP data for line chart |
+| GET | `/api/policies/gwp-cumulative?years=3` | Cumulative GWP data for line chart |
 | GET | `/api/policies/gwp-monthly?years=3` | Monthly GWP data for line chart |
 | GET | `/api/policies/gwp-cumulative?years=3` | Cumulative GWP data for line chart |
 | GET | `/api/activity/recent?userId={userId}&limit=10` | Recent activity for current user |
 | GET | `/api/tasks?assignedTo={userId}&status=pending` | Pending tasks for current user |
+
+### Backend Module Added
+
+| Module | Path | Purpose |
+|--------|------|---------|
+| `HomeModule` | `backend/nest/src/home/` | Serves `GET /api/home/kpi-summary`; internally resolves count SQL from `field-mappings.ts` DATA_SOURCES so measure definitions propagate to the home screen without duplication |
 
 ### Database Tables (read by API)
 
@@ -326,11 +330,25 @@ Each organisation sees only the data relevant to them.  The widget layout and st
 
 ### 10.3 KpiWidget
 
-**REQ-HOME-F-006:** The `KpiWidget` shall display an organisation-scoped count and a user-scoped count within the same card for each of the following KPIs: open submissions, active quotes, bound policies, active binding authorities, and YTD GWP.
+**REQ-HOME-F-006:** The `KpiWidget` shall display an organisation-scoped count and a user-scoped count within the same card for each of the following KPIs: submissions, active policies, binding authorities, and YTD GWP.
 
 **REQ-HOME-F-007:** The `KpiWidget` shall format numeric counts using `formatters.number` and currency values using `formatters.currency`.
 
-**REQ-HOME-F-008:** The `KpiWidget` shall pass `orgCode` (from `auth-session`) to every organisation-scoped API call and `userId` (from `auth-session`) to every user-scoped API call.
+**REQ-HOME-F-008:** The `KpiWidget` shall retrieve all KPI data via a single call to `GET /api/home/kpi-summary`; it shall not make separate per-domain count calls (REQ-HOME-F-020).
+
+**REQ-HOME-F-019:** The backend `HomeService.getKpiSummary` method shall resolve count SQL predicates for the `policies` domain from the `field-mappings.ts` DATA_SOURCES semantic layer (specifically, the `countActive` measure's `filterExpr`) rather than hardcoding the predicate. This ensures that any change to the `countActive` `filterExpr` in `field-mappings.ts` is automatically applied to the home screen KPI without a separate code change.
+
+**REQ-HOME-F-020:** The `GET /api/home/kpi-summary` endpoint shall return a single JSON object with the following shape, deriving all values from the same data sources and measure definitions used by the reporting/dashboard widget engine:
+```
+{
+  submissions: { org: number, user: number },
+  quotes:      { org: number, user: number },
+  policies:    { org: number, user: number },
+  bindingAuthorities: { org: number },
+  gwp:         { org: number, user: number }
+}
+```
+The `submissions` and `quotes` counts are total-count measures (`countAll`). The `policies` count is the active-policies measure (`countActive`). The GWP figure is `SUM(gross_written_premium)` on the policies table. All org-scope queries are scoped to `req.user.orgCode`; all user-scope queries filter on `created_by = req.user.username`. No query parameters are required; all scope context is derived from the authenticated session.
 
 ### 10.4 GwpChartWidget
 
@@ -391,10 +409,21 @@ Each organisation sees only the data relevant to them.  The widget layout and st
 | REQ-HOME-F-015 | `app/features/home/home.test.tsx` | pending |
 | REQ-HOME-F-016 | `app/features/home/home.test.tsx` | pending |
 | REQ-HOME-F-017 | `app/features/home/home.test.tsx` | pending |
+| REQ-HOME-F-019 | `backend/nest/src/home/home.spec.ts` | T-HOME-BE-R019a, T-HOME-BE-R019b |
+| REQ-HOME-F-020 | `frontend/src/home/__tests__/home.test.tsx` | T-HOME-KPI-R020 |
 
 ---
 
-## 12. HomeEmbeddedDashboard — Pinned Dashboard Tab (Block 2 addition)
+## 12. Open Questions
+
+| # | Question | Status |
+|---|----------|--------|
+| OQ-HOME-001 | Should `KpiWidget` be refactored to consume the reporting measures semantic layer (`field-mappings.ts`) instead of making 9 separate array-proxy calls to domain list endpoints, so that measure definition changes propagate to the home screen automatically? | **Resolved** — Yes. A new `GET /api/home/kpi-summary` endpoint (REQ-HOME-F-019/020) internally resolves count SQL from `DATA_SOURCES` in `field-mappings.ts`. `KpiWidget` makes one call to this endpoint. |
+| OQ-HOME-002 | Future feature: a Tenant Administrator UI allowing company admins to define custom measures (name, data source, filter logic) via a form and make them available to all users in their organisation — without a developer deploy. This would build on the existing `field-mappings.ts` semantic layer as the developer-defined baseline. Deferred to a future feature block. See also OQ-RPT-010 in `reports.requirements.md`. | **Deferred — future block** |
+
+---
+
+## 13. HomeEmbeddedDashboard — Pinned Dashboard Tab (Block 2 addition)
 
 This section covers the `HomeEmbeddedDashboard` component rendered inside the **Dashboard** tab of the home page. It allows users to view full reporting dashboards without leaving the home screen.
 

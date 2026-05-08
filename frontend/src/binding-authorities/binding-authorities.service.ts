@@ -42,6 +42,7 @@ export interface BASection {
     binding_authority_id: number
     reference: string
     class_of_business?: string | null
+    class_of_business_code?: string | null
     time_basis?: string | null
     inception_date?: string | null
     expiry_date?: string | null
@@ -53,6 +54,7 @@ export interface BASection {
 
 export interface CreateBASectionInput {
     class_of_business?: string | null
+    class_of_business_code?: string | null
     time_basis?: string | null
     inception_date?: string | null
     expiry_date?: string | null
@@ -68,22 +70,38 @@ export interface Participation {
     share_percent: number
 }
 
+export interface BATransactionDetails {
+    coverholder?: string | null
+    coverholder_id?: number | null
+    year_of_account?: number | null
+    inception_date?: string | null
+    expiry_date?: string | null
+    sections?: BASection[]
+}
+
+/** Transaction status lifecycle: Draft → Bound → Issued. Active/Endorsed kept for backward compatibility with existing records. */
+export type BATransactionStatus = 'Draft' | 'Issued' | 'Active' | 'Bound' | 'Endorsed'
+
 export interface BATransaction {
     id: number
     binding_authority_id: number
     type?: string | null
-    amount?: number | null
-    currency?: string | null
-    date?: string | null
+    sub_type?: string | null
+    status?: BATransactionStatus | null
+    sequence_number?: number | null
+    effective_date?: string | null
     description?: string | null
+    created_by?: string | null
+    created_at?: string | null
+    details?: BATransactionDetails | null
 }
 
 export interface CreateBATransactionInput {
     type?: string | null
-    amount?: number | null
-    currency?: string | null
-    date?: string | null
+    sub_type?: string | null
+    effective_date?: string | null
     description?: string | null
+    status?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -99,6 +117,19 @@ export async function getBindingAuthorities(search?: string): Promise<BindingAut
 
 export async function getBindingAuthority(id: number): Promise<BindingAuthority> {
     return get<BindingAuthority>(`/api/binding-authorities/${id}`)
+}
+
+export interface ClassOfBusiness {
+    code: string
+    name: string
+}
+
+export async function getClassesOfBusiness(): Promise<ClassOfBusiness[]> {
+    return get<ClassOfBusiness[]>('/api/lookups/classesOfBusiness')
+}
+
+export async function getCurrencies(): Promise<string[]> {
+    return get<string[]>('/api/lookups/currencies')
 }
 
 export async function createBindingAuthority(input: CreateBAInput): Promise<BindingAuthority> {
@@ -207,6 +238,44 @@ export async function getPoliciesForBA(baId: number): Promise<unknown[]> {
 }
 
 // ---------------------------------------------------------------------------
+// API — Bordereau Configs
+// ---------------------------------------------------------------------------
+
+export interface BordereauConfigAPI {
+    id: number
+    config_id: string
+    binding_authority_id: number
+    name: string
+    type: string
+    data_style: string
+    fields: string[]
+    created_at: string
+}
+
+export async function getBordereauConfigs(baId: number): Promise<BordereauConfigAPI[]> {
+    return get<BordereauConfigAPI[]>(`/api/binding-authorities/${baId}/bordereau-configs`)
+}
+
+export async function createBordereauConfig(
+    baId: number,
+    config: Pick<BordereauConfigAPI, 'config_id' | 'name' | 'type' | 'data_style' | 'fields'>
+): Promise<BordereauConfigAPI> {
+    return post<BordereauConfigAPI>(`/api/binding-authorities/${baId}/bordereau-configs`, config)
+}
+
+export async function updateBordereauConfig(
+    baId: number,
+    configId: string,
+    patch: Partial<Pick<BordereauConfigAPI, 'name' | 'type' | 'data_style' | 'fields'>>
+): Promise<BordereauConfigAPI> {
+    return put<BordereauConfigAPI>(`/api/binding-authorities/${baId}/bordereau-configs/${encodeURIComponent(configId)}`, patch)
+}
+
+export async function deleteBordereauConfig(baId: number, configId: string): Promise<void> {
+    await del(`/api/binding-authorities/${baId}/bordereau-configs/${encodeURIComponent(configId)}`)
+}
+
+// ---------------------------------------------------------------------------
 // API — Coverholder Search (local proxy to avoid cross-domain import)
 // ---------------------------------------------------------------------------
 
@@ -229,4 +298,8 @@ export async function listCoverholders(filters?: { type?: string; search?: strin
     const query = qs.toString()
     const url = query ? `/api/parties?${query}` : '/api/parties'
     return get<CoverholderParty[]>(url)
+}
+
+export async function getCoverholderParty(id: number): Promise<CoverholderParty> {
+    return get<CoverholderParty>(`/api/parties/${id}`)
 }

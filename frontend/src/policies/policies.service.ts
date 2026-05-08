@@ -22,16 +22,29 @@ export interface Policy {
     id: number
     reference: string
     quote_id?: number | null
+    submission_id?: number | null
     insured: string
     insured_id?: string | null
     placing_broker?: string | null
     class_of_business?: string | null
+    business_type?: string | null
+    new_or_renewal?: string | null
     inception_date?: string | null
     expiry_date?: string | null
+    inception_time?: string | null
+    expiry_time?: string | null
+    lta_applicable?: boolean | null
+    contract_type?: string | null
+    method_of_placement?: string | null
+    unique_market_reference?: string | null
+    renewable_indicator?: string | null
+    renewal_date?: string | null
+    renewal_status?: string | null
     status: PolicyStatus
     gross_premium?: number | null
     net_premium?: number | null
     policy_currency?: string | null
+    payload?: Record<string, unknown> | null
 }
 
 export interface PolicySection {
@@ -40,7 +53,9 @@ export interface PolicySection {
     reference: string
     class_of_business?: string | null
     inception_date?: string | null
+    effective_date?: string | null
     expiry_date?: string | null
+    days_on_cover?: number | null
     limit_currency?: string | null
     limit_amount?: number | null
     limit_loss_qualifier?: string | null
@@ -48,16 +63,27 @@ export interface PolicySection {
     excess_amount?: number | null
     excess_loss_qualifier?: string | null
     sum_insured_currency?: string | null
+    sum_insured?: number | null
     sum_insured_amount?: number | null
     premium_currency?: string | null
     gross_gross_premium?: number | null
     gross_premium?: number | null
     deductions?: number | null
     net_premium?: number | null
+    tax_receivable?: number | null
+    annual_gross_premium?: number | null
+    annual_net_premium?: number | null
     annual_gross?: number | null
     annual_net?: number | null
     written_order?: number | null
     signed_order?: number | null
+    time_basis?: string | null
+    written_order_basis?: string | null
+    signed_order_basis?: string | null
+    written_line_total?: number | null
+    signed_line_total?: number | null
+    delegated_authority_ref?: string | null
+    delegated_authority_section_ref?: string | null
 }
 
 export interface PolicyCoverage {
@@ -79,10 +105,59 @@ export interface PolicyTransaction {
     id: number
     policy_id: number
     transaction_type: string
+    sub_type?: string | null
     effective_date?: string | null
     description?: string | null
     status: string
     reference?: string | null
+    payload?: Record<string, unknown> | null
+    created_by?: string | null
+    created_at?: string | null
+    sequence_number?: number | null
+    number?: number | null
+}
+
+export interface PolicySectionTransactionDetail {
+    id: number
+    transaction_id: number
+    section_id: number
+    section_reference: string
+    policy_reference: string
+    transaction_type: string
+    effective_date?: string | null
+    current: {
+        limit_amount?: number | null
+        excess_amount?: number | null
+        sum_insured?: number | null
+        gross_premium?: number | null
+        net_premium?: number | null
+        tax_receivable?: number | null
+        deductions?: number | null
+        annual_gross_premium?: number | null
+        annual_net_premium?: number | null
+    }
+    previous: {
+        limit_amount?: number | null
+        excess_amount?: number | null
+        sum_insured?: number | null
+        gross_premium?: number | null
+        net_premium?: number | null
+        tax_receivable?: number | null
+        deductions?: number | null
+        annual_gross_premium?: number | null
+        annual_net_premium?: number | null
+    }
+    movements: {
+        limit_amount?: number | null
+        excess_amount?: number | null
+        sum_insured?: number | null
+        gross_premium?: number | null
+        net_premium?: number | null
+        tax_receivable?: number | null
+        deductions?: number | null
+        annual_gross_premium?: number | null
+        annual_net_premium?: number | null
+    }
 }
 
 export interface AuditEvent {
@@ -112,8 +187,19 @@ export interface LocationRow {
 
 export interface CreateEndorsementInput {
     transactionType?: string
+    transactionSubType?: string | null
     effectiveDate: string
     description?: string
+}
+
+export interface CreatePolicySectionInput {
+    class_of_business?: string
+    inception_date?: string
+    expiry_date?: string
+    limit_currency?: string
+    limit_amount?: number
+    premium_currency?: string
+    gross_premium?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +231,14 @@ export async function getPolicySections(policyId: string | number): Promise<Poli
     return get<PolicySection[]>(`/api/policies/${policyId}/sections`)
 }
 
+/** Create a new section for a policy. */
+export async function createPolicySection(
+    policyId: string | number,
+    input: CreatePolicySectionInput
+): Promise<PolicySection> {
+    return post<PolicySection>(`/api/policies/${policyId}/sections`, input)
+}
+
 /** Fetch a single section detail for a policy. */
 export async function getPolicySectionDetails(
     policyId: string | number,
@@ -163,6 +257,16 @@ export async function getPolicyTransactions(policyId: string | number): Promise<
     return get<PolicyTransaction[]>(`/api/policies/${policyId}/transactions`)
 }
 
+export async function getPolicySectionTransaction(
+    policyId: string | number,
+    transactionId: string | number,
+    sectionId: string | number,
+): Promise<PolicySectionTransactionDetail> {
+    return get<PolicySectionTransactionDetail>(
+        `/api/policies/${policyId}/transactions/${transactionId}/sections/${sectionId}`,
+    )
+}
+
 /** Fetch audit trail for a policy. */
 export async function getPolicyAudit(policyId: string | number): Promise<AuditEvent[]> {
     return get<AuditEvent[]>(`/api/policies/${policyId}/audit`)
@@ -173,7 +277,17 @@ export async function postPolicyAudit(
     policyId: string | number,
     event: { action: string; entityType: string; entityId: number; performedBy?: string }
 ): Promise<void> {
-    return post<void>(`/api/policies/${policyId}/audit`, event)
+    const action = event.action ?? ''
+    let description = 'Record activity logged.'
+    if (/opened/i.test(action)) description = 'Opened record.'
+    else if (/closed/i.test(action)) description = 'Viewed record, no changes made.'
+    else if (/created.*endorsement/i.test(action)) description = 'Created endorsement.'
+    else if (/issue.*endorsement/i.test(action)) description = 'Issued endorsement.'
+
+    return post<void>(`/api/policies/${policyId}/audit`, {
+        event_type: action,
+        description,
+    })
 }
 
 /** List endorsements for a policy. */
@@ -188,6 +302,7 @@ export async function createEndorsement(
 ): Promise<PolicyTransaction> {
     return post<PolicyTransaction>(`/api/policies/${policyId}/endorsements`, {
         endorsement_type: input.transactionType,
+        endorsement_sub_type: input.transactionSubType,
         effective_date: input.effectiveDate,
         description: input.description,
     })
@@ -215,4 +330,8 @@ export async function getPolicyCoverages(
 /** Fetch location/detail rows for a policy (used by coverage detail pages). */
 export async function getPolicyLocations(policyId: string | number): Promise<LocationRow[]> {
     return get<LocationRow[]>(`/api/policies/${policyId}/locations`)
+}
+
+export async function getClassesOfBusiness(): Promise<string[]> {
+    return get<string[]>('/api/lookups/classesOfBusiness')
 }
