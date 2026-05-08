@@ -4,6 +4,48 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-05-08] [Today] — TypeORM Entity-First Migration + Full Release to Production
+
+**Request:**
+Migrate database schema management from 29 `db/schema/*.js` raw SQL files and 5 TypeORM migration files to a TypeORM entity-first model (`@Entity()` classes as single source of truth). Push development to UAT and production.
+
+**Outcome:**
+Updated `docs/AI Guidelines/15-Database-Standards.md` and `12-Folder-Structure.md` to reflect entity-first standard. Augmented `ba-section.entity.ts` (16 columns) and `quote-section.entity.ts` (13 columns). Created 18 new entity files covering all previously unregistered tables. Created `backend/nest/src/database/db-sync.ts` replacing `db:migrate` for fresh installs. Updated `typeorm.config.ts` (all entities registered, `migrationsRun` removed), `entities/index.ts` (full exports), root `package.json` (`db:migrate` → `db:sync`). Deleted `db/schema/` (29 files) and `backend/nest/src/migrations/` (5 files). Fixed `LookupCurrency` `@Column` → `@PrimaryColumn`. Fixed CI workflow (`db:migrate` → `db:sync`). Committed as `73f2e27` + `1e9f823`. Merged development → UAT → production; all three branches now at `6ef131f`.
+
+**Files Changed:**
+- `docs/AI Guidelines/15-Database-Standards.md` — entity-first standard (§15.1, §15.7, §15.9, §15.10)
+- `docs/AI Guidelines/12-Folder-Structure.md` — db/ section updated (removed migrations/)
+- `backend/nest/src/entities/ba-section.entity.ts` — added 16 financial view columns
+- `backend/nest/src/entities/quote-section.entity.ts` — added 13 financial view columns
+- `backend/nest/src/entities/audit-event.entity.ts` — created
+- `backend/nest/src/entities/policy-transaction.entity.ts` — created
+- `backend/nest/src/entities/policy-section.entity.ts` — created
+- `backend/nest/src/entities/policy-section-coverage.entity.ts` — created (2 entities)
+- `backend/nest/src/entities/lookup.entity.ts` — created (27 entities; LookupCurrency PK fixed)
+- `backend/nest/src/entities/rating.entity.ts` — created (5 entities)
+- `backend/nest/src/entities/location.entity.ts` — created (4 entities)
+- `backend/nest/src/entities/party-entity.entity.ts` — created
+- `backend/nest/src/entities/participation.entity.ts` — created (3 entities)
+- `backend/nest/src/entities/submission-extras.entity.ts` — created (2 entities)
+- `backend/nest/src/entities/quote-section-risk-code.entity.ts` — created
+- `backend/nest/src/entities/auth-security.entity.ts` — created (3 entities)
+- `backend/nest/src/entities/measure-definition-history.entity.ts` — created
+- `backend/nest/src/entities/financial-section-transaction.entity.ts` — created (2 entities)
+- `backend/nest/src/entities/notification-extras.entity.ts` — created (4 entities)
+- `backend/nest/src/entities/organisation.entity.ts` — created (4 org entities + ClearanceQueue)
+- `backend/nest/src/database/db-sync.ts` — created (fresh-install synchronise script)
+- `backend/nest/src/config/typeorm.config.ts` — all entities registered, migrationsRun removed
+- `backend/nest/src/entities/index.ts` — full export list updated
+- `package.json` (root) — db:migrate → db:sync; db:setup and db:reset updated
+- `.github/workflows/ci.yml` — db:migrate → db:sync step
+- `db/schema/01–29` — deleted (29 files)
+- `backend/nest/src/migrations/1710000000000–1740000000004` — deleted (5 files)
+
+**Open Questions / Deferred:**
+- Production schema for UAT/prod environments: `db:sync` is for fresh installs only. Future column/table additions must be delivered via explicit TypeORM migrations (one per release). No migration tooling set up yet — deferred.
+
+---
+
 ### [2026-05-07] [Today] — Remove Legacy Migration Files / Schema-First Transition
 
 **Request:**
