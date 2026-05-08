@@ -58,13 +58,12 @@ Cleaned/
     package.json                 ← Website-only deps (Next.js, React, Tailwind)
     jest.config.js               ← Website Jest config (testEnvironment: jsdom)
     jest.setup.ts
-  backend/
-    docs/                        ← Backend-level documentation
-    src/                         ← NestJS source (target — currently at backend/nest/src/)
-    nest/                        ← NestJS API — current location (will become backend/src/ after migration)
-    server.js                    ← Express API (legacy — coexists during migration; delete at cutover)
-    routes/                      ← Express route files (legacy)
-    middleware/                  ← Express middleware (legacy)
+  backend/                       ← Multi-service container — one subfolder per service
+    nest/                        ← NestJS REST API (permanent home — do NOT flatten into backend/src/)
+      src/                       ← NestJS source: controllers, services, entities, modules
+      package.json               ← NestJS-only deps
+      tsconfig.json
+    [future-service]/            ← Pattern for any additional backend service (e.g. workers/, jobs/)
   package.json                   ← Root orchestration only — no sub-project deps; scripts delegate to --prefix
   package-lock.json              ← Corresponds to root package.json (devDependencies only)
   docker-compose.yml             ← Infrastructure — starts Postgres for local development
