@@ -19,4 +19,7 @@ module.exports = {
     // Run tests serially to avoid DB race conditions
     maxWorkers: 1,
     verbose: true,
+    // Force Jest to exit after tests complete; prevents DB connection handles
+    // from holding the process open and causing a non-zero exit code in CI.
+    forceExit: true,
 }

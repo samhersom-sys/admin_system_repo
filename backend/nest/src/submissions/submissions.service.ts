@@ -349,6 +349,23 @@ export class SubmissionsService {
     if (placingBroker != null) existing.placingBroker = placingBroker
     if (placingBrokerId != null) existing.brokerId = placingBrokerId
     if (placingBrokerName != null) existing.placingBrokerName = placingBrokerName
+    // Gap-fill fields — migrations 106–108 (REQ-SUB-BE-F-026)
+    if (body.workflowNotes != null) existing.workflowNotes = body.workflowNotes
+    if (body.aiExtracted != null) existing.aiExtracted = body.aiExtracted
+    if (body.reviewRequired != null) existing.reviewRequired = body.reviewRequired
+    if (body.emailSource != null) existing.emailSource = body.emailSource
+    if (body.emailReceivedDate != null) existing.emailReceivedDate = body.emailReceivedDate
+    if (body.emailProcessedDate != null) existing.emailProcessedDate = body.emailProcessedDate
+    if (body.extractionConfidence != null) existing.extractionConfidence = body.extractionConfidence
+    if (body.assignedBy != null) existing.assignedBy = body.assignedBy
+    if (body.assignedDate != null) existing.assignedDate = body.assignedDate
+    if (body.clearanceStatus != null) existing.clearanceStatus = body.clearanceStatus
+    if (body.clearanceStatusCode != null) existing.clearanceStatusCode = body.clearanceStatusCode
+    if (body.clearanceNotes != null) existing.clearanceNotes = body.clearanceNotes
+    if (body.clearanceMatchedSubmissions != null) existing.clearanceMatchedSubmissions = body.clearanceMatchedSubmissions
+    if (body.clearanceReviewedBy != null) existing.clearanceReviewedBy = body.clearanceReviewedBy
+    if (body.clearanceReviewedDate != null) existing.clearanceReviewedDate = body.clearanceReviewedDate
+    if (body.autoClearanceChecked != null) existing.autoClearanceChecked = body.autoClearanceChecked
 
     return this.submissionRepo.save(existing)
   }
@@ -416,14 +433,14 @@ export class SubmissionsService {
       `SELECT s.id, s.reference, s.insured, s."placingBroker", s.status,
               s."inceptionDate"
          FROM submission_related sr
-         JOIN submission s ON s.id = sr.related_id
+         JOIN submission s ON s.id = sr.related_submission_id
         WHERE sr.submission_id = $1
         UNION
        SELECT s.id, s.reference, s.insured, s."placingBroker", s.status,
               s."inceptionDate"
          FROM submission_related sr
          JOIN submission s ON s.id = sr.submission_id
-        WHERE sr.related_id = $1
+        WHERE sr.related_submission_id = $1
         ORDER BY reference ASC`,
       [id],
     )
@@ -438,16 +455,22 @@ export class SubmissionsService {
     id: number,
     relatedSubmissionId: number,
   ): Promise<Record<string, unknown>> {
+    if (!relatedSubmissionId || !Number.isInteger(Number(relatedSubmissionId))) {
+      throw new BadRequestException('relatedSubmissionId is required and must be an integer')
+    }
     await this.getAccessibleSubmission(orgCode, id)
     if (id === relatedSubmissionId) {
       throw new BadRequestException('A submission cannot be linked to itself')
     }
-    // Normalise order so (min,max) is always stored the same way
+    // Normalise order so (min,max) is always stored the same way — idempotent inserts
     const [a, b] = id < relatedSubmissionId ? [id, relatedSubmissionId] : [relatedSubmissionId, id]
     await this.dataSource.query(
-      `INSERT INTO submission_related (submission_id, related_id)
-       VALUES ($1, $2)
-       ON CONFLICT DO NOTHING`,
+      `INSERT INTO submission_related (submission_id, related_submission_id)
+       SELECT $1, $2
+        WHERE NOT EXISTS (
+            SELECT 1 FROM submission_related
+             WHERE submission_id = $1 AND related_submission_id = $2
+        )`,
       [a, b],
     )
     const rows = await this.dataSource.query<Record<string, unknown>[]>(
@@ -467,7 +490,7 @@ export class SubmissionsService {
     await this.getAccessibleSubmission(orgCode, id)
     const [a, b] = id < relatedId ? [id, relatedId] : [relatedId, id]
     await this.dataSource.query(
-      `DELETE FROM submission_related WHERE submission_id = $1 AND related_id = $2`,
+      `DELETE FROM submission_related WHERE submission_id = $1 AND related_submission_id = $2`,
       [a, b],
     )
   }

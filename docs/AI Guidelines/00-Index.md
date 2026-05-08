@@ -82,6 +82,6 @@ Regardless of the specific task, the following rules are always active:
 
 1. **Three-Artifact Rule** — requirements before tests, tests before code.  No exceptions.
 2. **Folder Structure** — every new file must be placed in the location defined in `12-Folder-Structure.md`.  If the location is unclear, raise an open question before creating the file.
-3. **Boundary Rules** — no cross-domain imports, no schema changes outside `db/migrations/`, no direct fetch calls outside `frontend/src/shared/lib/api-client`.
+3. **Boundary Rules** — no cross-domain imports, no schema changes outside `db/schema/`, no direct fetch calls outside `frontend/src/shared/lib/api-client`.
 4. **Conversation Log** — every qualifying session ends with an entry appended to `conversation-log.md`.
 5. **Checkpoint Behaviour** — stop and confirm after every major section of work.  Never assume intent.

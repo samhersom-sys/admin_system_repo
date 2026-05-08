@@ -11,7 +11,6 @@ import LoginPage from '@/auth/LoginPage'
 import NewSubmissionPage from '@/submissions/NewSubmissionPage'
 import SubmissionViewPage from '@/submissions/SubmissionViewPage'
 import QuotesPage from '@/quotes/index'
-import NewQuotePage from '@/quotes/NewQuotePage/NewQuotePage'
 import QuoteViewPage from '@/quotes/QuoteViewPage/QuoteViewPage'
 import QuoteSectionViewPage from '@/quotes/QuoteSectionViewPage/QuoteSectionViewPage'
 import PoliciesPage from '@/policies/index'
@@ -20,6 +19,7 @@ import PolicyViewPage from '@/policies/PolicyViewPage/PolicyViewPage'
 import PolicySectionViewPage from '@/policies/PolicySectionViewPage/PolicySectionViewPage'
 import PolicyEndorsePage from '@/policies/PolicyEndorsePage/PolicyEndorsePage'
 import PolicyEndorsementPage from '@/policies/PolicyEndorsementPage/PolicyEndorsementPage'
+import PolicyTransactionViewPage from '@/policies/PolicyTransactionViewPage/PolicyTransactionViewPage'
 import PolicyCoverageDetailPage from '@/policies/PolicyCoverageDetailPage/PolicyCoverageDetailPage'
 import PolicyCoverageSubDetailPage from '@/policies/PolicyCoverageSubDetailPage/PolicyCoverageSubDetailPage'
 import QuoteCoverageDetailPage from '@/quotes/QuoteCoverageDetailPage/QuoteCoverageDetailPage'
@@ -35,11 +35,19 @@ import TrialBalancePage from '@/finance/TrialBalancePage/TrialBalancePage'
 import ReportsListPage from '@/reporting/ReportsListPage/ReportsListPage'
 import ReportCreatePage from '@/reporting/ReportCreatePage/ReportCreatePage'
 import ReportRunPage from '@/reporting/ReportRunPage/ReportRunPage'
+import DashboardCreatePage from '@/reporting/DashboardCreatePage/DashboardCreatePage'
+import DashboardConfigurePage from '@/reporting/DashboardConfigurePage/DashboardConfigurePage'
+import DashboardViewPage from '@/reporting/DashboardViewPage/DashboardViewPage'
 // Binding Authorities
 import BAListPage from '@/binding-authorities/BAListPage/BAListPage'
 import NewBAPage from '@/binding-authorities/NewBAPage/NewBAPage'
 import BAViewPage from '@/binding-authorities/BAViewPage/BAViewPage'
 import BASectionViewPage from '@/binding-authorities/BASectionViewPage/BASectionViewPage'
+import BADocumentsPage from '@/binding-authorities/BADocumentsPage/BADocumentsPage'
+import BAEndorsePage from '@/binding-authorities/BAEndorsePage/BAEndorsePage'
+import BAEndorsementPage from '@/binding-authorities/BAEndorsementPage/BAEndorsementPage'
+import BATransactionViewPage from '@/binding-authorities/BATransactionViewPage/BATransactionViewPage'
+import BordereauRunPage from '@/binding-authorities/BordereauRunPage/BordereauRunPage'
 import SettingsPage from '@/settings/index'
 import CompanyListPage from '@/settings/ModuleLicensing/CompanyListPage'
 import CompanyConfigPage from '@/settings/ModuleLicensing/CompanyConfigPage'
@@ -47,6 +55,7 @@ import RatingRulesPage from '@/settings/RatingRulesPage'
 import RatingRulesDetailPage from '@/settings/RatingRulesDetailPage'
 import ProductListPage from '@/settings/ProductListPage'
 import ProductConfigPage from '@/settings/ProductConfigPage'
+import DashboardReportingSettingsPage from '@/settings/DashboardReportingSettingsPage'
 import DataQualitySettingsPage from '@/settings/DataQualitySettingsPage'
 import OrganisationDetailPage from '@/settings/OrganisationDetailPage'
 import PartyListPage from '@/parties/PartyListPage/PartyListPage'
@@ -55,6 +64,7 @@ import PartyViewPage from '@/parties/PartyViewPage/PartyViewPage'
 // Claims
 import ClaimsListPage from '@/claims/ClaimsListPage/ClaimsListPage'
 import ClaimViewPage from '@/claims/ClaimViewPage/ClaimViewPage'
+import ClaimCreatePage from '@/claims/ClaimCreatePage/ClaimCreatePage'
 // App shell features
 import HomePage from './home/index'
 // Workflow
@@ -105,7 +115,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/submissions/new"        element={<NewSubmissionPage />} />
           <Route path="/submissions/:id"        element={<SubmissionViewPage />} />
           <Route path="/quotes"                element={<QuotesPage />} />
-          <Route path="/quotes/new"           element={<NewQuotePage />} />
+          <Route path="/quotes/new"           element={<QuoteViewPage />} />
           <Route path="/quotes/:id"           element={<QuoteViewPage />} />
           <Route path="/quotes/:id/sections/:sectionId" element={<QuoteSectionViewPage />} />
           <Route path="/quotes/:id/sections/:sectionId/coverages/:coverageId" element={<QuoteCoverageDetailPage />} />
@@ -114,19 +124,29 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/policies/endorse/:id"  element={<PolicyEndorsePage />} />
           <Route path="/policies/:id"          element={<PolicyViewPage />} />
           <Route path="/policies/:id/endorsements/:endorsementId/edit" element={<PolicyEndorsementPage />} />
+          <Route path="/policies/:id/transactions/:transactionId" element={<PolicyTransactionViewPage />} />
           <Route path="/policies/:policyId/sections/:sectionId" element={<PolicySectionViewPage />} />
           <Route path="/policies/:policyId/sections/:sectionId/coverages/:coverageId" element={<PolicyCoverageDetailPage />} />
           <Route path="/policies/:policyId/sections/:sectionId/coverages/:coverageId/details/:detailName" element={<PolicyCoverageSubDetailPage />} />
           {/* Binding Authorities */}
-          <Route path="/binding-authorities"                           element={<BAListPage />} />
-          <Route path="/binding-authorities/new"                      element={<NewBAPage />} />
-          <Route path="/binding-authorities/:id"                      element={<BAViewPage />} />
-          <Route path="/binding-authorities/:id/sections/:sectionId" element={<BASectionViewPage />} />
+          <Route path="/binding-authorities"                                            element={<BAListPage />} />
+          <Route path="/binding-authorities/new"                                       element={<NewBAPage />} />
+          <Route path="/binding-authorities/endorse/:id"                               element={<BAEndorsePage />} />
+          <Route path="/binding-authorities/:id"                                       element={<BAViewPage />} />
+          <Route path="/binding-authorities/:id/sections/:sectionId"                  element={<BASectionViewPage />} />
+          <Route path="/binding-authorities/:id/documents"                            element={<BADocumentsPage />} />
+          <Route path="/binding-authorities/:id/endorsements/:endorsementId/edit"     element={<BAEndorsementPage />} />
+          <Route path="/binding-authorities/:id/transactions/:transactionId"           element={<BATransactionViewPage />} />
+          <Route path="/binding-authorities/:id/bordereaux/:configId/run"             element={<BordereauRunPage />} />
           {/* Reporting */}
           <Route path="/reports"               element={<ReportsListPage />} />
           <Route path="/reports/create"        element={<ReportCreatePage />} />
           <Route path="/reports/edit/:id"      element={<ReportCreatePage />} />
           <Route path="/reports/run/:reportId" element={<ReportRunPage />} />
+          <Route path="/dashboards/view/:reportId" element={<DashboardViewPage />} />
+          <Route path="/dashboards/create"     element={<DashboardCreatePage />} />
+          <Route path="/dashboards/edit/:id"   element={<DashboardCreatePage />} />
+          <Route path="/dashboards/configure/:id" element={<DashboardConfigurePage />} />
           {/* Finance */}
           <Route path="/finance"                      element={<FinanceHubPage />} />
           <Route path="/finance/cash-batching"        element={<CashBatchingPage />} />
@@ -151,11 +171,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/settings/rating-rules" element={<RatingRulesPage />} />
           <Route path="/settings/rating-rules/:id" element={<RatingRulesDetailPage />} />
           <Route path="/settings/data-quality" element={<DataQualitySettingsPage />} />
+          <Route path="/settings/dashboard-reporting" element={<DashboardReportingSettingsPage />} />
           <Route path="/parties"               element={<PartyListPage />} />
           <Route path="/parties/new"           element={<CreatePartyPage />} />
           <Route path="/parties/:id"           element={<PartyViewPage />} />
           {/* Claims */}
           <Route path="/claims"                element={<ClaimsListPage />} />
+          <Route path="/claims/create"         element={<ClaimCreatePage />} />
           <Route path="/claims/:id"            element={<ClaimViewPage />} />
           <Route path="/search"               element={<SearchPage />} />
           <Route path="/profile"              element={<ProfilePage />} />

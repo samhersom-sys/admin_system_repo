@@ -135,7 +135,6 @@ const DOMAIN_NAV = [
 // ─── Create quick-menu items ────────────────────────────────────────────────
 const CREATE_ITEMS = [
   { label: 'Submission', icon: FiFileText, to: '/submissions/new?type=submission' },
-  { label: 'Pre-Submission', icon: FiFileText, to: '/submissions/new?type=pre-submission' },
   { label: 'Quote', icon: FiFile, to: '/quotes/new' },
   { label: 'Binding Authority', icon: FiBriefcase, to: '/binding-authorities/new' },
   { label: 'Policy', icon: FiShield, to: '/policies/create' },
@@ -169,6 +168,7 @@ export default function Sidebar() {
 
   // Which domain item is currently active — used to bind section items to the right header
   const activeDomainItem = DOMAIN_NAV.find(d => location.pathname.startsWith(d.matchPrefix)) ?? null
+  const isReportingRoute = location.pathname.startsWith('/reports') || location.pathname.startsWith('/dashboards')
 
   // Domain sub-item hover state (REQ-SIDEBAR-F-016)
   const [hoveredDomain, setHoveredDomain] = useState<string | null>(null)
@@ -180,7 +180,7 @@ export default function Sidebar() {
 
   // Pre-render page-registered section sub-items for the active domain header.
   // This is a JSX expression (not a hook) — valid to compute before return().
-  const sectionSubEl = (section && activeDomainItem && Array.isArray(section.items)) ? (
+  const sectionSubEl = (section && Array.isArray(section.items)) ? (
     <ul className="sidebar-domain-sub" role="list">
       {section.items.map((item) => {
         const ItemIcon = item.icon
@@ -345,7 +345,8 @@ export default function Sidebar() {
               </NavLink>
 
               {/* ── Nav sub-items — shown on hover ── */}
-              {subItems?.length && hoveredNav === to ? (
+              {section && isReportingRoute && to === '/reports' ? sectionSubEl : null}
+              {subItems?.length && hoveredNav === to && !(section && isReportingRoute && to === '/reports') ? (
                 <ul className="sidebar-domain-sub" role="list">
                   {subItems.map((sub) => {
                     const SubIcon = sub.icon
@@ -496,7 +497,7 @@ export default function Sidebar() {
             Section items are now rendered inline under the domain header (REQ-SIDEBAR-F-007).
             This fallback block is preserved for edge cases where a section is registered
             but no domain route is matched (e.g. a future non-domain page with a section). */}
-        {section && Array.isArray(section.items) && !activeDomainItem && (
+        {section && Array.isArray(section.items) && !activeDomainItem && !isReportingRoute && (
           <li>
             <div className="sidebar-context-section">
               <ul className="sidebar-context-list" role="list">

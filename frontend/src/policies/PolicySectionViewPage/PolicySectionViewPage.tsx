@@ -16,6 +16,7 @@ import {
     getPolicy,
     getPolicySectionDetails,
     getPolicyCoverages,
+    getClassesOfBusiness,
 } from '@/policies/policies.service'
 import type { Policy, PolicySection, PolicyCoverage } from '@/policies/policies.service'
 import { useSidebarSection } from '@/shell/SidebarContext'
@@ -67,6 +68,7 @@ export default function PolicySectionViewPage() {
     const [coverages, setCoverages] = useState<PolicyCoverage[]>([])
     const [coveragesLoaded, setCoveragesLoaded] = useState(false)
     const [coverageSort, setCoverageSort] = useState<SortConfig>({ key: 'reference', direction: 'asc' })
+    const [classesOfBusiness, setClassesOfBusiness] = useState<string[]>([])
 
     // Wave 1: load policy
     useEffect(() => {
@@ -97,6 +99,12 @@ export default function PolicySectionViewPage() {
             })
             .finally(() => setLoading(false))
     }, [policy]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        getClassesOfBusiness()
+            .then((items) => setClassesOfBusiness(items ?? []))
+            .catch(() => setClassesOfBusiness([]))
+    }, [])
 
     function setPolicyCoveragesData(polId: string, secId: string) {
         getPolicyCoverages(polId, secId)
@@ -184,10 +192,11 @@ export default function PolicySectionViewPage() {
                         <div>
                             <label className="text-xs text-gray-500 block mb-0.5">Class of Business</label>
                             <input
+                                list="policy-section-class-of-business-options"
                                 className={inputCls}
                                 value={section.class_of_business ?? ''}
                                 readOnly={!editable}
-                                onChange={() => undefined}
+                                onChange={(e) => setSection((prev) => prev ? { ...prev, class_of_business: e.target.value } : prev)}
                             />
                         </div>
                         <div>
@@ -249,6 +258,12 @@ export default function PolicySectionViewPage() {
                     <p className="text-sm text-gray-400">No participations found.</p>
                 </Card>
             )}
+
+            <datalist id="policy-section-class-of-business-options">
+                {classesOfBusiness.map((item) => (
+                    <option key={item} value={item} />
+                ))}
+            </datalist>
         </div>
     )
 }

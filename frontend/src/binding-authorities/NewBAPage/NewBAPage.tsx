@@ -2,13 +2,17 @@
  * NewBAPage — REQ-BA-FE-F-009 to F-015
  *
  * Form to create a new binding authority.
+ * Coverholder selected via CoverholderSearchModal (party type = coverholder).
  * POST on save → navigate to /binding-authorities/:id
  */
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { FiSave, FiSearch, FiX } from 'react-icons/fi'
 import { useNotifications } from '@/shell/NotificationDock'
+import { useSidebarSection } from '@/shell/SidebarContext'
 import { createBindingAuthority, type CreateBAInput } from '../binding-authorities.service'
+import CoverholderSearchModal from '../CoverholderSearchModal/CoverholderSearchModal'
 
 function addDays(dateStr: string, days: number): string {
     const d = new Date(dateStr)
@@ -32,11 +36,24 @@ export default function NewBAPage() {
 
     const [form, setForm] = useState(EMPTY_FORM)
     const [saving, setSaving] = useState(false)
+    const [coverholderModalOpen, setCoverholderModalOpen] = useState(false)
+
+    // Sidebar section (REQ-BA-FE-F-015)
+    const sidebarSection = useMemo(() => ({
+        title: 'Binding Authority',
+        items: [{ label: 'Save', icon: FiSave, event: 'ba:save' }],
+    }), [])
+    useSidebarSection(sidebarSection)
+
+    useEffect(() => {
+        const handler = () => handleSave()
+        window.addEventListener('ba:save', handler)
+        return () => window.removeEventListener('ba:save', handler)
+    })
 
     function setField<K extends keyof typeof EMPTY_FORM>(key: K, value: (typeof EMPTY_FORM)[K]) {
         setForm((prev) => {
             const next = { ...prev, [key]: value }
-            // Auto-update expiry when inception changes
             if (key === 'inception_date' && typeof value === 'string') {
                 next.expiry_date = addDays(value, 365)
             }
@@ -79,14 +96,36 @@ export default function NewBAPage() {
                     <label htmlFor="ba-coverholder" className="text-sm font-medium text-gray-700">
                         Coverholder <span className="text-red-500">*</span>
                     </label>
-                    <input
-                        id="ba-coverholder"
-                        type="text"
-                        value={form.coverholder_name}
-                        onChange={(e) => setField('coverholder_name', e.target.value)}
-                        placeholder="Search coverholder…"
-                        className="border border-gray-300 rounded px-3 py-2 text-sm"
-                    />
+                    <div className="relative">
+                        <input
+                            id="ba-coverholder"
+                            type="text"
+                            value={form.coverholder_name}
+                            readOnly
+                            placeholder="Select coverholder…"
+                            className="border border-gray-300 rounded px-3 py-2 text-sm w-full bg-white pr-16"
+                        />
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            {form.coverholder_name && (
+                                <button
+                                    type="button"
+                                    onClick={() => setForm((p) => ({ ...p, coverholder_name: '', coverholder_id: 0 }))}
+                                    title="Clear"
+                                    className="text-gray-400 hover:text-red-500"
+                                >
+                                    <FiX size={14} />
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setCoverholderModalOpen(true)}
+                                title="Search Coverholder"
+                                className="text-gray-500 hover:text-brand-600"
+                            >
+                                <FiSearch size={16} />
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -150,6 +189,18 @@ export default function NewBAPage() {
                     </button>
                 </div>
             </div>
+
+            <CoverholderSearchModal
+                isOpen={coverholderModalOpen}
+                onClose={() => setCoverholderModalOpen(false)}
+                onSelect={(party) =>
+                    setForm((prev) => ({
+                        ...prev,
+                        coverholder_name: party.name,
+                        coverholder_id: party.id,
+                    }))
+                }
+            />
         </div>
     )
 }

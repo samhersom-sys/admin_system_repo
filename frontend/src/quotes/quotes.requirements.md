@@ -180,9 +180,13 @@ The Quote view page shall not register `All Quotes` or `Issue Policy` in its con
 
 **REQ-QUO-FE-F-022:** The Quote view page shall render the submission reference as a navigation link to `/submissions/:submission_id` when the quote has a linked submission.
 
-**REQ-QUO-FE-F-024:** The Insured field shall use the InsuredSearch modal for selection. Once an insured is selected the field shall show the party name as read-only with a `Clear` button. While a name has been typed but not confirmed via the modal the field shall display a red border and an `"Insured not confirmed — please search and select"` warning; the sidebar Save action shall be disabled until confirmed or cleared.
+**REQ-QUO-FE-F-024:** The Insured field shall use the InsuredSearch modal for selection. Once an insured is selected the field shall display the confirmed state: a bordered container (matching regular input styling — `border border-gray-300 rounded px-3 py-1.5 text-sm`) showing the party name on the left with a `FiTrash2` bin icon button (`aria-label="Clear insured"`) on the right to clear the selection. While no insured has been confirmed the field shall be rendered in an unconfirmed state (data-testid `insured-unconfirmed`). The red border and inline warning text `"Insured not confirmed — please search and select"` shall NOT be rendered on initial page load — they shall appear only after the user has triggered a save attempt (sidebar `submission:save` event sets `saveAttempted = true`). Selecting an insured via the modal shall clear the warning immediately regardless of `saveAttempted`.
 
-**REQ-QUO-FE-F-025:** The Submission field shall consist of a Submission ID (numeric, read-only display once linked) and a Submission Reference (text input for search/link). Once a submission is confirmed via search the fields shall show the reference as read-only with a `Clear` button. While a reference has been typed but not confirmed the Submission Reference field shall display a red border and a `"Submission not confirmed — please search and select"` warning.
+**REQ-QUO-FE-F-025:** The Submission field shall consist of a Submission Reference (text input for search/link using `SubmissionSearch`). Once a submission is confirmed via search the field shall display the confirmed state: a bordered container (matching regular input styling) showing the reference as a navigation link on the left with a `FiTrash2` bin icon button (`aria-label="Unlink submission"`) on the right. While no submission is confirmed the field shall be rendered in an unconfirmed state (data-testid `submission-unconfirmed`). The red border and inline warning text `"Submission not confirmed — please search and select"` shall NOT be rendered on initial page load — they shall appear only after the user has triggered a save attempt. Selecting a submission via the modal shall clear the warning immediately regardless of `saveAttempted`.
+
+**REQ-QUO-FE-F-025a:** When the user triggers a save attempt (sidebar `submission:save` event) and `submission_id` is `null` (no submission is confirmed), the save SHALL be blocked: `addNotification` SHALL push an `'error'`-type notification reading `'Quote not saved: a linked submission is required.'`, the `PUT /api/quotes/:id` API call SHALL NOT be made, and `saveAttempted` SHALL be set to `true` so that inline validation indicators become visible on the affected fields.
+
+**REQ-QUO-FE-F-076:** When the `QuoteViewPage` has both a confirmed insured (`insuredParty`) and a linked submission (`linkedSubmission`) loaded, and the insured party's name does not match the linked submission's `insured` field, the page SHALL push a `'warning'`-severity notification via `addNotification` reading `'Insured does not match the linked submission insured — review before saving.'` with a stable client ID `quote-{quoteId}-insured-mismatch`. The notification SHALL be removed via `removeNotification` as soon as the mismatch is resolved (insured updated to match, submission changed or unlinked, or insured cleared). The mismatch check SHALL be re-evaluated whenever either `insuredParty` or `linkedSubmission` changes.
 
 **REQ-QUO-FE-F-026:** The quote header panel shall include a Year of Account text input that is sent as `yearOfAccount` in `POST /api/quotes` and `PUT /api/quotes/:id` payloads.
 
@@ -212,11 +216,11 @@ The Quote view page shall not register `All Quotes` or `Issue Policy` in its con
 
 **REQ-QUO-FE-F-034:** The `QuoteViewPage` shall render the complete editable form (all fields from REQ-QUO-FE-F-017 through REQ-QUO-FE-F-032) **unconditionally** — always visible at the top of the page, regardless of the active tab. Below the form, a `TabsNav` component shall be rendered. See **REQ-QUO-FE-F-045** for the authoritative tab set. The active tab shall default to `'sections'` on page load. There is no `'details'` tab.
 
-**REQ-QUO-FE-F-035:** The complete editable form (Quote & Referencing, Insured, Dates, Contract / Placement, Renewal field groups) shall be rendered above the tab strip at all times. It shall not be gated by any tab selection.
+**REQ-QUO-FE-F-035:** The complete editable form (Contract & Reference, Insured, Dates, Contract / Placement, Renewal field groups) shall be rendered above the tab strip at all times. It shall not be gated by any tab selection.
 
-**REQ-QUO-FE-F-036:** The always-visible form above the tab strip shall be laid out in two side-by-side columns. The left column shall contain the **Quote & Referencing** `FieldGroup` followed by the **Insured** `FieldGroup`. The right column shall contain the **Dates** `FieldGroup`, the **Contract / Placement** `FieldGroup`, and the **Renewal** `FieldGroup`.
+**REQ-QUO-FE-F-036:** The always-visible form above the tab strip shall be laid out in two side-by-side columns. The left column shall contain the **Contract & Reference** `FieldGroup` followed by the **Insured** `FieldGroup`. The right column shall contain the **Dates** `FieldGroup`, the **Contract / Placement** `FieldGroup`, and the **Renewal** `FieldGroup`.
 
-**REQ-QUO-FE-F-037:** The **Quote & Referencing** `FieldGroup` shall contain, in order: Reference (read-only display), Status badge, Submission ID (read-only, populated when a submission is linked) + Linked Submission Reference (search/confirm/clear — see REQ-QUO-FE-F-025), Year of Account input, Business Type select.
+**REQ-QUO-FE-F-037:** The **Contract & Reference** `FieldGroup` shall contain, in order: Reference (read-only display), Status badge, Submission ID (read-only, populated when a submission is linked) + Linked Submission Reference (search/confirm/clear — see REQ-QUO-FE-F-025), Year of Account input, Business Type select.
 
 **REQ-QUO-FE-F-038:** The **Insured** `FieldGroup` shall contain a single field: Insured Name (InsuredSearch modal with search and clear — see REQ-QUO-FE-F-024).
 
@@ -238,9 +242,9 @@ The Quote view page shall not register `All Quotes` or `Issue Policy` in its con
 
 **REQ-QUO-FE-F-045:** The `QuoteViewPage` `TabsNav` component shall contain **five** tabs in this order: `{ key: 'sections', label: 'Sections' }`, `{ key: 'brokers', label: 'Brokers' }`, `{ key: 'additional-insureds', label: 'Additional Insureds' }`, `{ key: 'financial-summary', label: 'Financial Summary' }`, `{ key: 'audit', label: 'Audit' }`. There is no `'details'` tab. The active tab shall default to `'sections'` on page load. The `TABS` constant shall be defined at module level with these five entries. Tab data-testid values shall therefore be `tab-sections`, `tab-brokers`, `tab-additional-insureds`, `tab-financial-summary`, `tab-audit`.
 
-**REQ-QUO-FE-F-046:** The Sections tab shall load section data on page mount (not gated by tab selection) and render the returned records in an `app-table` table wrapped in `table-wrapper`. The table shall display the following columns: Reference (linked to `/quotes/:id/sections/:sectionId` per §14.7 RULE 9), Class of Business, Inception Date, Expiry Date, Limit, Gross Premium, and an optional Delete action column when the quote is Draft. The `<thead>` and column headers shall always be visible regardless of whether there are results (per §14.7 RULE 8). When the array is empty, the `<tbody>` shall render a single row with `"No sections found."` spanning all columns. While loading, a loading indicator shall be visible above the table. On load failure, an inline error message with a Retry button shall be shown.
+**REQ-QUO-FE-F-046:** The Sections tab shall load section data on page mount (not gated by tab selection) and render the returned records in a `ResizableGrid`. The table shall display the following columns: actions (FiPlus header to add a section when Draft; FiSearch link + FiTrash2 delete per row), Reference (navigation link to `/quotes/:id/sections/:sectionId`), Class of Business, Inception Date, Effective Date, Expiry Date, Days on Cover (read-only, server-computed), Limit Currency, Limit Amount, Limit Loss Qualifier, Excess Currency, Excess Amount, Excess Loss Qualifier, Sum Insured Currency, Sum Insured, Premium Currency, Gross Gross Premium, Gross Premium, Deductions, Net Premium, Tax Receivable, Annual Rated GP (`annual_gross_premium`), Annual Rated NP (`annual_net_premium`), Written Order %, Signed Order %, Time Basis (`time_basis`), Written Order Basis (`written_order_basis`), Signed Order Basis (`signed_order_basis`), Written Line Total (`written_line_total`), Signed Line Total (`signed_line_total`), DA Ref (`delegated_authority_ref`), DA Section Ref (`delegated_authority_section_ref`). When the quote status is `"Draft"`, every editable column cell (Class of Business, Inception Date, Effective Date, Expiry Date, Limit Currency, Limit Amount, Limit Loss Qualifier, Excess Currency, Excess Amount, Excess Loss Qualifier, Sum Insured Currency, Sum Insured, Premium Currency, Gross Gross Premium, Gross Premium, Deductions, Net Premium, Tax Receivable, Annual Rated GP, Annual Rated NP, Written Order %, Signed Order %) SHALL render as an inline input (`type="text"` for text fields, `type="date"` for date fields, `type="number"` for numeric fields). The value SHALL be persisted on `blur` via a `PATCH`-style call to `PUT /api/quotes/:id/sections/:sectionId` carrying only the changed field. The `days_on_cover` column is always read-only (server-computed; updated when `inception_date` or `expiry_date` changes on blur). The `reference` column is always read-only. The `FiSearch` magnifying-glass link per row is mandatory and shall be present regardless of quote status. The `<thead>` and column headers shall always be visible regardless of whether there are results (per §14.7 RULE 8). When the array is empty, the `<tbody>` shall render a single row with `"No sections found."` spanning all columns.
 
-**REQ-QUO-FE-F-047:** When the quote status is `"Draft"`, the Sections tab shall render an `"+ Add Section"` button that calls `POST /api/quotes/:id/sections`. On a 201 response the returned section shall be prepended to the grid without a full reload. Each section row shall have a delete button that calls `DELETE /api/quotes/:id/sections/:sectionId`; on a 204 response the row shall be removed from the grid. Both actions shall be hidden when the quote is not `"Draft"`.
+**REQ-QUO-FE-F-047:** When the quote status is `"Draft"`, the Sections tab shall allow a new section to be added by clicking the `FiPlus` icon in the `actions` column header. Clicking the icon SHALL call `POST /api/quotes/:id/sections` directly (no modal). On a 201 response the returned section SHALL be appended to the grid without a full reload. There is no separate `"+ Add Section"` button outside the table. Each section row SHALL have a `FiSearch` link to the section detail page and, when Draft, a `FiTrash2` delete button that calls `DELETE /api/quotes/:id/sections/:sectionId`; on a 204 response the row is removed from the grid. The `FiSearch` link and `FiTrash2` button are the only action controls in the row. Both the add icon and the delete button shall be hidden when the quote is not `"Draft"`. The `FiSearch` link SHALL be present in all statuses.
 
 **REQ-QUO-FE-F-048:** The Broker tab shall display two sub-sections labelled **Placing Broker** and **Surplus Lines Broker**. Each sub-section shall use the project's existing `BrokerSearch` component (from `@/parties/BrokerSearch/BrokerSearch`) for broker search and selection. Once a broker is confirmed via the `BrokerSearch` modal, the Broker Name shall be shown read-only with a `Clear` button. The Placing Broker sub-section shall additionally include a **Broker Contact** text input. All broker values shall be stored in the quote's `payload` JSONB field under keys `placingBrokerId`, `placingBrokerName`, `placingBrokerContact`, `surplusLinesBrokerId`, `surplusLinesBrokerName`. The sidebar **Save** action (fires `submission:save`) shall call `PUT /api/quotes/:id` with `{ payload: { ...currentPayload, ...updatedBrokerFields } }`. All fields shall be editable only when quote status is `"Draft"`; when locked, the names shall be rendered as plain read-only text.
 
@@ -306,6 +310,12 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 
 **REQ-QUO-FE-F-073:** Clicking the Cancel button or the modal backdrop shall call `onClose` without invoking `onSelect`.
 
+### 4.10 TypeScript Interface Completeness (Gap-fill migrations 102–105)
+
+**REQ-QUO-FE-F-074:** The `QuoteSection` TypeScript interface in `frontend/src/quotes/quotes.service.ts` shall include the following optional nullable fields added by migrations 102–104: `time_basis?: string | null`, `written_order_basis?: string | null`, `signed_order_basis?: string | null`, `written_line_total?: number | null`, `signed_line_total?: number | null`, `delegated_authority_ref?: string | null`, `delegated_authority_section_ref?: string | null`. The `QuoteSectionPatch` interface shall include the same seven fields as optional partial-patch fields so they can be sent in `PUT /api/quotes/:id/sections/:sectionId` payloads.
+
+**REQ-QUO-FE-F-075:** The `Quote` TypeScript interface in `frontend/src/quotes/quotes.service.ts` shall include the optional nullable field `renewal_time?: string | null` added by migration 105. The `QuotePatch` type (derived from `Partial<Quote>`) shall therefore also accept `renewal_time` in `PUT /api/quotes/:id` payloads.
+
 ---
 
 ## 5. Traceability
@@ -336,8 +346,10 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | REQ-QUO-FE-F-021 | `frontend/src/quotes/__tests__/quotes.test.tsx` | T-quotes-view-R05 |
 | REQ-QUO-FE-F-022 | `frontend/src/quotes/__tests__/quotes.test.tsx` | T-quotes-view-R06 |
 | ~~REQ-QUO-FE-F-023~~ | — | REMOVED |
+| REQ-QUO-FE-F-076 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-view-R20f, R20g |
 | REQ-QUO-FE-F-024 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-view-R20b, R20c |
 | REQ-QUO-FE-F-025 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-view-R20d, R20e |
+| REQ-QUO-FE-F-025a | `frontend/src/quotes/quotes.test.tsx` | T-quotes-view-R40a, R40b |
 | REQ-QUO-FE-F-026 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-027 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-028 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
@@ -361,8 +373,8 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | REQ-QUO-FE-F-043 | `frontend/src/quotes/__tests__/quotes.test.tsx` | T-quotes-view-R24, R25 |
 | REQ-QUO-FE-F-044 | `frontend/src/quotes/__tests__/quotes.test.tsx` | T-quotes-view-R26 |
 | REQ-QUO-FE-F-045 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
-| REQ-QUO-FE-F-046 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
-| REQ-QUO-FE-F-047 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
+| REQ-QUO-FE-F-046 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-sections-R01, R02, R03 |
+| REQ-QUO-FE-F-047 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-sections-R01, R02, R03 |
 | REQ-QUO-FE-F-048 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-049 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-050 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
@@ -388,6 +400,8 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | REQ-QUO-FE-F-071 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R071 |
 | REQ-QUO-FE-F-072 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R072 |
 | REQ-QUO-FE-F-073 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R073 |
+| REQ-QUO-FE-F-074 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-section-types-R01, R02 |
+| REQ-QUO-FE-F-075 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-section-types-R03 |
 
 ---
 
@@ -419,7 +433,9 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | 2026-04-04 | Block 5 (Batch D): REQ-QUO-FE-F-062 to F-065 added — QuoteCoverageDetailPage (location schedule grouped by CoverageType) and QuoteCoverageSubDetailPage (grouped by CoverageSubType); backup coverage map row 55 updated to COVERED. |
 | 2026-04-05 | Block 6: REQ-QUO-FE-F-066 to F-073 added — QuoteSearchModal reusable component (search, filter, excludeIds, select, error/empty states). Backup coverage map row 61 added. |
 | 2026-04-07 | REQ-QUO-FE-F-023 REMOVED — delete quote from list page is not required per user confirmation. Backup coverage map row 8 updated to REMOVED. Scope §3 updated. |
+| 2026-04-07 | REQ-QUO-FE-F-076 added — insured-mismatch warning notification: fires when `insuredParty.name !== linkedSubmission.insured`, uses stable ID `quote-{id}-insured-mismatch`, cleared on resolution. Tests T-quotes-view-R20f/R20g added. |
 | 2026-04-07 | REQ-QUO-FE-F-024 and F-025 implemented — insured/submission unconfirmed state shows red border (`border-red-500 ring-1 ring-red-400`) + warning text. Tests T-quotes-view-R20b/c/d/e added. Traceability updated. |
+| 2026-04-29 | REQ-QUO-FE-F-035, F-036, F-037: renamed FieldGroup title from "Quote & Referencing" to "Contract & Reference" for consistency with Binding Authority and Policy headers. Code change in QuoteViewPage.tsx. |
 | 2026-04-07 | Block 4: REQ-QUO-FE-F-052 implemented — Days on Cover (computed), Inception Time, Expiry Time, Annual Net Premium added to section header. F-057 — Risk Code uses `<select>` from `GET /api/lookups/riskCodes` with free-text fallback. F-058 — Participations inline editing, Save Participations button, 100% validation for Written/Signed Line %. Tests R15–R23 added. `getRiskCodes` added to quotes.service.ts. |
 | 2026-04-07 | Block 5: REQ-QUO-FE-F-063 — QuoteCoverageDetailPage updated with currency filter, "Coverage Sub-Details" and "Number of Locations" columns. F-064 — QuoteCoverageSubDetailPage updated with currency filter and "Number of Locations" column. Tests R063d–R063f, R064e–R064f added. Traceability updated. |
 | 2026-04-07 | Block 6: REQ-QUO-FE-F-066 to F-073 implemented — QuoteSearchModal component at `frontend/src/quotes/QuoteSearchModal/QuoteSearchModal.tsx`. Tests R066–R073 added (8 tests). All 111 quotes tests pass. |

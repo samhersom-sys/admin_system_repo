@@ -36,15 +36,19 @@ It does not cover:
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/submissions?status=open&orgCode={orgCode}` | KPI — open submission count |
-| GET | `/api/quotes?status=active&orgCode={orgCode}` | KPI — active quote count |
-| GET | `/api/policies?status=bound&orgCode={orgCode}` | KPI — bound policy count |
-| GET | `/api/binding-authorities?status=active&orgCode={orgCode}` | KPI — active BA count |
-| GET | `/api/policies/gwp-summary?orgCode={orgCode}` | GWP summary data for bar chart |
+| GET | `/api/home/kpi-summary` | KPI — all counts + GWP for `KpiWidget` (single call, org + user scope, REQ-HOME-F-019) |
+| GET | `/api/policies/gwp-monthly?years=3` | Monthly GWP data for line chart |
+| GET | `/api/policies/gwp-cumulative?years=3` | Cumulative GWP data for line chart |
 | GET | `/api/policies/gwp-monthly?years=3` | Monthly GWP data for line chart |
 | GET | `/api/policies/gwp-cumulative?years=3` | Cumulative GWP data for line chart |
 | GET | `/api/activity/recent?userId={userId}&limit=10` | Recent activity for current user |
 | GET | `/api/tasks?assignedTo={userId}&status=pending` | Pending tasks for current user |
+
+### Backend Module Added
+
+| Module | Path | Purpose |
+|--------|------|---------|
+| `HomeModule` | `backend/nest/src/home/` | Serves `GET /api/home/kpi-summary`; internally resolves count SQL from `field-mappings.ts` DATA_SOURCES so measure definitions propagate to the home screen without duplication |
 
 ### Database Tables (read by API)
 
@@ -326,11 +330,25 @@ Each organisation sees only the data relevant to them.  The widget layout and st
 
 ### 10.3 KpiWidget
 
-**REQ-HOME-F-006:** The `KpiWidget` shall display an organisation-scoped count and a user-scoped count within the same card for each of the following KPIs: open submissions, active quotes, bound policies, active binding authorities, and YTD GWP.
+**REQ-HOME-F-006:** The `KpiWidget` shall display an organisation-scoped count and a user-scoped count within the same card for each of the following KPIs: submissions, active policies, binding authorities, and YTD GWP.
 
 **REQ-HOME-F-007:** The `KpiWidget` shall format numeric counts using `formatters.number` and currency values using `formatters.currency`.
 
-**REQ-HOME-F-008:** The `KpiWidget` shall pass `orgCode` (from `auth-session`) to every organisation-scoped API call and `userId` (from `auth-session`) to every user-scoped API call.
+**REQ-HOME-F-008:** The `KpiWidget` shall retrieve all KPI data via a single call to `GET /api/home/kpi-summary`; it shall not make separate per-domain count calls (REQ-HOME-F-020).
+
+**REQ-HOME-F-019:** The backend `HomeService.getKpiSummary` method shall resolve count SQL predicates for the `policies` domain from the `field-mappings.ts` DATA_SOURCES semantic layer (specifically, the `countActive` measure's `filterExpr`) rather than hardcoding the predicate. This ensures that any change to the `countActive` `filterExpr` in `field-mappings.ts` is automatically applied to the home screen KPI without a separate code change.
+
+**REQ-HOME-F-020:** The `GET /api/home/kpi-summary` endpoint shall return a single JSON object with the following shape, deriving all values from the same data sources and measure definitions used by the reporting/dashboard widget engine:
+```
+{
+  submissions: { org: number, user: number },
+  quotes:      { org: number, user: number },
+  policies:    { org: number, user: number },
+  bindingAuthorities: { org: number },
+  gwp:         { org: number, user: number }
+}
+```
+The `submissions` and `quotes` counts are total-count measures (`countAll`). The `policies` count is the active-policies measure (`countActive`). The GWP figure is `SUM(gross_written_premium)` on the policies table. All org-scope queries are scoped to `req.user.orgCode`; all user-scope queries filter on `created_by = req.user.username`. No query parameters are required; all scope context is derived from the authenticated session.
 
 ### 10.4 GwpChartWidget
 
@@ -360,6 +378,10 @@ Each organisation sees only the data relevant to them.  The widget layout and st
 
 **REQ-HOME-F-017:** The `TasksWidget` shall include a "View all" link that navigates to `/my-work-items`.
 
+### 10.8 Navigation Reset
+
+**REQ-HOME-F-018:** When the user navigates to `/app-home` (including re-clicking the Home link while already on the home page), the active page/tab state shall reset to `'overview'`. This ensures the user always lands on the Overview tab regardless of which sub-tab was previously selected. Implementation shall use React Router's `location.key` change to detect navigation events.
+
 ---
 
 ## 11. Traceability
@@ -387,10 +409,109 @@ Each organisation sees only the data relevant to them.  The widget layout and st
 | REQ-HOME-F-015 | `app/features/home/home.test.tsx` | pending |
 | REQ-HOME-F-016 | `app/features/home/home.test.tsx` | pending |
 | REQ-HOME-F-017 | `app/features/home/home.test.tsx` | pending |
+| REQ-HOME-F-019 | `backend/nest/src/home/home.spec.ts` | T-HOME-BE-R019a, T-HOME-BE-R019b |
+| REQ-HOME-F-020 | `frontend/src/home/__tests__/home.test.tsx` | T-HOME-KPI-R020 |
 
 ---
 
-## 12. Change Log
+## 12. Open Questions
+
+| # | Question | Status |
+|---|----------|--------|
+| OQ-HOME-001 | Should `KpiWidget` be refactored to consume the reporting measures semantic layer (`field-mappings.ts`) instead of making 9 separate array-proxy calls to domain list endpoints, so that measure definition changes propagate to the home screen automatically? | **Resolved** — Yes. A new `GET /api/home/kpi-summary` endpoint (REQ-HOME-F-019/020) internally resolves count SQL from `DATA_SOURCES` in `field-mappings.ts`. `KpiWidget` makes one call to this endpoint. |
+| OQ-HOME-002 | Future feature: a Tenant Administrator UI allowing company admins to define custom measures (name, data source, filter logic) via a form and make them available to all users in their organisation — without a developer deploy. This would build on the existing `field-mappings.ts` semantic layer as the developer-defined baseline. Deferred to a future feature block. See also OQ-RPT-010 in `reports.requirements.md`. | **Deferred — future block** |
+
+---
+
+## 13. HomeEmbeddedDashboard — Pinned Dashboard Tab (Block 2 addition)
+
+This section covers the `HomeEmbeddedDashboard` component rendered inside the **Dashboard** tab of the home page. It allows users to view full reporting dashboards without leaving the home screen.
+
+### REQ-HOME-DASH-F-001 — Filter by `showOnHomepage` flag
+
+The `HomeEmbeddedDashboard` component shall call `getReportTemplates()` on mount and filter the results to only those templates whose `type === 'dashboard'` **and** whose `fields.showOnHomepage === true`. The filtered list is known as the **pinned dashboards** list.
+
+Acceptance criteria:
+- Only dashboards with `showOnHomepage: true` appear in the pinned list.
+- A dashboard with `showOnHomepage: false` (or the property absent) is excluded from the list.
+
+### REQ-HOME-DASH-F-002 — Empty state when no dashboards are pinned
+
+When the pinned dashboards list is empty, the component shall render a message: `"No dashboards are pinned to the homepage. Enable Show on Homepage on any dashboard to display it here."` No error state shall be shown; this is an expected user-configuration state.
+
+Acceptance criteria:
+- The message is visible when no templates have `showOnHomepage: true`.
+- No `LoadingSpinner` is shown after the fetch resolves to an empty list.
+- `getDashboard()` is NOT called when the list is empty.
+
+### REQ-HOME-DASH-F-003 — Pagination dots for multiple pinned dashboards
+
+When there is more than one pinned dashboard, the component shall render a row of pagination dots (`role="tablist"`) containing one dot per pinned dashboard. The currently selected dot shall have width `w-6` and height `h-3` (pill shape) styled `bg-brand-600`; unselected dots shall be `w-3 h-3 bg-brand-200`. Clicking an unselected dot shall update `selectedIndex` to that dot's index, which triggers loading of the corresponding dashboard.
+
+Acceptance criteria:
+- With exactly 1 pinned dashboard, no pagination dot row is rendered.
+- With 2+ pinned dashboards, exactly N dots are rendered.
+- Each dot has `role="tab"` and `aria-label` equal to the dashboard's name.
+- The active dot has `aria-selected="true"`; all others have `aria-selected="false"`.
+- Clicking a dot updates the active selection (the clicked dot becomes the active pill).
+
+### REQ-HOME-DASH-F-004 — Load and display selected dashboard
+
+When a dashboard is selected (by index), the component shall: call `getDashboard(id)`, display a `LoadingSpinner` during the request, then render the dashboard title, page tabs (if multi-page), and widget grid. The widget grid must use the `DashboardLiveWidget` component and the live slot/section layout from the dashboard's `dashboardConfig`.
+
+Acceptance criteria:
+- The dashboard name appears as an `<h2>` heading above the content.
+- If the dashboard has multiple pages, page-selector pills are rendered.
+- An error message ("Could not load dashboard.") is shown when `getDashboard()` rejects.
+
+### REQ-HOME-DASH-F-005 — `DashboardCreatePage` showOnHomepage checkbox
+
+The `DashboardCreatePage` component shall include a **"Show on Homepage"** checkbox in its create/edit form. When checked, the value `showOnHomepage: true` shall be stored in the dashboard's `dashboardConfig` payload. When unchecked, the value shall be `false`. On load, the form shall initialise the checkbox state from the existing dashboard's `dashboardConfig.showOnHomepage` value.
+
+Acceptance criteria:
+- The checkbox renders with an accessible label.
+- Saving with the checkbox checked persists `showOnHomepage: true` in the dashboard config.
+- Saving with the checkbox unchecked persists `showOnHomepage: false`.
+- Loading an existing dashboard with `showOnHomepage: true` pre-checks the box.
+- Loading an existing dashboard with `showOnHomepage: false` (or absent) leaves the box unchecked.
+
+---
+
+## 11. Traceability (updated)
+
+| Requirement ID | Test file | Test ID(s) |
+|----------------|-----------|------------|
+| REQ-HOME-F-001 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-002 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-003 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-004 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-005 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-C-001 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-C-002 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-C-003 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-006 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-007 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-008 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-009 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-010 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-C-004 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-011 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-012 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-013 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-014 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-015 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-016 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-017 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-F-018 | `frontend/src/home/__tests__/home.test.tsx` | pending |
+| REQ-HOME-DASH-F-001 | `frontend/src/home/__tests__/home.test.tsx` | T-HOME-DASH-R01a, R01b |
+| REQ-HOME-DASH-F-002 | `frontend/src/home/__tests__/home.test.tsx` | T-HOME-DASH-R02a, R02b |
+| REQ-HOME-DASH-F-003 | `frontend/src/home/__tests__/home.test.tsx` | T-HOME-DASH-R03a, R03b, R03c, R03d |
+| REQ-HOME-DASH-F-004 | `frontend/src/home/__tests__/home.test.tsx` | T-HOME-DASH-R04a, R04b |
+| REQ-HOME-DASH-F-005 | `frontend/src/reporting/__tests__/DashboardCreatePage.test.tsx` | T-RPT-DASH-CREATE-R05a, R05b, R05c |
+
+---
+
+## 13. Change Log
 
 | Date | Change |
 |------|--------|
@@ -398,3 +519,5 @@ Each organisation sees only the data relevant to them.  The widget layout and st
 | 2026-03-11 | Formal REQ-HOME-{TYPE}-{NNN} statements added per Guideline 13 |
 | 2026-03-25 | §5.4 RecentActivityWidget data source amended — widget now shows current user's own recently opened records (audit-event based, `userId`-filtered) rather than org-level last-opened. API updated to `GET /api/activity/recent?userId={userId}&limit=10`. Scope note updated. (OQ-QUO-FE-001) |
 | 2026-04-05 | Added Impact Analysis (§1a): 6 UI components, 9 API endpoints, 6 DB tables, 6 dependencies |
+| 2026-05-22 | §12 added — HomeEmbeddedDashboard requirements (REQ-HOME-DASH-F-001 to F-005) covering pinned dashboard filtering, empty state, pagination dots, live widget rendering, and showOnHomepage checkbox. Retroactive compliance with Three-Artifact Rule — code was written before requirements; acknowledged. Traceability table updated. Open questions OQ-034 raised. |
+| 2026-05-22 | REQ-HOME-F-018 added — Navigation reset: Home page always resets to Overview tab on navigation (Defect 3). §10.8 added. Traceability table updated. |

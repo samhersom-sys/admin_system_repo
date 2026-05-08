@@ -70,6 +70,12 @@ The Party List Page is the primary party management screen. It provides a search
 
 ---
 
+### R05 — Row click navigation
+
+**REQ-PAR-LIST-R05a:** Clicking a party row in the grid shall navigate to `/parties/:id` where `:id` is the party's `id` field. The `ResizableGrid` component's `onRowClick` prop shall be used for this navigation.
+
+---
+
 ## 4. Traceability
 
 | Requirement ID | Test ID |
@@ -84,13 +90,14 @@ The Party List Page is the primary party management screen. It provides a search
 | REQ-PAR-LIST-R03a | T-PAR-LIST-R03a (implicit render check) |
 | REQ-PAR-LIST-R03b | T-PAR-LIST-R03b |
 | REQ-PAR-LIST-R04a | T-PAR-LIST-R04a |
+| REQ-PAR-LIST-R05a | T-PAR-LIST-R05a |
 
 ---
 
 ## 5. Dependencies
 
 - `@/domains/parties/parties` — `listParties`, `Party`, `PartyFilters`
-- `react-router-dom` — `useNavigate` (to navigate to `/parties/new`)
+- `react-router-dom` — `useNavigate` (to navigate to `/parties/new` and `/parties/:id`)
 
 ---
 
@@ -100,3 +107,4 @@ The Party List Page is the primary party management screen. It provides a search
 |---|---|
 | 2026-03-14 | Initial requirements written |
 | 2026-07-14 | R04 updated: modal replaced by navigation to CreatePartyPage |
+| 2026-04-09 | R05 added: row click navigation to /parties/:id |

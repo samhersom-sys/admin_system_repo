@@ -61,6 +61,94 @@ export class PoliciesService {
     }
 
     // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-GWP-1 — GET /api/policies/gwp-monthly
+    // Monthly GWP grouped by year-of-account for the requesting org.
+    // -----------------------------------------------------------------------
+    async getGwpMonthly(orgCode: string): Promise<{ series: any[] }> {
+        const rows = await this.dataSource.query(
+            `SELECT
+                 EXTRACT(YEAR  FROM inception_date::date) AS yr,
+                 EXTRACT(MONTH FROM inception_date::date) AS mo,
+                 COALESCE(SUM(gross_written_premium), 0)  AS total
+             FROM policies
+             WHERE created_by_org_code = $1
+               AND deleted_at IS NULL
+               AND inception_date IS NOT NULL
+               AND gross_written_premium IS NOT NULL
+             GROUP BY yr, mo
+             ORDER BY yr, mo`,
+            [orgCode],
+        )
+        const byYear: Record<string, { label: string; months: string[]; values: number[] }> = {}
+        for (const r of rows) {
+            const yr = String(r.yr)
+            if (!byYear[yr]) byYear[yr] = { label: yr, months: [], values: [] }
+            byYear[yr].months.push(`${yr}-${String(r.mo).padStart(2, '0')}`)
+            byYear[yr].values.push(Number(r.total))
+        }
+        return { series: Object.values(byYear) }
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-GWP-2 — GET /api/policies/gwp-cumulative
+    // Running cumulative GWP grouped by year-of-account.
+    // -----------------------------------------------------------------------
+    async getGwpCumulative(orgCode: string): Promise<{ series: any[] }> {
+        const rows = await this.dataSource.query(
+            `SELECT
+                 EXTRACT(YEAR  FROM inception_date::date) AS yr,
+                 EXTRACT(MONTH FROM inception_date::date) AS mo,
+                 COALESCE(SUM(gross_written_premium), 0)  AS total
+             FROM policies
+             WHERE created_by_org_code = $1
+               AND deleted_at IS NULL
+               AND inception_date IS NOT NULL
+               AND gross_written_premium IS NOT NULL
+             GROUP BY yr, mo
+             ORDER BY yr, mo`,
+            [orgCode],
+        )
+        const byYear: Record<string, { label: string; months: string[]; values: number[] }> = {}
+        for (const r of rows) {
+            const yr = String(r.yr)
+            if (!byYear[yr]) byYear[yr] = { label: yr, months: [], values: [] }
+            const prev = byYear[yr].values.length > 0
+                ? byYear[yr].values[byYear[yr].values.length - 1] : 0
+            byYear[yr].months.push(`${yr}-${String(r.mo).padStart(2, '0')}`)
+            byYear[yr].values.push(prev + Number(r.total))
+        }
+        return { series: Object.values(byYear) }
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-GWP-3 — GET /api/policies/gwp-summary
+    // Org-level and user-level GWP totals.
+    // -----------------------------------------------------------------------
+    async getGwpSummary(orgCode: string, username: string): Promise<{ orgTotal: number; userTotal: number }> {
+        const orgRows = await this.dataSource.query(
+            `SELECT COALESCE(SUM(gross_written_premium), 0) AS total
+             FROM policies
+             WHERE created_by_org_code = $1
+               AND deleted_at IS NULL
+               AND gross_written_premium IS NOT NULL`,
+            [orgCode],
+        )
+        const userRows = await this.dataSource.query(
+            `SELECT COALESCE(SUM(gross_written_premium), 0) AS total
+             FROM policies
+             WHERE created_by_org_code = $1
+               AND created_by = $2
+               AND deleted_at IS NULL
+               AND gross_written_premium IS NOT NULL`,
+            [orgCode, username],
+        )
+        return {
+            orgTotal: Number(orgRows[0]?.total ?? 0),
+            userTotal: Number(userRows[0]?.total ?? 0),
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // REQ-POL-BE-F-002 — GET /api/policies/:id
     // -----------------------------------------------------------------------
     async findOne(id: number, orgCode: string): Promise<Policy> {
@@ -135,6 +223,69 @@ export class PoliciesService {
     }
 
     // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-005b — POST /api/policies/:id/sections
+    // -----------------------------------------------------------------------
+    async createSection(
+        id: number,
+        orgCode: string,
+        body: Record<string, unknown>,
+    ): Promise<unknown> {
+        const policy = await this.findOne(id, orgCode)
+        const existing = await this.dataSource.query(
+            `SELECT COUNT(*)::int AS count FROM policy_sections WHERE policy_id = $1`,
+            [id],
+        )
+        const nextSeq = Number(existing[0]?.count ?? 0) + 1
+        const sectionRef = `${policy.reference ?? `POL-${id}`}-S${String(nextSeq).padStart(2, '0')}`
+
+        const rows = await this.dataSource.query(
+            `INSERT INTO policy_sections (
+                policy_id,
+                reference,
+                class_of_business,
+                inception_date,
+                effective_date,
+                expiry_date,
+                limit_currency,
+                limit_amount,
+                premium_currency,
+                gross_premium,
+                net_premium,
+                is_current,
+                payload
+            ) VALUES (
+                $1,
+                $2,
+                $3,
+                $4,
+                $4,
+                $5,
+                $6,
+                $7,
+                $8,
+                $9,
+                $9,
+                TRUE,
+                $10::jsonb
+            ) RETURNING *`,
+            [
+                id,
+                sectionRef,
+                body.class_of_business ?? policy.businessType ?? null,
+                body.inception_date ?? policy.inceptionDate ?? null,
+                body.expiry_date ?? policy.expiryDate ?? null,
+                body.limit_currency ?? null,
+                body.limit_amount ?? null,
+                body.premium_currency ?? null,
+                body.gross_premium ?? null,
+                JSON.stringify(body.payload ?? {}),
+            ],
+        )
+
+        return rows[0]
+    }
+
+    // -----------------------------------------------------------------------
     // REQ-POL-BE-F-006 — GET /api/policies/:id/sections/:sectionId
     // -----------------------------------------------------------------------
     async getSectionDetail(
@@ -171,6 +322,201 @@ export class PoliciesService {
             `SELECT * FROM policy_transactions WHERE policy_id = $1 ORDER BY id`,
             [id],
         )
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-008b — POST /api/policies/:id/transactions
+    // Creates a policy_transactions header row then, for each section entry
+    // in the request body, fetches the previous section snapshot, calculates
+    // movement deltas, and persists a policy_section_transactions row.
+    // Movement is only stored for "Contractual" transaction types; for all
+    // others the delta columns are set to 0 (baseline / admin corrections).
+    // -----------------------------------------------------------------------
+    async createTransaction(
+        id: number,
+        orgCode: string,
+        body: Record<string, unknown>,
+        createdBy: string | null,
+    ): Promise<unknown> {
+        await this.findOne(id, orgCode)
+
+        const {
+            transaction_type = 'Initial Transaction',
+            status = null,
+            effective_date = null,
+            description = null,
+            payload = {},
+            sections,
+        } = body as {
+            transaction_type?: string
+            status?: string
+            effective_date?: string | null
+            description?: string | null
+            payload?: Record<string, unknown>
+            sections?: Array<Record<string, unknown>>
+        }
+
+        // 1. Insert the header transaction row
+        const txRows = await this.dataSource.query(
+            `INSERT INTO policy_transactions
+               (policy_id, transaction_type, status, effective_date, description, payload, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING *`,
+            [id, transaction_type, status, effective_date ?? null, description ?? null, JSON.stringify(payload), createdBy],
+        )
+        const tx = txRows[0]
+
+        // 2. Insert section transaction rows with movement calculation
+        if (Array.isArray(sections) && sections.length > 0) {
+            // Only calculate real deltas for Contractual endorsements.
+            const isContractual = transaction_type === 'Contractual'
+
+            for (const s of sections) {
+                const sectionId = s.section_id as number
+                if (!sectionId) continue
+
+                // Fetch the most recent prior section transaction for movement base
+                const prevRows = await this.dataSource.query(
+                    `SELECT * FROM policy_section_transactions
+                     WHERE section_id = $1
+                     ORDER BY created_at DESC
+                     LIMIT 1`,
+                    [sectionId],
+                )
+                const prev = prevRows[0] ?? null
+
+                // Helper: round to 2dp
+                const mvmt = (cur: unknown, prv: unknown): number =>
+                    isContractual
+                        ? Math.round(((Number(cur) || 0) - (Number(prv) || 0)) * 100) / 100
+                        : 0
+
+                const cur = {
+                    limit_amount: s.limit_amount ?? null,
+                    excess_amount: s.excess_amount ?? null,
+                    sum_insured: s.sum_insured ?? null,
+                    gross_premium: s.gross_premium ?? null,
+                    net_premium: s.net_premium ?? null,
+                    tax_receivable: s.tax_receivable ?? null,
+                    deductions: s.deductions ?? null,
+                    annual_gross_premium: s.annual_gross_premium ?? null,
+                    annual_net_premium: s.annual_net_premium ?? null,
+                }
+
+                await this.dataSource.query(
+                    `INSERT INTO policy_section_transactions
+                       (policy_transaction_id, section_id, transaction_type, effective_date, created_by,
+                        limit_amount, excess_amount, sum_insured, gross_premium, net_premium,
+                        tax_receivable, deductions, annual_gross_premium, annual_net_premium,
+                        prev_limit_amount, prev_excess_amount, prev_sum_insured, prev_gross_premium,
+                        prev_net_premium, prev_tax_receivable, prev_deductions,
+                        prev_annual_gross_premium, prev_annual_net_premium,
+                        limit_amount_mvmt, excess_amount_mvmt, sum_insured_mvmt, gross_premium_mvmt,
+                        net_premium_mvmt, tax_receivable_mvmt, deductions_mvmt,
+                        annual_gross_premium_mvmt, annual_net_premium_mvmt)
+                     VALUES
+                       ($1,$2,$3,$4,$5,
+                        $6,$7,$8,$9,$10,
+                        $11,$12,$13,$14,
+                        $15,$16,$17,$18,
+                        $19,$20,$21,
+                        $22,$23,
+                        $24,$25,$26,$27,
+                        $28,$29,$30,
+                        $31,$32)`,
+                    [
+                        tx.id, sectionId, transaction_type, effective_date ?? null, createdBy,
+                        cur.limit_amount, cur.excess_amount, cur.sum_insured, cur.gross_premium, cur.net_premium,
+                        cur.tax_receivable, cur.deductions, cur.annual_gross_premium, cur.annual_net_premium,
+                        prev?.limit_amount ?? null, prev?.excess_amount ?? null, prev?.sum_insured ?? null,
+                        prev?.gross_premium ?? null, prev?.net_premium ?? null, prev?.tax_receivable ?? null,
+                        prev?.deductions ?? null, prev?.annual_gross_premium ?? null, prev?.annual_net_premium ?? null,
+                        mvmt(cur.limit_amount, prev?.limit_amount),
+                        mvmt(cur.excess_amount, prev?.excess_amount),
+                        mvmt(cur.sum_insured, prev?.sum_insured),
+                        mvmt(cur.gross_premium, prev?.gross_premium),
+                        mvmt(cur.net_premium, prev?.net_premium),
+                        mvmt(cur.tax_receivable, prev?.tax_receivable),
+                        mvmt(cur.deductions, prev?.deductions),
+                        mvmt(cur.annual_gross_premium, prev?.annual_gross_premium),
+                        mvmt(cur.annual_net_premium, prev?.annual_net_premium),
+                    ],
+                )
+            }
+        }
+
+        return tx
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-008c — GET /api/policies/:id/transactions/:txId/sections/:sectionId
+    // Returns current values, previous snapshot, and persisted movement deltas
+    // for a specific policy section transaction.
+    // -----------------------------------------------------------------------
+    async getSectionTransaction(
+        id: number,
+        txId: number,
+        sectionId: number,
+        orgCode: string,
+    ): Promise<unknown> {
+        await this.findOne(id, orgCode)
+        const rows = await this.dataSource.query(
+            `SELECT pst.*,
+                    ps.reference  AS section_reference,
+                    p.reference   AS policy_reference
+             FROM policy_section_transactions pst
+             JOIN policy_sections ps       ON ps.id  = pst.section_id
+             JOIN policy_transactions pt   ON pt.id  = pst.policy_transaction_id
+             JOIN policies p               ON p.id   = pt.policy_id
+             WHERE pst.policy_transaction_id = $1
+               AND pst.section_id            = $2
+               AND p.id                      = $3`,
+            [txId, sectionId, id],
+        )
+        if (!rows.length) throw new NotFoundException(`Section transaction not found.`)
+        const d = rows[0]
+        return {
+            id: d.id,
+            transaction_id: d.policy_transaction_id,
+            section_id: d.section_id,
+            section_reference: d.section_reference,
+            policy_reference: d.policy_reference,
+            transaction_type: d.transaction_type,
+            effective_date: d.effective_date,
+            current: {
+                limit_amount: d.limit_amount,
+                excess_amount: d.excess_amount,
+                sum_insured: d.sum_insured,
+                gross_premium: d.gross_premium,
+                net_premium: d.net_premium,
+                tax_receivable: d.tax_receivable,
+                deductions: d.deductions,
+                annual_gross_premium: d.annual_gross_premium,
+                annual_net_premium: d.annual_net_premium,
+            },
+            previous: {
+                limit_amount: d.prev_limit_amount,
+                excess_amount: d.prev_excess_amount,
+                sum_insured: d.prev_sum_insured,
+                gross_premium: d.prev_gross_premium,
+                net_premium: d.prev_net_premium,
+                tax_receivable: d.prev_tax_receivable,
+                deductions: d.prev_deductions,
+                annual_gross_premium: d.prev_annual_gross_premium,
+                annual_net_premium: d.prev_annual_net_premium,
+            },
+            movements: {
+                limit_amount: d.limit_amount_mvmt,
+                excess_amount: d.excess_amount_mvmt,
+                sum_insured: d.sum_insured_mvmt,
+                gross_premium: d.gross_premium_mvmt,
+                net_premium: d.net_premium_mvmt,
+                tax_receivable: d.tax_receivable_mvmt,
+                deductions: d.deductions_mvmt,
+                annual_gross_premium: d.annual_gross_premium_mvmt,
+                annual_net_premium: d.annual_net_premium_mvmt,
+            },
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -217,7 +563,21 @@ export class PoliciesService {
     async getEndorsements(id: number, orgCode: string): Promise<unknown[]> {
         await this.findOne(id, orgCode)
         return this.dataSource.query(
-            `SELECT * FROM policy_endorsements WHERE policy_id = $1 ORDER BY id`,
+            `SELECT
+                id,
+                policy_id,
+                transaction_type,
+                effective_date,
+                description,
+                status,
+                payload,
+                payload->>'sub_type' AS sub_type,
+                created_by,
+                created_at
+             FROM policy_transactions
+             WHERE policy_id = $1
+               AND transaction_type IN ('Administrative', 'Contractual')
+             ORDER BY effective_date ASC NULLS LAST, id ASC`,
             [id],
         )
     }
@@ -232,21 +592,45 @@ export class PoliciesService {
         createdBy: string | null,
     ): Promise<unknown> {
         await this.findOne(id, orgCode)
-        const { endorsement_type, effective_date, description } = body as {
+        const { endorsement_type, endorsement_sub_type, effective_date, description } = body as {
             endorsement_type: string
+            endorsement_sub_type?: string
             effective_date: string
             description?: string
         }
         if (!endorsement_type) throw new BadRequestException('endorsement_type is required.')
         if (!effective_date) throw new BadRequestException('effective_date is required.')
 
+        // Backward-compatible mapping:
+        // - legacy FE sent endorsement_type = 'Mid Term Adjustment' | 'Cancellation'
+        // - new FE sends endorsement_type = 'Administrative' | 'Contractual'
+        //   plus endorsement_sub_type = 'Mid Term Adjustment' | 'Cancellation'
+        const isLegacySubtypeOnly = ['Mid Term Adjustment', 'Cancellation'].includes(endorsement_type)
+        const transactionType = isLegacySubtypeOnly
+            ? 'Contractual'
+            : endorsement_type
+        const subType = transactionType === 'Contractual'
+            ? (isLegacySubtypeOnly ? endorsement_type : (endorsement_sub_type ?? 'Mid Term Adjustment'))
+            : null
+
         const rows = await this.dataSource.query(
-            `INSERT INTO policy_endorsements (policy_id, endorsement_type, effective_date, description, status, created_by)
-             VALUES ($1, $2, $3, $4, 'Open', $5)
+            `INSERT INTO policy_transactions
+               (policy_id, transaction_type, status, effective_date, description, payload, created_by)
+             VALUES ($1, $2, 'Draft', $3, $4, $5, $6)
              RETURNING *`,
-            [id, endorsement_type, effective_date, description ?? null, createdBy],
+            [
+                id,
+                transactionType,
+                effective_date,
+                description ?? null,
+                JSON.stringify(subType ? { sub_type: subType } : {}),
+                createdBy,
+            ],
         )
-        return rows[0]
+        return {
+            ...rows[0],
+            sub_type: subType,
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -258,15 +642,41 @@ export class PoliciesService {
         orgCode: string,
         updatedBy: string | null,
     ): Promise<unknown> {
-        await this.findOne(id, orgCode)
+        const policy = await this.findOne(id, orgCode)
         const rows = await this.dataSource.query(
-            `UPDATE policy_endorsements SET status = 'Issued', updated_by = $1, updated_at = NOW()
-             WHERE id = $2 AND policy_id = $3
+            `UPDATE policy_transactions
+             SET status = 'Endorsed', created_by = COALESCE($1, created_by)
+             WHERE id = $2
+               AND policy_id = $3
+               AND transaction_type IN ('Administrative', 'Contractual')
              RETURNING *`,
             [updatedBy, endorsementId, id],
         )
         if (!rows.length) throw new NotFoundException(`Endorsement ${endorsementId} not found.`)
-        return rows[0]
+
+        const endorsement = rows[0]
+        const subType = (endorsement.payload as Record<string, unknown> | null)?.sub_type
+            ?? null
+
+        let nextPolicy = policy
+        if (subType === 'Cancellation') {
+            const policyRows = await this.dataSource.query(
+                `UPDATE policies
+                 SET status = 'Cancelled', updated_by = $1, updated_at = NOW()
+                 WHERE id = $2
+                 RETURNING *`,
+                [updatedBy, id],
+            )
+            nextPolicy = policyRows[0] ?? policy
+        }
+
+        return {
+            policy: nextPolicy,
+            endorsement: {
+                ...endorsement,
+                sub_type: subType,
+            },
+        }
     }
 
     // -----------------------------------------------------------------------

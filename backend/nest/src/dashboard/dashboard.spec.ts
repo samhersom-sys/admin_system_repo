@@ -5,7 +5,7 @@
  *
  * Coverage:
  *   R01 — sync stub methods (no DB interaction)
- *   R02 — getRecentRecords (queries submissions + quotes by orgCode)
+ *   R02 — getRecentRecords (queries org-scoped dashboard entities)
  */
 
 import { Test, TestingModule } from '@nestjs/testing'
@@ -22,7 +22,7 @@ describe('DashboardService', () => {
 
   beforeEach(async () => {
     mockDataSource = {
-      query: jest.fn(),
+      query: jest.fn().mockResolvedValue([]),
     }
 
     const module: TestingModule = await Test.createTestingModule({
@@ -49,16 +49,18 @@ describe('DashboardService', () => {
       expect(service.getPolicies()).toEqual([])
     })
 
-    it('T-DASH-BE-NE-R01c: getPoliciesGwpMonthly returns series stub shape', () => {
-      expect(service.getPoliciesGwpMonthly()).toHaveProperty('series')
+    it('T-DASH-BE-NE-R01c: getPoliciesGwpMonthly returns series stub shape', async () => {
+      const result = await service.getPoliciesGwpMonthly('DEMO')
+      expect(result).toHaveProperty('series')
     })
 
-    it('T-DASH-BE-NE-R01d: getPoliciesGwpCumulative returns series stub shape', () => {
-      expect(service.getPoliciesGwpCumulative()).toHaveProperty('series')
+    it('T-DASH-BE-NE-R01d: getPoliciesGwpCumulative returns series stub shape', async () => {
+      const result = await service.getPoliciesGwpCumulative('DEMO')
+      expect(result).toHaveProperty('series')
     })
 
-    it('T-DASH-BE-NE-R01e: getPoliciesGwpSummary returns orgTotal and userTotal', () => {
-      const result = service.getPoliciesGwpSummary()
+    it('T-DASH-BE-NE-R01e: getPoliciesGwpSummary returns orgTotal and userTotal', async () => {
+      const result = await service.getPoliciesGwpSummary('DEMO', 'admin')
       expect(result).toHaveProperty('orgTotal')
       expect(result).toHaveProperty('userTotal')
     })
@@ -80,45 +82,133 @@ describe('DashboardService', () => {
   // REQ-DASH-BE-NE-R02 — getRecentRecords
   // -------------------------------------------------------------------------
   describe('getRecentRecords', () => {
-    it('T-DASH-BE-NE-R02a: queries submissions and quotes scoped to orgCode', async () => {
+    it('T-DASH-BE-NE-R02a: queries audit history first, then returns submissions, quotes, policies and binding authorities scoped to orgCode', async () => {
+      const auditRows = [
+        { entity_type: 'Submission', entity_id: 1, last_opened: '2026-04-10T12:00:00Z', user_name: 'local-admin', row_rank: 1 },
+        { entity_type: 'Quote', entity_id: 2, last_opened: '2026-04-10T11:00:00Z', user_name: 'local-admin', row_rank: 1 },
+        { entity_type: 'Policy', entity_id: 3, last_opened: '2026-04-10T10:00:00Z', user_name: 'local-admin', row_rank: 1 },
+        { entity_type: 'Binding Authority', entity_id: 4, last_opened: '2026-04-10T09:00:00Z', user_name: 'local-admin', row_rank: 1 },
+      ]
       const submissions = [{ id: 1, reference: 'SUB-TST-001' }]
       const quotes = [{ id: 2, reference: 'QUO-TST-001' }]
+      const policies = [{ id: 3, reference: 'POL-TST-001' }]
+      const bindingAuthorities = [{ id: 4, reference: 'BA-TST-001' }]
       mockDataSource.query
+        .mockResolvedValueOnce(auditRows)   // audit query
         .mockResolvedValueOnce(submissions) // submissions query
         .mockResolvedValueOnce(quotes)      // quotes query
+        .mockResolvedValueOnce(policies)    // policies query
+        .mockResolvedValueOnce(bindingAuthorities) // binding authorities query
 
-      const result = await service.getRecentRecords('TST')
-      expect(result.submissions).toEqual(submissions)
-      expect(result.quotes).toEqual(quotes)
+      const result = await service.getRecentRecords('TST', 99, 'local-admin')
+      expect(result.submissions[0]).toMatchObject({ id: 1, reference: 'SUB-TST-001', lastOpenedDate: '2026-04-10T12:00:00Z', lastAuditUser: 'local-admin' })
+      expect(result.quotes[0]).toMatchObject({ id: 2, reference: 'QUO-TST-001', lastOpenedDate: '2026-04-10T11:00:00Z', lastAuditUser: 'local-admin' })
+      expect(result.policies[0]).toMatchObject({ id: 3, reference: 'POL-TST-001', lastOpenedDate: '2026-04-10T10:00:00Z', lastAuditUser: 'local-admin' })
+      expect(result.bindingAuthorities[0]).toMatchObject({ id: 4, reference: 'BA-TST-001', lastOpenedDate: '2026-04-10T09:00:00Z', lastAuditUser: 'local-admin' })
     })
 
-    it('T-DASH-BE-NE-R02b: returns empty arrays for policies and bindingAuthorities', async () => {
+    it('T-DASH-BE-NE-R02b: falls back to createdDate ordering when no audit history exists', async () => {
       mockDataSource.query
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]) // audit query
+        .mockResolvedValueOnce([]) // submissions fallback
+        .mockResolvedValueOnce([]) // quotes fallback
+        .mockResolvedValueOnce([]) // policies fallback
+        .mockResolvedValueOnce([]) // binding authorities fallback
 
-      const result = await service.getRecentRecords('TST')
+      const result = await service.getRecentRecords('TST', 99, 'local-admin')
       expect(result.policies).toEqual([])
       expect(result.bindingAuthorities).toEqual([])
     })
 
-    it('T-DASH-BE-NE-R02c: passes orgCode to submissions query', async () => {
+    it('T-DASH-BE-NE-R02c: passes orgCode to submissions query and user identity to audit query', async () => {
       mockDataSource.query
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
 
-      await service.getRecentRecords('MYORG')
+      await service.getRecentRecords('MYORG', 321, 'local-admin')
       const firstCall = mockDataSource.query.mock.calls[0]
-      expect(firstCall[1]).toEqual(['MYORG'])
+      const secondCall = mockDataSource.query.mock.calls[1]
+      expect(firstCall[0]).toContain('FROM public.audit_event')
+      expect(firstCall[1]).toEqual([321, 'local-admin'])
+      expect(secondCall[1]).toEqual(['MYORG'])
     })
 
     it('T-DASH-BE-NE-R02d: returns empty quotes array when quotes query fails', async () => {
       mockDataSource.query
+        .mockResolvedValueOnce([]) // audit query
         .mockResolvedValueOnce([]) // submissions OK
         .mockRejectedValueOnce(new Error('DB error')) // quotes fail — caught by .catch(() => [])
+        .mockResolvedValueOnce([]) // policies OK
+        .mockResolvedValueOnce([]) // binding authorities OK
 
-      const result = await service.getRecentRecords('TST')
+      const result = await service.getRecentRecords('TST', 99, 'local-admin')
       expect(result.quotes).toEqual([])
+    })
+
+    it('T-DASH-BE-NE-R02da: returns empty submissions array when submissions query fails', async () => {
+      mockDataSource.query
+        .mockResolvedValueOnce([]) // audit query
+        .mockRejectedValueOnce(new Error('DB error')) // submissions fail — caught by .catch(() => [])
+        .mockResolvedValueOnce([]) // quotes OK
+        .mockResolvedValueOnce([]) // policies OK
+        .mockResolvedValueOnce([]) // binding authorities OK
+
+      const result = await service.getRecentRecords('TST', 99, 'local-admin')
+      expect(result.submissions).toEqual([])
+    })
+
+    it('T-DASH-BE-NE-R02e: reads recent activity from audit_event before entity fallbacks', async () => {
+      mockDataSource.query
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+
+      await service.getRecentRecords('TST', 99, 'local-admin')
+      const [auditSql] = mockDataSource.query.mock.calls[0]
+      expect(auditSql).toContain('FROM public.audit_event')
+    })
+
+    it('T-DASH-BE-NE-R02f: guards party joins against non-numeric insured ids', async () => {
+      mockDataSource.query
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+
+      await service.getRecentRecords('TST', 99, 'local-admin')
+
+      const [, submissionSql] = mockDataSource.query.mock.calls[1]
+      void submissionSql
+      const [submissionQuery] = mockDataSource.query.mock.calls[1]
+      const [quoteQuery] = mockDataSource.query.mock.calls[2]
+      const [policyQuery] = mockDataSource.query.mock.calls[3]
+
+      expect(submissionQuery).toContain("COALESCE(s.\"insuredId\", '') ~ '^[0-9]+$'")
+      expect(quoteQuery).toContain("COALESCE(q.insured_id, '') ~ '^[0-9]+$'")
+      expect(policyQuery).toContain("COALESCE(policy.insured_id, '') ~ '^[0-9]+$'")
+    })
+
+    it('T-DASH-BE-NE-R02g: ignores duplicate older audit rows for the same entity and keeps the latest user audit row only', async () => {
+      mockDataSource.query
+        .mockResolvedValueOnce([
+          { entity_type: 'Submission', entity_id: 1, last_opened: '2026-04-10T12:00:00Z', user_name: 'local-admin', row_rank: 1 },
+          { entity_type: 'Submission', entity_id: 1, last_opened: '2026-04-09T12:00:00Z', user_name: 'other-user', row_rank: 2 },
+        ])
+        .mockResolvedValueOnce([{ id: 1, reference: 'SUB-TST-001' }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+
+      const result = await service.getRecentRecords('TST', 99, 'local-admin')
+
+      expect(result.submissions).toHaveLength(1)
+      expect(result.submissions[0]).toMatchObject({ lastAuditUser: 'local-admin' })
     })
   })
 })

@@ -21,6 +21,8 @@ export interface SubmissionSearchProps {
     onSelect: (submission: Submission) => void
     /** When true, hides the label above the trigger button */
     hideLabel?: boolean
+    /** Additional classes applied to the trigger button (e.g. error border overrides) */
+    triggerClassName?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -113,8 +115,8 @@ function SubmissionSearchModal({ isOpen, onClose, onSelect }: ModalProps) {
                             storageKey="table-widths-submission-search"
                             columns={[
                                 { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 180 },
-                                { key: 'insured',   label: 'Insured',   sortable: true, defaultWidth: 220 },
-                                { key: 'status',    label: 'Status',    sortable: true, defaultWidth: 130 },
+                                { key: 'insured', label: 'Insured', sortable: true, defaultWidth: 220 },
+                                { key: 'status', label: 'Status', sortable: true, defaultWidth: 130 },
                                 { key: 'inception', label: 'Inception', sortable: false, defaultWidth: 120 },
                             ]}
                             rows={filtered}
@@ -124,8 +126,8 @@ function SubmissionSearchModal({ isOpen, onClose, onSelect }: ModalProps) {
                             renderCell={(key, row) => {
                                 const s = row as Submission
                                 if (key === 'reference') return <span className="font-medium text-brand-700">{s.reference}</span>
-                                if (key === 'insured')   return s.insured
-                                if (key === 'status')    return s.status
+                                if (key === 'insured') return s.insured
+                                if (key === 'status') return s.status
                                 if (key === 'inception') return s.inceptionDate ?? '—'
                                 return null
                             }}
@@ -142,7 +144,7 @@ function SubmissionSearchModal({ isOpen, onClose, onSelect }: ModalProps) {
 // SubmissionSearch — trigger field + modal
 // ---------------------------------------------------------------------------
 
-export default function SubmissionSearch({ selectedSubmission, onSelect, hideLabel }: SubmissionSearchProps) {
+export default function SubmissionSearch({ selectedSubmission, onSelect, hideLabel, triggerClassName }: SubmissionSearchProps) {
     const [modalOpen, setModalOpen] = useState(false)
 
     return (
@@ -156,7 +158,7 @@ export default function SubmissionSearch({ selectedSubmission, onSelect, hideLab
                 data-testid="submission-search-trigger"
                 type="button"
                 onClick={() => setModalOpen(true)}
-                className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-800 border border-brand-300 rounded px-3 py-1.5 hover:bg-brand-50 w-full"
+                className={`flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800 border rounded px-3 py-1.5 hover:bg-gray-50 w-full ${triggerClassName ?? 'border-gray-300'}`}
             >
                 <FiSearch size={14} />
                 {selectedSubmission

@@ -183,3 +183,22 @@ export async function patch<T = unknown>(
   })
   return handleResponse<T>(res, 'PATCH', resolvedUrl)
 }
+
+export async function getBlob(
+  url: string,
+  headers?: Record<string, string>
+): Promise<Blob> {
+  const resolvedUrl = resolveApiUrl(url)
+  logger.request('GET', resolvedUrl)
+  const res = await fetch(resolvedUrl, {
+    method: 'GET',
+    headers: buildHeaders(headers),
+  })
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as ApiError
+    err.status = res.status
+    err.body = null
+    throw err
+  }
+  return res.blob()
+}

@@ -14,7 +14,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { FiSave, FiArrowLeft } from 'react-icons/fi'
+import { FiSave } from 'react-icons/fi'
 import { useSidebarSection } from '@/shell/SidebarContext'
 import type { SidebarSection } from '@/shell/SidebarContext'
 import { createParty } from '@/parties/parties.service'
@@ -24,10 +24,10 @@ import Card from '@/shared/Card/Card'
 const PARTY_ROLES = ['Insured', 'Broker', 'Insurer', 'Coverholder']
 
 // Module-level constant — required by RULE 9 (must not be inside component)
+// Back navigation handled by the global sidebar Back button (§14 — no duplicate Back)
 const SIDEBAR_SECTION: SidebarSection = {
     title: 'Party',
     items: [
-        { label: 'Back', icon: FiArrowLeft, to: '/parties' },
         { label: 'Save', icon: FiSave, event: 'party:save' },
     ],
 }

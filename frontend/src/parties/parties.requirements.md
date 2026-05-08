@@ -193,9 +193,9 @@ None — all required tables and columns already exist.
 
 | Field key | Label | Input type | Required on save | Editable |
 |-----------|-------|------------|------------------|----------|
-| `sicStandard` | SIC Standard | select (`aria-label="SIC Standard"`) with options: US SIC, UK SIC | No | Yes |
-| `sicCode` | SIC Code | text input (`aria-label="SIC Code"`) | No | Yes |
-| `sicDescription` | SIC Description | read-only text (auto-populated from code selection) | No | No |
+| `sicStandard` | SIC Standard | select with options: `US SIC (1987)`, `UK SIC (2007)` — stored values `US SIC`, `UK SIC` | No | Yes |
+| `sicCode` | SIC Code | text input | No | Yes |
+| `sicDescription` | SIC Description | text input (interim — will become auto-populated SearchableSelect when OQ-002 is resolved) | No | Yes |
 
 ### 2.20 Details Tab — Workforce & Financials Fields
 
@@ -315,7 +315,7 @@ None — all required tables and columns already exist.
 | REQ-PAR-DOM-F-041 | `parties/PartyViewPage/__tests__/PartyViewPage.test.tsx` | T-PAR-VIEW-R041 |
 | REQ-PAR-DOM-F-042 | `parties/PartyViewPage/__tests__/PartyViewPage.test.tsx` | T-PAR-VIEW-R042 |
 | REQ-PAR-DOM-F-043 | `parties/PartyViewPage/__tests__/PartyViewPage.test.tsx` | T-PAR-VIEW-R043 |
-| REQ-PAR-DOM-F-044 | `parties/PartyViewPage/__tests__/PartyViewPage.test.tsx` | T-PAR-VIEW-R044 |
+| REQ-PAR-DOM-F-044 | `parties/PartyViewPage/__tests__/PartyViewPage.test.tsx` | T-PAR-VIEW-R044, T-PAR-VIEW-R044b, T-PAR-VIEW-R044c |
 | REQ-PAR-DOM-F-045 | `parties/PartyViewPage/__tests__/PartyViewPage.test.tsx` | T-PAR-VIEW-R045 |
 | REQ-PAR-DOM-F-046 | `parties/PartyViewPage/__tests__/PartyViewPage.test.tsx` | T-PAR-VIEW-R046 |
 | REQ-PAR-DOM-F-047 | `parties/PartyViewPage/__tests__/PartyViewPage.test.tsx` | T-PAR-VIEW-R047 |

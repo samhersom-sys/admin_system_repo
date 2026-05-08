@@ -37,11 +37,15 @@
 
 **REQ-SIDEBAR-F-007:** When a page registers a contextual section via `useSidebarSection`, its items shall be rendered inline directly below the active domain header (e.g. Submissions). No separate contextual area is rendered at the foot of the nav.
 
+**REQ-SIDEBAR-F-007a:** For routes in the reporting domain (`/reports/*` and `/dashboards/*`), a registered contextual section shall render directly below the top-level `Reporting` nav item and shall replace the default `Create Report` / `Create Dashboard` hover actions while the contextual section is active.
+
 **REQ-SIDEBAR-F-008:** The contextual section shall display each `item` from the `items` array as a button with an icon and label. The `title` field on the registered section object is used internally for context only and shall not be rendered as a visible heading in the sidebar.
 
 ### 2.6 Domain contextual nav sub-items
 
 **REQ-SIDEBAR-F-016:** Each domain nav header (Submissions, Quotes, Policies, Binding Authorities) shall display a list of sub-action items directly beneath it when the user hovers over that header. These predefined sub-items (derived from the backup sub-menus) shall be shown when no page section is registered for that domain. Sub-actions that trigger behaviour dispatch `CustomEvent` on `window`; sub-actions that navigate use `<NavLink>`. Sub-items shall be absent from the DOM when the domain header is not hovered.
+
+**REQ-SIDEBAR-F-016a:** The top-level `Reporting` nav item shall display `Create Report` and `Create Dashboard` quick actions on non-edit reporting pages. When a reporting page registers a contextual section, those quick actions shall be hidden and the registered section shall be shown instead.
 
 **REQ-SIDEBAR-F-018:** Sub-items (both page-registered and predefined) shall use the CSS class `sidebar-domain-sub-item` which renders them at a slightly different background colour to visually distinguish them from top-level nav items.
 

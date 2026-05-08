@@ -11,11 +11,12 @@
 
 **In scope:**
 - Tile grid layout: responsive 3→2→1 column grid of clickable setting category tiles
-- Six tiles, each navigating to a dedicated route
-- Role-based tile visibility: Module Licensing tile visible to `internal_admin` only
+- Seven tiles, each navigating to a dedicated route
+- Role-based tile visibility: Module Licensing tile visible to `internal_admin` only; Dashboard & Reporting tile visible to `client_admin` and `internal_admin`
 - Tiles for unbuilt sections navigate to a shared NotFound page
 - Module Licensing: company list page + reusable per-company config page (param-driven)
 - Module toggling with dependency validation (unchanged from strawman)
+- Dashboard & Reporting Settings: manage tenant custom measures (list, create, deactivate)
 
 **Out of scope (deferred):**
 - Account Administration page content
@@ -84,6 +85,9 @@ When this feature is built it shall:
 | GET | `/api/organisation-entities/:id/hierarchy-links` | Get hierarchy links |
 | POST | `/api/organisation-entities/:id/hierarchy-links` | Save hierarchy links |
 | GET | `/api/users` | List users (org assignment) |
+| GET | `/api/measures` | List org measures (dashboard & reporting settings) |
+| POST | `/api/measures` | Create tenant measure |
+| DELETE | `/api/measures/:id` | Deactivate (soft-delete) tenant measure |
 
 ### Database Tables
 | Table | Impact |
@@ -97,6 +101,27 @@ When this feature is built it shall:
 | `org_hierarchy_config` | CRUD |
 | `org_hierarchy_links` | CRUD |
 | `data_quality_settings` | Read / update |
+| `measure_definitions` | CRUD (tenant measures, Dashboard & Reporting Settings) |
+
+---
+
+## 2. Requirements — Dashboard & Reporting Settings
+
+**REQ-SETTINGS-DASH-F-001** — Settings tile grid MUST include a "Dashboard & Reporting" tile visible to `client_admin` and `internal_admin` users only. It navigates to `/settings/dashboard-reporting`.
+
+**REQ-SETTINGS-DASH-F-002** — The Dashboard & Reporting Settings page MUST load and display all active measures for the authenticated org, split into two sections:
+- "Internal Measures" — `created_by_type = 'internal'` (read-only; no delete button)
+- "Custom Measures" — `created_by_type = 'tenant'` (editable; deactivate button present)
+
+**REQ-SETTINGS-DASH-F-003** — Each measure row MUST display: label, source, measure type (count / ratio), and for tenant measures a "Deactivate" button.
+
+**REQ-SETTINGS-DASH-F-004** — The page MUST show a loading spinner while the measures list is loading and an error message if the API returns an error. Test IDs: `T-SETTINGS-DASH-R002a` (loading), `T-SETTINGS-DASH-R002b` (error).
+
+**REQ-SETTINGS-DASH-F-005** — "Deactivate" calls `DELETE /api/measures/:id` and removes the row from the list on success. On failure, an error notification is shown. Test IDs: `T-SETTINGS-DASH-R003a` (success), `T-SETTINGS-DASH-R003b` (failure).
+
+**REQ-SETTINGS-DASH-F-006** — An "Add Custom Measure" button opens an inline form. The form requires: Label, Source Key (select from available sources), Measure Type (count). On submit it calls `POST /api/measures`. Test ID: `T-SETTINGS-DASH-R004`.
+
+**REQ-SETTINGS-DASH-F-007** — The internal_admin must also see internal measures listed as read-only with no action buttons. The "Add Custom Measure" button is visible to both `client_admin` and `internal_admin`. Test ID: `T-SETTINGS-DASH-R001`.
 
 ### Dependencies
 - `@/shared/lib/api-client/api-client` — `get`, `post`, `put`, `del`

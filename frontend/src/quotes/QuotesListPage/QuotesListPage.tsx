@@ -14,9 +14,11 @@
 
 import React, { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { FiSearch } from 'react-icons/fi'
 import { listQuotes } from '@/quotes/quotes.service'
 import type { Quote } from '@/quotes/quotes.service'
 import { useNotifications } from '@/shell/NotificationDock'
+import { brandClasses } from '@/shared/lib/design-tokens/brandClasses'
 import ResizableGrid from '@/shared/components/ResizableGrid/ResizableGrid'
 import type { Column, SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
 
@@ -36,6 +38,7 @@ const GRID_COLUMNS: Column[] = [
     { key: 'business_type', label: 'Business Type', sortable: true, defaultWidth: 140 },
     { key: 'inception_date', label: 'Inception Date', sortable: true, defaultWidth: 130 },
     { key: 'expiry_date', label: 'Expiry Date', sortable: true, defaultWidth: 120 },
+    { key: '_action', label: '', sortable: false, defaultWidth: 44 },
 ]
 
 export default function QuotesListPage() {
@@ -81,12 +84,16 @@ export default function QuotesListPage() {
     function renderCell(key: string, row: unknown): React.ReactNode {
         const q = row as Quote
         if (key === 'reference') {
+            return <span className="font-medium">{q.reference}</span>
+        }
+        if (key === '_action') {
             return (
                 <Link
                     to={`/quotes/${q.id}`}
-                    className="text-brand-600 hover:text-brand-800 hover:underline font-medium"
+                    className={`inline-flex items-center justify-center ${brandClasses.icon.actionOpen}`}
+                    aria-label="View record"
                 >
-                    {q.reference}
+                    <FiSearch size={15} aria-hidden="true" />
                 </Link>
             )
         }

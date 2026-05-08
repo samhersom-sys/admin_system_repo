@@ -15,6 +15,7 @@ async function run() {
             { code: 'CANCELLED', name: 'Cancelled', description: 'Policy has been cancelled',     order_index: 3 },
             { code: 'LAPSED',    name: 'Lapsed',    description: 'Policy has lapsed',             order_index: 4 },
             { code: 'DISBANDED', name: 'Disbanded', description: 'Policy has been disbanded',     order_index: 5 },
+            { code: 'RENEWED',   name: 'Renewed',   description: 'Policy has been renewed',       order_index: 6 },
         ]
         for (const r of rows) {
             await client.query(

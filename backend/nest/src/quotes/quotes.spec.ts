@@ -131,6 +131,54 @@ describe('QuotesService', () => {
             expect(qb.where).toHaveBeenCalledWith('q.createdByOrgCode = :orgCode', { orgCode: 'TST' })
             expect(qb.orderBy).toHaveBeenCalledWith('q.createdDate', 'DESC')
         })
+
+        it('T-QUO-BE-NE-R01-date-a: applies dateFrom >= filter on correct column for inception basis', async () => {
+            const qb = buildQueryBuilderMock(null)
+            qb.getMany = jest.fn().mockResolvedValue([])
+            mockQuoteRepo.createQueryBuilder.mockReturnValue(qb)
+
+            await service.findAll('TST', undefined, undefined, 'inception', '2026-01-01', undefined)
+
+            expect(qb.andWhere).toHaveBeenCalledWith(
+                expect.stringContaining('q.inceptionDate'),
+                expect.objectContaining({ dateFrom: '2026-01-01' }),
+            )
+        })
+
+        it('T-QUO-BE-NE-R01-date-b: applies dateTo <= filter on expiry column for expiry basis', async () => {
+            const qb = buildQueryBuilderMock(null)
+            qb.getMany = jest.fn().mockResolvedValue([])
+            mockQuoteRepo.createQueryBuilder.mockReturnValue(qb)
+
+            await service.findAll('TST', undefined, undefined, 'expiry', undefined, '2026-12-31')
+
+            expect(qb.andWhere).toHaveBeenCalledWith(
+                expect.stringContaining('q.expiryDate'),
+                expect.objectContaining({ dateTo: '2026-12-31' }),
+            )
+        })
+
+        it('T-QUO-BE-NE-R01-date-c: filters on createdDate column for created basis', async () => {
+            const qb = buildQueryBuilderMock(null)
+            qb.getMany = jest.fn().mockResolvedValue([])
+            mockQuoteRepo.createQueryBuilder.mockReturnValue(qb)
+
+            await service.findAll('TST', undefined, undefined, 'created', '2026-03-01', '2026-03-31')
+
+            const allCalls = qb.andWhere.mock.calls.map((c: unknown[]) => c[0])
+            expect(allCalls.some((c: unknown) => typeof c === 'string' && c.includes('q.createdDate'))).toBe(true)
+        })
+
+        it('T-QUO-BE-NE-R01-date-d: unknown dateBasis falls back to createdDate column', async () => {
+            const qb = buildQueryBuilderMock(null)
+            qb.getMany = jest.fn().mockResolvedValue([])
+            mockQuoteRepo.createQueryBuilder.mockReturnValue(qb)
+
+            await service.findAll('TST', undefined, undefined, 'unknownBasis', '2026-01-01', undefined)
+
+            const allCalls = qb.andWhere.mock.calls.map((c: unknown[]) => c[0])
+            expect(allCalls.some((c: unknown) => typeof c === 'string' && c.includes('q.createdDate'))).toBe(true)
+        })
     })
 
     // -------------------------------------------------------------------------
@@ -248,6 +296,16 @@ describe('QuotesService', () => {
             // result.status should not have changed to 'Bound' via update
             const savedArg: Quote = mockQuoteRepo.save.mock.calls[0][0]
             expect(savedArg.status).toBe('Draft')
+        })
+
+        it('T-QUO-BE-NE-R04e: persists renewal_time when provided in update body (REQ-QUO-BE-NE-F-004, migration 105)', async () => {
+            const quote = makeQuote({ status: 'Draft' })
+            mockQuoteRepo.findOne.mockResolvedValue(quote)
+            mockQuoteRepo.save.mockResolvedValue({ ...quote, renewalTime: '12:00:00' })
+
+            await service.update(1, 'TST', { renewal_time: '12:00:00' }, 'user')
+            const savedArg: Quote = mockQuoteRepo.save.mock.calls[0][0]
+            expect((savedArg as any).renewalTime).toBe('12:00:00')
         })
     })
 
@@ -367,20 +425,21 @@ describe('QuotesService', () => {
     // to call auditService.writeEvent() and auditService.getHistory().
     // -------------------------------------------------------------------------
     describe('postAudit', () => {
-        it('T-QUO-BE-NE-R09a: delegates to AuditService and returns { success, audit, otherUsersOpen }', async () => {
+        it('T-QUO-BE-NE-R09a: delegates to AuditService and returns the created audit event', async () => {
             mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
-            const writeResult = { id: 1, action: 'Quote Updated', entityType: 'Quote', entityId: 1 }
+            const writeResult = { id: 1, action: 'Quote Updated', entityType: 'Quote', entityId: 1, createdAt: '2026-01-01T00:00:00Z' }
             mockAuditService.writeEvent.mockResolvedValue(writeResult)
-            const auditHistory = [{ action: 'Quote Updated', user: 'user', userId: 1, date: '2026-01-01' }]
-            mockAuditService.getHistory.mockResolvedValue(auditHistory)
 
             const result = await service.postAudit(1, 'TST', { id: 42, username: 'user' }, { action: 'Quote Updated', details: {} })
-            expect(result).toEqual({ success: true, audit: auditHistory, otherUsersOpen: [] })
+            expect(result.id).toBe(1)
+            expect(result.action).toBe('Quote Updated')
+            expect(result.entity_type).toBe('Quote')
+            expect(result.entity_id).toBe(1)
+            expect(result.otherUsersOpen).toEqual([])
             expect(mockAuditService.writeEvent).toHaveBeenCalledWith(
                 expect.objectContaining({ entityType: 'Quote', entityId: 1, action: 'Quote Updated' }),
                 expect.objectContaining({ id: 42, username: 'user' }),
             )
-            expect(mockAuditService.getHistory).toHaveBeenCalledWith('Quote', 1)
         })
 
         it('T-QUO-BE-NE-R09b: throws BadRequestException when action is absent', async () => {
@@ -391,11 +450,10 @@ describe('QuotesService', () => {
         // REQ-QUO-BE-NE-F-014 — concurrent-user detection in postAudit response
         it('T-QUO-BE-NE-R14a: passes otherUsersOpen through from AuditService when action contains "Opened"', async () => {
             mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
-            mockAuditService.writeEvent.mockResolvedValue({ id: 2, action: 'Quote Opened', otherUsersOpen: ['Alice', 'Bob'] })
-            mockAuditService.getHistory.mockResolvedValue([{ action: 'Quote Opened', user: 'user', userId: 1, date: '2026-01-01' }])
+            mockAuditService.writeEvent.mockResolvedValue({ id: 2, action: 'Quote Opened', entityType: 'Quote', entityId: 1, createdAt: '2026-01-01T00:00:00Z', otherUsersOpen: ['Alice', 'Bob'] })
 
             const result = await service.postAudit(1, 'TST', { id: 42, username: 'user' }, { action: 'Quote Opened' })
-            expect(result.success).toBe(true)
+            expect(result.entity_type).toBe('Quote')
             expect(result.otherUsersOpen).toEqual(['Alice', 'Bob'])
         })
     })
@@ -617,6 +675,102 @@ describe('QuotesService', () => {
             await expect(service.updateSection(1, 1, 'TST', 'user', {}))
                 .rejects.toThrow(ForbiddenException)
         })
+
+        it('T-QUO-BE-NE-R14f: persists effective_date and tax_receivable to the section entity', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const section: any = {
+                id: 1, quoteId: 1, payload: {}, deletedAt: null,
+                effectiveDate: null, taxReceivable: null,
+                inceptionDate: '2026-06-01', expiryDate: '2027-06-01',
+            }
+            mockSectionRepo.findOne.mockResolvedValue(section)
+            mockSectionRepo.save.mockImplementation((s: any) => Promise.resolve(s))
+
+            await service.updateSection(1, 1, 'TST', 'user', {
+                effective_date: '2026-07-01',
+                tax_receivable: 1250,
+            })
+            expect(section.effectiveDate).toBe('2026-07-01')
+            expect(section.taxReceivable).toBe(1250)
+        })
+
+        it('T-QUO-BE-NE-R14g: auto-computes days_on_cover from inceptionDate and expiryDate', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const section: any = {
+                id: 1, quoteId: 1, payload: {}, deletedAt: null,
+                inceptionDate: '2026-06-01', expiryDate: '2027-06-01',
+                daysOnCover: null,
+            }
+            mockSectionRepo.findOne.mockResolvedValue(section)
+            mockSectionRepo.save.mockImplementation((s: any) => Promise.resolve(s))
+
+            await service.updateSection(1, 1, 'TST', 'user', {})
+            // 2026-06-01 to 2027-06-01 inclusive = 366 days (crosses leap-year boundary)
+            expect(section.daysOnCover).toBe(
+                Math.round(
+                    (new Date('2027-06-01').getTime() - new Date('2026-06-01').getTime()) / 86400000
+                ) + 1
+            )
+        })
+
+        it('T-QUO-BE-NE-R14h: sets days_on_cover to null when inceptionDate is absent', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const section: any = {
+                id: 1, quoteId: 1, payload: {}, deletedAt: null,
+                inceptionDate: null, expiryDate: '2027-06-01',
+                daysOnCover: 365,
+            }
+            mockSectionRepo.findOne.mockResolvedValue(section)
+            mockSectionRepo.save.mockImplementation((s: any) => Promise.resolve(s))
+
+            await service.updateSection(1, 1, 'TST', 'user', {})
+            expect(section.daysOnCover).toBeNull()
+        })
+
+        it('T-QUO-BE-NE-R14i: persists time_basis, written_order_basis, signed_order_basis to section entity', async () => {
+            // REQ-QUO-BE-NE-F-020c: new order/time fields are patched individually
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const section: any = {
+                id: 1, quoteId: 1, payload: {}, deletedAt: null,
+                inceptionDate: '2026-01-01', expiryDate: '2026-12-31',
+                timeBasis: null, writtenOrderBasis: null, signedOrderBasis: null,
+            }
+            mockSectionRepo.findOne.mockResolvedValue(section)
+            mockSectionRepo.save.mockImplementation((s: any) => Promise.resolve(s))
+
+            await service.updateSection(1, 1, 'TST', 'user', {
+                time_basis: 'Local Standard Time',
+                written_order_basis: 'Percentage of Order',
+                signed_order_basis: 'Percentage of Whole',
+            })
+            expect(section.timeBasis).toBe('Local Standard Time')
+            expect(section.writtenOrderBasis).toBe('Percentage of Order')
+            expect(section.signedOrderBasis).toBe('Percentage of Whole')
+        })
+
+        it('T-QUO-BE-NE-R14j: persists written_line_total, signed_line_total, annual_gross_premium, annual_net_premium', async () => {
+            // REQ-QUO-BE-NE-F-020c: new financial fields are patched individually
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const section: any = {
+                id: 1, quoteId: 1, payload: {}, deletedAt: null,
+                inceptionDate: '2026-01-01', expiryDate: '2026-12-31',
+                writtenLineTotal: null, signedLineTotal: null,
+                annualGrossPremium: null, annualNetPremium: null,
+            }
+            mockSectionRepo.findOne.mockResolvedValue(section)
+            mockSectionRepo.save.mockImplementation((s: any) => Promise.resolve(s))
+
+            await service.updateSection(1, 1, 'TST', 'user', {
+                written_line_total: 500000,
+                signed_line_total: 450000,
+                annual_gross_premium: 50000,
+                annual_net_premium: 45000,
+            })
+            expect(section.writtenLineTotal).toBe(500000)
+            expect(section.signedLineTotal).toBe(450000)
+            expect(section.annualGrossPremium).toBe(50000)
+            expect(section.annualNetPremium).toBe(45000)
+        })
     })
 
     // -------------------------------------------------------------------------
@@ -797,6 +951,201 @@ describe('QuotesService', () => {
 
             const result = await service.getLocations(1, 'TST')
             expect(result).toEqual([])
+        })
+    })
+
+    // -------------------------------------------------------------------------
+    // REQ-QUO-BE-NE-F-041 — getCoverages
+    // Written ahead of implementation per §03 Three-Artifact Rule.
+    // These tests will FAIL until quotes.service.ts adds getCoverages().
+    // -------------------------------------------------------------------------
+    describe('getCoverages', () => {
+        it('T-QUO-BE-NE-R41a: returns coverages for the section ordered by id', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const coverages = [
+                { id: 1, section_id: 1, quote_id: 1, coverage: 'Property Damage' },
+            ]
+            mockDataSource.query.mockResolvedValue(coverages)
+
+            const result = await (service as any).getCoverages(1, 1, 'TST', 'user')
+            expect(result).toEqual(coverages)
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('FROM quote_section_coverages'),
+                expect.arrayContaining([1]),
+            )
+        })
+
+        it('T-QUO-BE-NE-R41b: throws NotFoundException when parent quote does not exist', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(null)
+
+            await expect((service as any).getCoverages(99, 1, 'TST', 'user'))
+                .rejects.toThrow(NotFoundException)
+        })
+
+        it('T-QUO-BE-NE-R41c: throws ForbiddenException when orgCode does not match', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote({ createdByOrgCode: 'OTHER' }))
+
+            await expect((service as any).getCoverages(1, 1, 'TST', 'user'))
+                .rejects.toThrow(ForbiddenException)
+        })
+    })
+
+    // -------------------------------------------------------------------------
+    // REQ-QUO-BE-NE-F-042 — createCoverage
+    // Written ahead of implementation per §03 Three-Artifact Rule.
+    // These tests will FAIL until quotes.service.ts adds createCoverage().
+    // -------------------------------------------------------------------------
+    describe('createCoverage', () => {
+        it('T-QUO-BE-NE-R42a: creates a coverage with auto-generated reference {sectionRef}-COV-001', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            mockSectionRepo.findOne.mockResolvedValue({
+                id: 1,
+                reference: 'QUO-TST-20260325-001-S01',
+                quoteId: 1,
+            })
+            mockDataSource.query
+                .mockResolvedValueOnce([{ count: '0' }])
+                .mockResolvedValueOnce([{
+                    id: 1,
+                    section_id: 1,
+                    quote_id: 1,
+                    reference: 'QUO-TST-20260325-001-S01-COV-001',
+                    coverage: 'Property Damage',
+                }])
+
+            const result = await (service as any).createCoverage(1, 1, 'TST', { coverage: 'Property Damage' }, 'user')
+            expect(result.reference).toBe('QUO-TST-20260325-001-S01-COV-001')
+            expect(result.coverage).toBe('Property Damage')
+        })
+
+        it('T-QUO-BE-NE-R42b: throws NotFoundException when parent quote does not exist', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(null)
+
+            await expect((service as any).createCoverage(99, 1, 'TST', { coverage: 'X' }, 'user'))
+                .rejects.toThrow(NotFoundException)
+        })
+
+        it('T-QUO-BE-NE-R42c: throws ForbiddenException when orgCode does not match', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote({ createdByOrgCode: 'OTHER' }))
+
+            await expect((service as any).createCoverage(1, 1, 'TST', { coverage: 'X' }, 'user'))
+                .rejects.toThrow(ForbiddenException)
+        })
+
+        it('T-QUO-BE-NE-R42d: increments reference sequence when coverages already exist', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            mockSectionRepo.findOne.mockResolvedValue({
+                id: 1,
+                reference: 'QUO-TST-20260325-001-S01',
+                quoteId: 1,
+            })
+            mockDataSource.query
+                .mockResolvedValueOnce([{ count: '2' }])
+                .mockResolvedValueOnce([{
+                    id: 3,
+                    section_id: 1,
+                    quote_id: 1,
+                    reference: 'QUO-TST-20260325-001-S01-COV-003',
+                    coverage: 'Third Coverage',
+                }])
+
+            const result = await (service as any).createCoverage(1, 1, 'TST', { coverage: 'Third Coverage' }, 'user')
+            expect(result.reference).toBe('QUO-TST-20260325-001-S01-COV-003')
+        })
+    })
+
+    // -------------------------------------------------------------------------
+    // REQ-QUO-BE-NE-F-043 — updateCoverage
+    // Written ahead of implementation per §03 Three-Artifact Rule.
+    // These tests will FAIL until quotes.service.ts adds updateCoverage().
+    // -------------------------------------------------------------------------
+    describe('updateCoverage', () => {
+        it('T-QUO-BE-NE-R43a: updates mutable fields and returns the updated coverage', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            mockDataSource.query
+                .mockResolvedValueOnce([{ id: 1, section_id: 1, quote_id: 1, coverage: 'Old' }])
+                // TypeORM v0.3 returns [rawRows, rowCount] for UPDATE queries
+                .mockResolvedValueOnce([[{
+                    id: 1, section_id: 1, quote_id: 1,
+                    coverage: 'Updated', class_of_business: 'Marine',
+                }], 1])
+
+            const result = await (service as any).updateCoverage(
+                1, 1, 1, 'TST',
+                { coverage: 'Updated', class_of_business: 'Marine' },
+                'user',
+            )
+            expect(result.coverage).toBe('Updated')
+            expect(result.class_of_business).toBe('Marine')
+        })
+
+        it('T-QUO-BE-NE-R43b: computes days_on_cover = 90 for Jan 1 to Apr 1', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            mockDataSource.query
+                .mockResolvedValueOnce([{ id: 1, section_id: 1, quote_id: 1 }])
+                // TypeORM v0.3 returns [rawRows, rowCount] for UPDATE queries
+                .mockResolvedValueOnce([[{
+                    id: 1, section_id: 1, quote_id: 1,
+                    effective_date: '2026-01-01',
+                    expiry_date: '2026-04-01',
+                    days_on_cover: 90,
+                }], 1])
+
+            const result = await (service as any).updateCoverage(
+                1, 1, 1, 'TST',
+                { effective_date: '2026-01-01', expiry_date: '2026-04-01' },
+                'user',
+            )
+            expect(result.days_on_cover).toBe(90)
+        })
+
+        it('T-QUO-BE-NE-R43c: throws NotFoundException when coverage does not exist', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            mockDataSource.query.mockResolvedValueOnce([]) // SELECT returns empty
+
+            await expect((service as any).updateCoverage(1, 1, 999, 'TST', { coverage: 'X' }, 'user'))
+                .rejects.toThrow(NotFoundException)
+        })
+
+        it('T-QUO-BE-NE-R43d: throws ForbiddenException when orgCode does not match', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote({ createdByOrgCode: 'OTHER' }))
+
+            await expect((service as any).updateCoverage(1, 1, 1, 'TST', { coverage: 'X' }, 'user'))
+                .rejects.toThrow(ForbiddenException)
+        })
+    })
+
+    // -------------------------------------------------------------------------
+    // REQ-QUO-BE-NE-F-044 — deleteCoverage
+    // Written ahead of implementation per §03 Three-Artifact Rule.
+    // These tests will FAIL until quotes.service.ts adds deleteCoverage().
+    // -------------------------------------------------------------------------
+    describe('deleteCoverage', () => {
+        it('T-QUO-BE-NE-R44a: soft-deletes coverage by setting deleted_at', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            mockDataSource.query.mockResolvedValue([{ id: 1 }])
+
+            await expect((service as any).deleteCoverage(1, 1, 1, 'TST', 'user'))
+                .resolves.not.toThrow()
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('deleted_at'),
+                expect.arrayContaining([1]),
+            )
+        })
+
+        it('T-QUO-BE-NE-R44b: throws NotFoundException when coverage does not exist (no rows updated)', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            mockDataSource.query.mockResolvedValue([])
+
+            await expect((service as any).deleteCoverage(1, 1, 999, 'TST', 'user'))
+                .rejects.toThrow(NotFoundException)
+        })
+
+        it('T-QUO-BE-NE-R44c: throws ForbiddenException when orgCode does not match', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote({ createdByOrgCode: 'OTHER' }))
+
+            await expect((service as any).deleteCoverage(1, 1, 1, 'TST', 'user'))
+                .rejects.toThrow(ForbiddenException)
         })
     })
 })

@@ -34,8 +34,8 @@ const pool = new Pool({ connectionString: DB_URL })
 // Test submission data
 //
 // Status coverage (required — do not remove any status):
-//   Open      — SUB-2024-001, SUB-2024-005, SUB-2025-001, SUB-2025-003
-//   Quoted    — SUB-2024-002, SUB-2025-002
+//   Open      — SUB-2024-001, SUB-2024-005, SUB-2025-001, SUB-2025-003, SUB-2025-D01, SUB-2026-D01
+//   Quoted    — SUB-2024-002, SUB-2025-002, SUB-2025-D02
 //   Bound     — SUB-2024-003
 //   Declined  — SUB-2024-004
 // ---------------------------------------------------------------------------
@@ -152,6 +152,48 @@ const SUBMISSIONS = [
         createdDate: '2025-02-15',
         createdBy: 'broker.sam',
         createdByOrgCode: 'BBRK',
+    },
+    {
+        reference: 'SUB-2025-D01',
+        submissionType: 'Submission',
+        insured: 'Demo Manufacturing Co',
+        insuredId: 'PTY-INS-D01',
+        placingBroker: 'Demo Brokers Ltd',
+        contractType: 'Policy Contract',
+        inceptionDate: '2025-06-01',
+        expiryDate: '2026-05-31',
+        status: 'Open',
+        createdDate: '2025-05-20',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
+    },
+    {
+        reference: 'SUB-2025-D02',
+        submissionType: 'Submission',
+        insured: 'Demo Logistics Ltd',
+        insuredId: 'PTY-INS-D02',
+        placingBroker: 'Demo Risk Partners',
+        contractType: 'Policy Contract',
+        inceptionDate: '2025-07-01',
+        expiryDate: '2026-06-30',
+        status: 'Quoted',
+        createdDate: '2025-06-18',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
+    },
+    {
+        reference: 'SUB-2026-D01',
+        submissionType: 'Delegated Authority',
+        insured: 'Demo Manufacturing Co',
+        insuredId: 'PTY-INS-D01',
+        placingBroker: 'Demo Brokers Ltd',
+        contractType: 'Delegated Authority',
+        inceptionDate: '2026-01-01',
+        expiryDate: '2026-12-31',
+        status: 'Open',
+        createdDate: '2026-01-15',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
     },
 ]
 

@@ -32,6 +32,7 @@ import type { SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid
 import { useResizableColumns } from '@/shared/lib/hooks/useResizableColumns'
 import {
     getQuote,
+    createQuote,
     updateQuote,
     markQuoteAsQuoted,
     bindQuote,
@@ -41,12 +42,15 @@ import {
     getContractTypes,
     getMethodsOfPlacement,
     getRenewalStatuses,
+    getCurrencies,
+    getClassesOfBusiness,
     listSections,
     createSection,
+    updateSection,
     deleteSection,
     issuePolicy,
 } from '@/quotes/quotes.service'
-import type { Quote, QuoteSection, CreateSectionInput } from '@/quotes/quotes.service'
+import type { Quote, QuoteSection, QuoteSectionPatch } from '@/quotes/quotes.service'
 import { getSubmission } from '@/submissions/submissions.service'
 import type { Submission } from '@/submissions/submissions.service'
 import InsuredSearch from '@/parties/InsuredSearch/InsuredSearch'
@@ -56,6 +60,7 @@ import SubmissionSearch from '@/submissions/SubmissionSearch/SubmissionSearch'
 import { useSidebarSection } from '@/shell/SidebarContext'
 import type { SidebarSection } from '@/shell/SidebarContext'
 import { useNotifications } from '@/shell/NotificationDock'
+import { getSession } from '@/shared/lib/auth-session/auth-session'
 import Card from '@/shared/Card/Card'
 import TabsNav from '@/shared/components/TabsNav/TabsNav'
 import type { TabItem } from '@/shared/components/TabsNav/TabsNav'
@@ -128,14 +133,17 @@ interface FormValues {
     renewable_indicator: string
     renewal_date: string
     renewal_status: string
+    new_or_renewal: string
 }
 
 function quoteToForm(q: Quote): FormValues {
+    // Derive YOA from inception date if not already stored
+    const yoa = q.year_of_account ?? (q.inception_date ? q.inception_date.slice(0, 4) : '')
     return {
         insured: q.insured ?? '',
         insured_id: q.insured_id ? Number(q.insured_id) : null,
         submission_id: q.submission_id ?? null,
-        year_of_account: q.year_of_account ?? '',
+        year_of_account: yoa,
         business_type: q.business_type ?? '',
         inception_date: q.inception_date ?? '',
         inception_time: q.inception_time ?? '00:00:00',
@@ -153,6 +161,7 @@ function quoteToForm(q: Quote): FormValues {
         renewable_indicator: q.renewable_indicator ?? 'No',
         renewal_date: q.renewal_date ?? '',
         renewal_status: q.renewal_status ?? '',
+        new_or_renewal: q.new_or_renewal ?? 'New',
     }
 }
 
@@ -166,16 +175,25 @@ function serialise(v: FormValues): string {
 // ---------------------------------------------------------------------------
 
 export default function QuoteViewPage() {
-    const { id } = useParams<{ id: string }>()
+    const { id } = useParams<{ id?: string }>()
+    if (!id) return <ExistingQuoteViewPage quoteId={0} isCreate />
+
     const quoteId = Number(id)
+    if (!Number.isFinite(quoteId) || quoteId <= 0) {
+        return <div className="p-6 text-sm text-red-600">Invalid quote id.</div>
+    }
+
+    return <ExistingQuoteViewPage quoteId={quoteId} />
+}
+
+function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number, isCreate?: boolean }) {
     const navigate = useNavigate()
 
     const { addNotification, removeNotification } = useNotifications()
 
     const [quote, setQuote] = useState<Quote | null>(null)
-    const [loading, setLoading] = useState(true)
+    const [loading, setLoading] = useState(!isCreate)
     const [loadError, setLoadError] = useState<string | null>(null)
-    const [actionError, setActionError] = useState<string | null>(null)
 
     const [formValues, setFormValues] = useState<FormValues>({
         insured: '', insured_id: null, submission_id: null,
@@ -188,6 +206,7 @@ export default function QuoteViewPage() {
         contract_type: '', method_of_placement: '',
         unique_market_reference: '', renewable_indicator: 'No',
         renewal_date: '', renewal_status: '',
+        new_or_renewal: 'New',
     })
     const [savedSnapshot, setSavedSnapshot] = useState('')
 
@@ -201,12 +220,26 @@ export default function QuoteViewPage() {
     const [contractTypes, setContractTypes] = useState<string[]>([])
     const [methodsOfPlacement, setMethodsOfPlacement] = useState<string[]>([])
     const [renewalStatuses, setRenewalStatuses] = useState<string[]>([])
+    const [currencies, setCurrencies] = useState<string[]>([])
+    const [classesOfBusiness, setClassesOfBusiness] = useState<string[]>([])
+
+    // Save-attempt guard — validation errors only surface after first save attempt (F-025)
+    const [saveAttempted, setSaveAttempted] = useState(false)
+
+    // Track whether insured was inherited from the linked submission (so unlink can clear it)
+    const [insuredFromSubmission, setInsuredFromSubmission] = useState(false)
 
     // Decline modal
     const [showDeclineModal, setShowDeclineModal] = useState(false)
     const [declineReasonCode, setDeclineReasonCode] = useState('')
     const [declineReasonText, setDeclineReasonText] = useState('')
     const [declineError, setDeclineError] = useState<string | null>(null)
+
+    // YOA mismatch confirmation modal
+    const [showYoaWarning, setShowYoaWarning] = useState(false)
+
+    // Add Section modal
+    const [showAddSectionModal, setShowAddSectionModal] = useState(false)
 
     // Tabs
     type TabKey = 'sections' | 'brokers' | 'additional-insureds' | 'financial-summary' | 'audit'
@@ -218,10 +251,9 @@ export default function QuoteViewPage() {
     const [sectionsLoading, setSectionsLoading] = useState(false)
     const [sectionsLoaded, setSectionsLoaded] = useState(false)
     const [sectionsError, setSectionsError] = useState<string | null>(null)
-    const [showAddSectionModal, setShowAddSectionModal] = useState(false)
-    const [sectionForm, setSectionForm] = useState<CreateSectionInput>({})
-    const [sectionSaving, setSectionSaving] = useState(false)
-    const [sectionError, setSectionError] = useState<string | null>(null)
+    const [sectionAdding, setSectionAdding] = useState(false)
+    // Per-row draft edits — keyed by section id, only holds fields changed since last blur-save
+    const [sectionEdits, setSectionEdits] = useState<Record<number, Record<string, unknown>>>({})
     const [sectionSort, setSectionSort] = useState<SortConfig>({ key: 'reference', direction: 'asc' })
 
     // Additional Insureds tab state — backed by payload.additionalInsured (F-049)
@@ -278,6 +310,7 @@ export default function QuoteViewPage() {
     // Fetch quote on mount; load sections independently so a sections failure
     // does not block the quote page from rendering.
     useEffect(() => {
+        if (isCreate) return
         setLoading(true)
         setLoadError(null)
 
@@ -337,17 +370,9 @@ export default function QuoteViewPage() {
             })
             .finally(() => setLoading(false))
 
-        // Sections load is non-critical — failure shows an error inside the tab
-        setSectionsLoading(true)
-        setSectionsError(null)
-        listSections(quoteId)
-            .then((secs) => { setSections(secs); setSectionsLoaded(true) })
-            .catch((err: Error) => {
-                setSectionsLoaded(true)
-                setSectionsError(err.message ?? 'Failed to load sections.')
-                addNotification('Sections could not be loaded. The rest of the quote is unaffected.', 'warning')
-            })
-            .finally(() => setSectionsLoading(false))
+        // Sections are loaded lazily when the user first opens the Sections tab
+        // (see handleTabChange below) to prevent a 500 error from a missing column
+        // from showing a spurious toast notification on every page open.
     }, [quoteId]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch linked submission for reference display whenever submission_id changes
@@ -360,7 +385,7 @@ export default function QuoteViewPage() {
             .catch(() => setLinkedSubmission(null))
     }, [formValues.submission_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const editable = quote ? isQuoteEditable(quote.status) : false
+    const editable = isCreate ? true : (quote ? isQuoteEditable(quote.status) : false)
 
     // F-033 — show locked notification (replaces in-page banner) and remove on unmount
     useEffect(() => {
@@ -372,12 +397,51 @@ export default function QuoteViewPage() {
 
     // Load lookups (F-029, F-030, F-032)
     useEffect(() => {
-        getContractTypes().then(setContractTypes).catch(() => setContractTypes([]))
-        getMethodsOfPlacement().then(setMethodsOfPlacement).catch(() => setMethodsOfPlacement([]))
-        getRenewalStatuses().then(setRenewalStatuses).catch(() => setRenewalStatuses([]))
+        Promise.resolve(getContractTypes()).then(setContractTypes).catch(() => setContractTypes([]))
+        Promise.resolve(getMethodsOfPlacement()).then(setMethodsOfPlacement).catch(() => setMethodsOfPlacement([]))
+        Promise.resolve(getRenewalStatuses()).then(setRenewalStatuses).catch(() => setRenewalStatuses([]))
+        Promise.resolve(getCurrencies()).then((c) => setCurrencies(c ?? [])).catch(() => setCurrencies([]))
+        Promise.resolve(getClassesOfBusiness()).then((items) => setClassesOfBusiness(items ?? [])).catch(() => setClassesOfBusiness([]))
     }, [])
 
-    const isDirty = savedSnapshot !== '' && serialise(formValues) !== savedSnapshot
+    const isDirty = isCreate
+        ? (!!formValues.insured || !!formValues.submission_id)
+        : savedSnapshot !== '' && serialise(formValues) !== savedSnapshot
+
+    // ---------------------------------------------------------------------------
+    // Unsaved changes notification (shown in notification panel)
+    // ---------------------------------------------------------------------------
+
+    const dirtyNotifId = useRef<string | null>(null)
+    useEffect(() => {
+        if (isDirty && !dirtyNotifId.current) {
+            const clientId = `quote-${quoteId}-dirty`
+            dirtyNotifId.current = clientId
+            addNotification('You have unsaved changes.', 'warning', { id: clientId })
+        } else if (!isDirty && dirtyNotifId.current) {
+            removeNotification(dirtyNotifId.current)
+            dirtyNotifId.current = null
+        }
+        return () => {
+            if (dirtyNotifId.current) {
+                removeNotification(dirtyNotifId.current)
+                dirtyNotifId.current = null
+            }
+        }
+    }, [isDirty]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ---------------------------------------------------------------------------
+    // F-076 — Insured mismatch warning
+    // ---------------------------------------------------------------------------
+
+    useEffect(() => {
+        const clientId = `quote-${quoteId}-insured-mismatch`
+        if (insuredParty?.name && linkedSubmission?.insured && insuredParty.name !== linkedSubmission.insured) {
+            addNotification('Insured does not match the linked submission insured — review before saving.', 'warning', { id: clientId })
+        } else {
+            removeNotification(clientId)
+        }
+    }, [insuredParty, linkedSubmission]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // ---------------------------------------------------------------------------
     // C-003 — Back-navigation barrier while dirty
@@ -410,31 +474,31 @@ export default function QuoteViewPage() {
     // editable or quote changes), satisfying the useSidebarSection stable-ref contract.
     const sidebarSection = useMemo((): SidebarSection => {
         const items: SidebarSection['items'] = []
-        if (editable) {
+        if (isCreate || editable) {
             items.push({ label: 'Save', icon: FiSave, event: 'submission:save' })
         }
-        if (quote?.status === 'Draft') {
-            items.push({ label: 'Issue Quote', icon: FiCheckCircle, event: 'quote:mark-quoted' })
-        }
-        if (quote?.status === 'Quoted') {
-            items.push({ label: 'Bind Quote', icon: FiCheckCircle, event: 'quote:bind' })
-        }
-        if (quote && !['Bound', 'Declined'].includes(quote.status)) {
-            items.push({ label: 'Decline Quote', icon: FiXCircle, event: 'quote:decline' })
-        }
-        // Issue Policy when Bound
-        if (quote?.status === 'Bound') {
-            items.push({ label: 'Issue Policy', icon: FiCheckCircle, event: 'quote:issue-policy' })
-        }
-        // Copy Quote available in all states
-        if (quote) {
-            items.push({ label: 'Copy Quote', icon: FiCopy, event: 'quote:copy' })
-        }
-        if (quote?.submission_id) {
-            items.push({ label: 'Back to Submission', icon: FiArrowLeft, to: `/submissions/${quote.submission_id}` })
+        if (!isCreate) {
+            if (quote?.status === 'Draft') {
+                items.push({ label: 'Issue Quote', icon: FiCheckCircle, event: 'quote:mark-quoted' })
+            }
+            if (quote?.status === 'Quoted') {
+                items.push({ label: 'Bind Quote', icon: FiCheckCircle, event: 'quote:bind' })
+            }
+            if (quote && !['Bound', 'Declined'].includes(quote.status)) {
+                items.push({ label: 'Decline Quote', icon: FiXCircle, event: 'quote:decline' })
+            }
+            if (quote?.status === 'Bound') {
+                items.push({ label: 'Issue Policy', icon: FiCheckCircle, event: 'quote:issue-policy' })
+            }
+            if (quote) {
+                items.push({ label: 'Copy Quote', icon: FiCopy, event: 'quote:copy' })
+            }
+            if (quote?.submission_id) {
+                items.push({ label: 'Back to Submission', icon: FiArrowLeft, to: `/submissions/${quote?.submission_id}` })
+            }
         }
         return { title: 'Quote', items }
-    }, [editable, quote])
+    }, [isCreate, editable, quote])
 
     useSidebarSection(sidebarSection)
 
@@ -442,17 +506,40 @@ export default function QuoteViewPage() {
     // DOM event handlers
     // ---------------------------------------------------------------------------
 
-    const handleSave = useCallback(async () => {
-        if (!quote || !editable) return
-        if (!formValues.submission_id) {
-            setActionError('A linked submission is required before saving.')
-            addNotification('Quote not saved: a linked submission is required.', 'error')
-            return
-        }
-        setActionError(null)
+    const doSave = useCallback(async () => {
         try {
+            if (isCreate) {
+                const session = getSession()
+                const created = await createQuote({
+                    insured: formValues.insured || insuredParty?.name || '',
+                    insured_id: formValues.insured_id ?? undefined,
+                    submission_id: formValues.submission_id ?? undefined,
+                    business_type: formValues.business_type,
+                    inception_date: formValues.inception_date,
+                    expiry_date: formValues.expiry_date,
+                    inception_time: formValues.inception_time,
+                    expiry_time: formValues.expiry_time,
+                    quote_currency: formValues.quote_currency,
+                    year_of_account: formValues.year_of_account,
+                    lta_applicable: formValues.lta_applicable,
+                    lta_start_date: formValues.lta_start_date,
+                    lta_start_time: formValues.lta_start_time,
+                    lta_expiry_date: formValues.lta_expiry_date,
+                    lta_expiry_time: formValues.lta_expiry_time,
+                    contract_type: formValues.contract_type,
+                    method_of_placement: formValues.method_of_placement,
+                    unique_market_reference: formValues.unique_market_reference,
+                    renewable_indicator: formValues.renewable_indicator,
+                    renewal_date: formValues.renewal_date,
+                    renewal_status: formValues.renewal_status,
+                    created_by: session?.user?.name ?? 'Unknown',
+                })
+                addNotification('Quote created successfully.', 'success')
+                navigate(`/quotes/${created.id}`)
+                return
+            }
             const updatedPayload: Record<string, unknown> = {
-                ...(quote.payload ?? {}),
+                ...(quote?.payload ?? {}),
                 // F-048 — broker fields
                 placingBrokerId: brokerFields.placingBrokerParty?.id ?? null,
                 placingBrokerName: brokerFields.placingBrokerParty?.name ?? null,
@@ -473,12 +560,34 @@ export default function QuoteViewPage() {
             const next = quoteToForm(updated)
             setFormValues(next)
             setSavedSnapshot(serialise(next))
+            addNotification('Quote saved successfully.', 'success')
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to save.'
-            setActionError(msg)
             addNotification(`Quote save failed: ${msg}`, 'error')
         }
-    }, [quote, editable, quoteId, formValues, brokerFields, additionalInsuredRows, financials, addNotification])
+    }, [isCreate, quote, quoteId, formValues, insuredParty, brokerFields, additionalInsuredRows, financials, addNotification, navigate])
+
+    const handleSave = useCallback(async () => {
+        if (!isCreate && (!quote || !editable)) return
+        setSaveAttempted(true)
+        if (!formValues.submission_id) {
+            addNotification('Quote not saved: a linked submission is required.', 'error')
+            return
+        }
+        // YOA mismatch warning
+        const inceptionYear = formValues.inception_date ? formValues.inception_date.slice(0, 4) : ''
+        if (formValues.year_of_account && inceptionYear && formValues.year_of_account !== inceptionYear) {
+            setShowYoaWarning(true)
+            return
+        }
+        await doSave()
+    }, [isCreate, quote, editable, formValues, doSave, addNotification])
+
+    // Called when user confirms they want to save despite YOA mismatch
+    const handleYoaConfirmSave = useCallback(async () => {
+        setShowYoaWarning(false)
+        await doSave()
+    }, [doSave])
 
     const handleMarkQuoted = useCallback(async () => {
         if (!quote) return
@@ -486,27 +595,23 @@ export default function QuoteViewPage() {
             addNotification('Cannot issue quote: a linked submission is required.', 'error')
             return
         }
-        setActionError(null)
         try {
             const updated = await markQuoteAsQuoted(quoteId)
             setQuote(updated)
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to mark as Quoted.'
-            setActionError(msg)
             addNotification(`Failed to mark as Quoted: ${msg}`, 'error')
         }
     }, [quote, quoteId, formValues.submission_id, addNotification])
 
     const handleBind = useCallback(async () => {
         if (!quote) return
-        setActionError(null)
         try {
             const updated = await bindQuote(quoteId)
             setQuote(updated)
             addNotification('Quote bound. Any other quotes on this submission have been declined.', 'success')
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to bind.'
-            setActionError(msg)
             addNotification(`Bind failed: ${msg}`, 'error')
         }
     }, [quote, quoteId, addNotification])
@@ -561,15 +666,12 @@ export default function QuoteViewPage() {
         const onCopy = () => handleCopyQuote()
         const onIssuePolicy = () => handleIssuePolicy()
 
-        const onAddSection = () => { setSectionForm({}); setSectionError(null); setShowAddSectionModal(true) }
-
         window.addEventListener('submission:save', onSave)
         window.addEventListener('quote:mark-quoted', onMarkQuoted)
         window.addEventListener('quote:bind', onBind)
         window.addEventListener('quote:decline', onDecline)
         window.addEventListener('quote:copy', onCopy)
         window.addEventListener('quote:issue-policy', onIssuePolicy)
-        window.addEventListener('quote:add-section', onAddSection)
 
         return () => {
             window.removeEventListener('submission:save', onSave)
@@ -578,26 +680,44 @@ export default function QuoteViewPage() {
             window.removeEventListener('quote:decline', onDecline)
             window.removeEventListener('quote:copy', onCopy)
             window.removeEventListener('quote:issue-policy', onIssuePolicy)
-            window.removeEventListener('quote:add-section', onAddSection)
         }
     }, [handleSave, handleMarkQuoted, handleBind, handleCopyQuote, handleIssuePolicy])
 
-    // Sections: add handler
+    // Sections: add a new row directly in the table (no modal)
     const handleAddSection = useCallback(async () => {
-        setSectionSaving(true)
-        setSectionError(null)
+        if (sectionAdding) return
+        setSectionAdding(true)
         try {
-            const created = await createSection(quoteId, sectionForm)
+            const created = await createSection(quoteId, {})
             setSections((prev) => [...prev, created])
-            setSectionForm({})
-            setShowAddSectionModal(false)
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to add section.'
-            setSectionError(msg)
+            addNotification(`Add section failed: ${msg}`, 'error')
         } finally {
-            setSectionSaving(false)
+            setSectionAdding(false)
         }
-    }, [quoteId, sectionForm])
+    }, [quoteId, sectionAdding, addNotification])
+
+    // Sections: persist a single field change on blur
+    const handleSectionFieldBlur = useCallback(async (sectionId: number, field: string, value: unknown) => {
+        try {
+            const patch = { [field]: value } as QuoteSectionPatch
+            const updated = await updateSection(quoteId, sectionId, patch)
+            setSections((prev) => prev.map((s) => (s.id === sectionId ? updated : s)))
+            setSectionEdits((prev) => {
+                const next = { ...(prev[sectionId] ?? {}) }
+                delete next[field]
+                if (Object.keys(next).length === 0) {
+                    const { [sectionId]: _, ...rest } = prev
+                    return rest
+                }
+                return { ...prev, [sectionId]: next }
+            })
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Failed to save field.'
+            addNotification(`Section update failed: ${msg}`, 'error')
+        }
+    }, [quoteId, addNotification])
 
     // Sections: delete handler
     const handleDeleteSection = useCallback(async (sectionId: number) => {
@@ -623,12 +743,24 @@ export default function QuoteViewPage() {
         setAdditionalInsuredRows((prev) => prev.filter((_, i) => i !== idx))
     }, [])
 
-    // Inception date ? auto-default expiry to +365 days
+    // Inception date → auto-default expiry to +365 days
     useEffect(() => {
         if (!editable || !formValues.inception_date || formValues.expiry_date) return
         const d = new Date(formValues.inception_date)
         d.setDate(d.getDate() + 365)
         setFormValues((v) => ({ ...v, expiry_date: d.toISOString().slice(0, 10) }))
+    }, [formValues.inception_date]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Inception date change → auto-update Year of Account to match
+    const inceptionYearRef = useRef(formValues.inception_date.slice(0, 4))
+    useEffect(() => {
+        if (!editable || !formValues.inception_date) return
+        const newYear = formValues.inception_date.slice(0, 4)
+        // Only auto-update YOA when the inception date year actually changes (user interaction)
+        if (newYear && newYear !== inceptionYearRef.current) {
+            inceptionYearRef.current = newYear
+            setFormValues((v) => ({ ...v, year_of_account: newYear }))
+        }
     }, [formValues.inception_date]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // LTA toggle — auto-populate LTA dates from quote inception/expiry when toggled on
@@ -655,7 +787,7 @@ export default function QuoteViewPage() {
         return <div className="p-6 text-sm text-red-600">{loadError}</div>
     }
 
-    if (!quote) return null
+    if (!isCreate && !quote) return null
 
     const field = (label: string, content: React.ReactNode) => (
         <div>
@@ -672,90 +804,102 @@ export default function QuoteViewPage() {
 
     return (
         <div className="p-6 flex flex-col gap-4">
-            {/* Unsaved changes indicator */}
-            {isDirty && (
-                <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-800">
-                    You have unsaved changes.
-                </div>
-            )}
-
-            {/* Action error */}
-            {actionError && (
-                <div className="rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">
-                    {actionError}
-                </div>
-            )}
 
             {/* F-035 / F-036 — Always-visible form in two-column FieldGroup layout */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {/* Left column */}
                 <div className="flex flex-col gap-4">
-                    {/* F-037 — Quote & Referencing */}
-                    <FieldGroup title="Quote & Referencing">
+                    {/* F-037 — Contract & Reference */}
+                    <FieldGroup title="Contract & Reference">
                         <div className="flex flex-col gap-3">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs text-gray-500 mb-0.5">Reference</p>
-                                    <p className="text-base font-semibold text-gray-900">{quote.reference}</p>
+                            {isCreate ? (
+                                <p role="heading" aria-level={1} className="text-xl font-semibold text-gray-900">New Quote</p>
+                            ) : (
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-0.5">Reference</p>
+                                        <p className="text-base font-semibold text-gray-900">{quote!.reference}</p>
+                                    </div>
+                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${STATUS_CLASSES[quote!.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                        {quote!.status}
+                                    </span>
                                 </div>
-                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${STATUS_CLASSES[quote.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                                    {quote.status}
-                                </span>
-                            </div>
+                            )}
 
                             {/* F-025 — Submission */}
                             <div>
                                 {field('Linked Submission',
                                     editable ? (
                                         linkedSubmission ? (
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center w-full border border-gray-300 rounded px-3 py-1.5 text-sm">
                                                 <Link
                                                     to={`/submissions/${linkedSubmission.id}`}
-                                                    className="text-sm text-brand-600 hover:text-brand-800 hover:underline flex-1"
+                                                    className="text-gray-600 hover:text-gray-800 hover:underline flex-1"
                                                 >
                                                     {linkedSubmission.reference}
                                                 </Link>
                                                 <button
                                                     type="button"
+                                                    aria-label="Unlink submission"
                                                     onClick={() => {
                                                         setLinkedSubmission(null)
-                                                        setFormValues((v) => ({ ...v, submission_id: null }))
+                                                        setFormValues((v) => ({
+                                                            ...v,
+                                                            submission_id: null,
+                                                            ...(insuredFromSubmission ? { insured: '', insured_id: null } : {}),
+                                                        }))
+                                                        if (insuredFromSubmission) {
+                                                            setInsuredParty(null)
+                                                            setInsuredFromSubmission(false)
+                                                        }
                                                     }}
-                                                    className="text-xs text-red-600 hover:text-red-800"
+                                                    className="ml-auto text-gray-400 hover:text-red-600 flex-shrink-0"
                                                 >
-                                                    Unlink
+                                                    <FiTrash2 size={14} />
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div data-testid="submission-unconfirmed" className="border border-red-500 ring-1 ring-red-400 rounded p-2">
+                                            <div
+                                                data-testid="submission-unconfirmed"
+                                            >
                                                 <SubmissionSearch
                                                     hideLabel
+                                                    triggerClassName={saveAttempted && !formValues.submission_id ? 'border-red-500 ring-1 ring-red-400' : undefined}
                                                     onSelect={(s) => {
                                                         setLinkedSubmission(s)
-                                                        setFormValues((v) => ({ ...v, submission_id: s.id }))
+                                                        // Inherit insured from submission when available
+                                                        if (s.insured) {
+                                                            setInsuredParty({ id: 0, name: s.insured, type: 'Insured', orgCode: s.createdByOrgCode })
+                                                            setFormValues((v) => ({ ...v, submission_id: s.id, insured: s.insured, insured_id: null }))
+                                                            setInsuredFromSubmission(true)
+                                                        } else {
+                                                            setFormValues((v) => ({ ...v, submission_id: s.id }))
+                                                        }
                                                     }}
                                                 />
-                                                <p className="text-xs text-red-500 mt-1">Submission not confirmed — please search and select</p>
+                                                {saveAttempted && !formValues.submission_id && (
+                                                    <p className="text-xs text-red-500 mt-1">Submission not confirmed — please search and select</p>
+                                                )}
                                             </div>
                                         )
                                     ) : linkedSubmission ? (
                                         <Link
                                             to={`/submissions/${linkedSubmission.id}`}
-                                            className="text-sm text-brand-600 hover:text-brand-800 hover:underline"
+                                            className="text-sm text-gray-600 hover:text-gray-800 hover:underline"
                                         >
                                             {linkedSubmission.reference}
                                         </Link>
-                                    ) : quote.submission_id ? (
+                                    ) : quote?.submission_id ? (
                                         <span className="text-sm text-gray-500">Loading…</span>
                                     ) : readText(null)
                                 )}
                             </div>
 
-                            {/* F-026 — Year of Account */}
+                            {/* F-026 — Year of Account (defaults from inception year, editable) */}
                             {field('Year of Account',
                                 editable
-                                    ? <input aria-label="Year of Account" type="text" value={formValues.year_of_account} onChange={(e) => setFormValues((v) => ({ ...v, year_of_account: e.target.value }))} className={inputCls} />
-                                    : readText(quote.year_of_account)
+                                    ? <input aria-label="Year of Account" type="text" value={formValues.year_of_account} onChange={(e) => setFormValues((v) => ({ ...v, year_of_account: e.target.value }))} maxLength={4} placeholder="YYYY" className={inputCls} />
+                                    : readText(quote?.year_of_account)
                             )}
 
                             {/* Business Type */}
@@ -766,14 +910,27 @@ export default function QuoteViewPage() {
                                         <option value="Insurance">Insurance</option>
                                         <option value="Reinsurance">Reinsurance</option>
                                     </select>
-                                    : readText(quote.business_type)
+                                    : readText(quote?.business_type)
+                            )}
+
+                            {/* New or Renewal */}
+                            {field('New or Renewal',
+                                editable
+                                    ? <select aria-label="New or Renewal" value={formValues.new_or_renewal} onChange={(e) => setFormValues((v) => ({ ...v, new_or_renewal: e.target.value }))} className={inputCls}>
+                                        <option value="New">New</option>
+                                        <option value="Renewal">Renewal</option>
+                                    </select>
+                                    : readText(quote?.new_or_renewal)
                             )}
 
                             {/* Quote Currency */}
                             {field('Quote Currency',
                                 editable
-                                    ? <input aria-label="Quote Currency" type="text" value={formValues.quote_currency} onChange={(e) => setFormValues((v) => ({ ...v, quote_currency: e.target.value.toUpperCase() }))} maxLength={8} className={inputCls} />
-                                    : readText(quote.quote_currency)
+                                    ? <select aria-label="Quote Currency" value={formValues.quote_currency} onChange={(e) => setFormValues((v) => ({ ...v, quote_currency: e.target.value }))} className={inputCls}>
+                                        <option value="">— Select —</option>
+                                        {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                    : readText(quote?.quote_currency)
                             )}
                         </div>
                     </FieldGroup>
@@ -782,34 +939,39 @@ export default function QuoteViewPage() {
                     <FieldGroup title="Insured">
                         {editable ? (
                             insuredParty ? (
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm text-gray-900 flex-1">{insuredParty.name}</span>
+                                <div className="flex items-center w-full border border-gray-300 rounded px-3 py-1.5 text-sm">
+                                    <span className="text-gray-900 flex-1">{insuredParty.name}</span>
                                     <button
                                         type="button"
+                                        aria-label="Clear insured"
                                         onClick={() => {
                                             setInsuredParty(null)
                                             setFormValues((v) => ({ ...v, insured: '', insured_id: null }))
                                         }}
-                                        className="text-xs text-red-600 hover:text-red-800"
+                                        className="ml-auto text-gray-400 hover:text-red-600 flex-shrink-0"
                                     >
-                                        Clear
+                                        <FiTrash2 size={14} />
                                     </button>
                                 </div>
                             ) : (
-                                <div data-testid="insured-unconfirmed" className="border border-red-500 ring-1 ring-red-400 rounded p-2">
+                                <div data-testid="insured-unconfirmed">
                                     <InsuredSearch
                                         hideLabel
                                         selectedParty={null}
+                                        inputClassName={saveAttempted && !insuredParty ? 'border-red-500 ring-1 ring-red-400' : undefined}
                                         onSelect={(party: Party) => {
                                             setInsuredParty(party)
+                                            setInsuredFromSubmission(false)
                                             setFormValues((v) => ({ ...v, insured: party.name, insured_id: party.id }))
                                         }}
                                     />
-                                    <p className="text-xs text-red-500 mt-1">Insured not confirmed — please search and select</p>
+                                    {saveAttempted && !insuredParty && (
+                                        <p className="text-xs text-red-500 mt-1">Insured not confirmed — please search and select</p>
+                                    )}
                                 </div>
                             )
                         ) : (
-                            readText(quote.insured)
+                            readText(quote?.insured)
                         )}
                     </FieldGroup>
                 </div>
@@ -823,24 +985,24 @@ export default function QuoteViewPage() {
                                 {field('Inception Date',
                                     editable
                                         ? <input id="inception-date" aria-label="Inception Date" type="date" value={formValues.inception_date} onChange={(e) => setFormValues((v) => ({ ...v, inception_date: e.target.value }))} className={inputCls} />
-                                        : readText(quote.inception_date)
+                                        : readText(quote?.inception_date)
                                 )}
                                 {field('Inception Time',
                                     editable
                                         ? <input aria-label="Inception Time" type="time" step="1" value={formValues.inception_time} onChange={(e) => setFormValues((v) => ({ ...v, inception_time: e.target.value }))} className={inputCls} />
-                                        : readText(quote.inception_time)
+                                        : readText(quote?.inception_time)
                                 )}
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 {field('Expiry Date',
                                     editable
                                         ? <input id="expiry-date" aria-label="Expiry Date" type="date" value={formValues.expiry_date} onChange={(e) => setFormValues((v) => ({ ...v, expiry_date: e.target.value }))} className={inputCls} />
-                                        : readText(quote.expiry_date)
+                                        : readText(quote?.expiry_date)
                                 )}
                                 {field('Expiry Time',
                                     editable
                                         ? <input aria-label="Expiry Time" type="time" step="1" value={formValues.expiry_time} onChange={(e) => setFormValues((v) => ({ ...v, expiry_time: e.target.value }))} className={inputCls} />
-                                        : readText(quote.expiry_time)
+                                        : readText(quote?.expiry_time)
                                 )}
                             </div>
 
@@ -874,24 +1036,24 @@ export default function QuoteViewPage() {
                                         {field('LTA Start Date',
                                             editable
                                                 ? <input aria-label="LTA Start Date" type="date" value={formValues.lta_start_date} onChange={(e) => setFormValues((v) => ({ ...v, lta_start_date: e.target.value }))} className={inputCls} />
-                                                : readText(quote.lta_start_date)
+                                                : readText(quote?.lta_start_date)
                                         )}
                                         {field('LTA Start Time',
                                             editable
                                                 ? <input aria-label="LTA Start Time" type="time" step="1" value={formValues.lta_start_time} onChange={(e) => setFormValues((v) => ({ ...v, lta_start_time: e.target.value }))} className={inputCls} />
-                                                : readText(quote.lta_start_time)
+                                                : readText(quote?.lta_start_time)
                                         )}
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         {field('LTA Expiry Date',
                                             editable
                                                 ? <input aria-label="LTA Expiry Date" type="date" value={formValues.lta_expiry_date} onChange={(e) => setFormValues((v) => ({ ...v, lta_expiry_date: e.target.value }))} className={inputCls} />
-                                                : readText(quote.lta_expiry_date)
+                                                : readText(quote?.lta_expiry_date)
                                         )}
                                         {field('LTA Expiry Time',
                                             editable
                                                 ? <input aria-label="LTA Expiry Time" type="time" step="1" value={formValues.lta_expiry_time} onChange={(e) => setFormValues((v) => ({ ...v, lta_expiry_time: e.target.value }))} className={inputCls} />
-                                                : readText(quote.lta_expiry_time)
+                                                : readText(quote?.lta_expiry_time)
                                         )}
                                     </div>
                                 </>
@@ -909,7 +1071,7 @@ export default function QuoteViewPage() {
                                         <option value="">— Select —</option>
                                         {contractTypes.map((ct) => <option key={ct} value={ct}>{ct}</option>)}
                                     </select>
-                                    : readText(quote.contract_type)
+                                    : readText(quote?.contract_type)
                             )}
                             {/* F-030 */}
                             {field('Method of Placement',
@@ -918,13 +1080,13 @@ export default function QuoteViewPage() {
                                         <option value="">— Select —</option>
                                         {methodsOfPlacement.map((mp) => <option key={mp} value={mp}>{mp}</option>)}
                                     </select>
-                                    : readText(quote.method_of_placement)
+                                    : readText(quote?.method_of_placement)
                             )}
                             {/* F-031 */}
                             {field('Unique Market Reference',
                                 editable
                                     ? <input aria-label="Unique Market Reference" type="text" value={formValues.unique_market_reference} onChange={(e) => setFormValues((v) => ({ ...v, unique_market_reference: e.target.value }))} className={inputCls} />
-                                    : readText(quote.unique_market_reference)
+                                    : readText(quote?.unique_market_reference)
                             )}
                         </div>
                     </FieldGroup>
@@ -938,14 +1100,14 @@ export default function QuoteViewPage() {
                                         <option value="No">No</option>
                                         <option value="Yes">Yes</option>
                                     </select>
-                                    : readText(quote.renewable_indicator)
+                                    : readText(quote?.renewable_indicator)
                             )}
                             {formValues.renewable_indicator === 'Yes' && (
                                 <>
                                     {field('Renewal Date',
                                         editable
                                             ? <input aria-label="Renewal Date" type="date" value={formValues.renewal_date} onChange={(e) => setFormValues((v) => ({ ...v, renewal_date: e.target.value }))} className={inputCls} />
-                                            : readText(quote.renewal_date)
+                                            : readText(quote?.renewal_date)
                                     )}
                                     {field('Renewal Status',
                                         editable
@@ -953,7 +1115,7 @@ export default function QuoteViewPage() {
                                                 <option value="">— Select —</option>
                                                 {renewalStatuses.map((rs) => <option key={rs} value={rs}>{rs}</option>)}
                                             </select>
-                                            : readText(quote.renewal_status)
+                                            : readText(quote?.renewal_status)
                                     )}
                                 </>
                             )}
@@ -962,13 +1124,16 @@ export default function QuoteViewPage() {
                 </div>
             </div>
 
-            {/* F-034 — Tab navigation */}
-            <TabsNav tabs={TABS} activeTab={activeTab} onChange={handleTabChange} />
+            {/* F-034 — Tab navigation (hidden on create until quote is saved) */}
+            {!isCreate && <TabsNav tabs={TABS} activeTab={activeTab} onChange={handleTabChange} />}
+            {isCreate && (
+                <p className="text-sm text-gray-400 italic">Save the quote to access sections, brokers, and other details.</p>
+            )}
 
             {/* ----------------------------------------------------------------
                 Sections tab
             ---------------------------------------------------------------- */}
-            {activeTab === 'sections' && (
+            {!isCreate && activeTab === 'sections' && (
                 <Card>
                     <div className="p-4 flex flex-col gap-3">
 
@@ -1005,9 +1170,10 @@ export default function QuoteViewPage() {
                                         label: editable ? (
                                             <button
                                                 type="button"
-                                                title="Add Section"
-                                                className="text-brand-600 hover:text-brand-800"
-                                                onClick={() => { setSectionForm({}); setSectionError(null); setShowAddSectionModal(true) }}
+                                                title={sectionAdding ? 'Adding…' : 'Add Section'}
+                                                disabled={sectionAdding}
+                                                className="text-brand-600 hover:text-brand-800 disabled:opacity-40"
+                                                onClick={handleAddSection}
                                             >
                                                 <FiPlus size={14} />
                                             </button>
@@ -1017,7 +1183,9 @@ export default function QuoteViewPage() {
                                     { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 120 },
                                     { key: 'class_of_business', label: 'Class of Business', sortable: true, defaultWidth: 200 },
                                     { key: 'inception_date', label: 'Inception Date', sortable: true, defaultWidth: 130 },
+                                    { key: 'effective_date', label: 'Effective Date', defaultWidth: 130 },
                                     { key: 'expiry_date', label: 'Expiry Date', defaultWidth: 130 },
+                                    { key: 'days_on_cover', label: 'Days on Cover', defaultWidth: 120 },
                                     { key: 'limit_currency', label: 'Limit Currency', defaultWidth: 120 },
                                     { key: 'limit_amount', label: 'Limit Amount', defaultWidth: 150 },
                                     { key: 'limit_loss_qualifier', label: 'Limit Loss Qualifier', defaultWidth: 160 },
@@ -1031,10 +1199,18 @@ export default function QuoteViewPage() {
                                     { key: 'gross_premium', label: 'Gross Premium', defaultWidth: 160 },
                                     { key: 'deductions', label: 'Deductions', defaultWidth: 140 },
                                     { key: 'net_premium', label: 'Net Premium', defaultWidth: 140 },
-                                    { key: 'annual_gross_premium', label: 'Annual Gross Premium', defaultWidth: 180 },
-                                    { key: 'annual_net_premium', label: 'Annual Net Premium', defaultWidth: 180 },
+                                    { key: 'tax_receivable', label: 'Tax Receivable', defaultWidth: 140 },
+                                    { key: 'annual_gross_premium', label: 'Annual Rated GP', defaultWidth: 180 },
+                                    { key: 'annual_net_premium', label: 'Annual Rated NP', defaultWidth: 180 },
                                     { key: 'written_order', label: 'Written Order %', defaultWidth: 130 },
                                     { key: 'signed_order', label: 'Signed Order %', defaultWidth: 130 },
+                                    { key: 'time_basis', label: 'Time Basis', defaultWidth: 140 },
+                                    { key: 'written_order_basis', label: 'Written Order Basis', defaultWidth: 170 },
+                                    { key: 'signed_order_basis', label: 'Signed Order Basis', defaultWidth: 170 },
+                                    { key: 'written_line_total', label: 'Written Line Total', defaultWidth: 160 },
+                                    { key: 'signed_line_total', label: 'Signed Line Total', defaultWidth: 160 },
+                                    { key: 'delegated_authority_ref', label: 'DA Ref', defaultWidth: 130 },
+                                    { key: 'delegated_authority_section_ref', label: 'DA Section Ref', defaultWidth: 160 },
                                 ]}
                                 rows={[...sections].sort((a, b) => {
                                     const dir = sectionSort.direction === 'asc' ? 1 : -1
@@ -1054,6 +1230,53 @@ export default function QuoteViewPage() {
                                 emptyMessage="No sections found."
                                 renderCell={(key, row) => {
                                     const s = row as QuoteSection
+
+                                    // Helper: get display value (draft edit takes precedence)
+                                    const draftVal = (f: string) => sectionEdits[s.id]?.[f]
+                                    const val = (f: keyof QuoteSection) => {
+                                        const d = draftVal(f)
+                                        return d !== undefined ? d : s[f]
+                                    }
+
+                                    // Inline text input (saves on blur)
+                                    const textCell = (f: string, listId?: string) => editable ? (
+                                        <input
+                                            type="text"
+                                            list={listId}
+                                            className="border-0 bg-transparent px-1 w-full text-sm"
+                                            value={(draftVal(f) as string) ?? (s[f as keyof QuoteSection] as string) ?? ''}
+                                            onChange={(e) => setSectionEdits((p) => ({ ...p, [s.id]: { ...p[s.id], [f]: e.target.value } }))}
+                                            onBlur={(e) => handleSectionFieldBlur(s.id, f, e.target.value || null)}
+                                        />
+                                    ) : ((s[f as keyof QuoteSection] as string) || '—')
+
+                                    // Inline date input (saves on blur)
+                                    const dateCell = (f: string) => editable ? (
+                                        <input
+                                            type="date"
+                                            className="border-0 bg-transparent px-1 w-full text-sm"
+                                            value={(draftVal(f) as string) ?? (s[f as keyof QuoteSection] as string) ?? ''}
+                                            onChange={(e) => setSectionEdits((p) => ({ ...p, [s.id]: { ...p[s.id], [f]: e.target.value } }))}
+                                            onBlur={(e) => handleSectionFieldBlur(s.id, f, e.target.value || null)}
+                                        />
+                                    ) : ((s[f as keyof QuoteSection] as string) || '—')
+
+                                    // Inline number input (saves on blur)
+                                    const numCell = (f: string, display?: (v: number) => string) => {
+                                        const raw = draftVal(f) !== undefined ? draftVal(f) : s[f as keyof QuoteSection]
+                                        const numVal = raw != null ? Number(raw) : null
+                                        return editable ? (
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                className="border-0 bg-transparent px-1 w-full text-sm text-right"
+                                                value={numVal != null ? String(numVal) : ''}
+                                                onChange={(e) => setSectionEdits((p) => ({ ...p, [s.id]: { ...p[s.id], [f]: e.target.value } }))}
+                                                onBlur={(e) => handleSectionFieldBlur(s.id, f, e.target.value === '' ? null : Number(e.target.value))}
+                                            />
+                                        ) : (numVal != null ? (display ? display(numVal) : numVal.toLocaleString()) : '—')
+                                    }
+
                                     if (key === 'actions') {
                                         return (
                                             <span className="flex items-center gap-2">
@@ -1083,30 +1306,41 @@ export default function QuoteViewPage() {
                                                 to={`/quotes/${quoteId}/sections/${s.id}`}
                                                 className="text-brand-600 hover:text-brand-800 font-medium"
                                             >
-                                                {s.reference}
+                                                {String(val('reference') ?? '')}
                                             </Link>
                                         )
                                     }
-                                    if (key === 'class_of_business') return s.class_of_business || '—'
-                                    if (key === 'inception_date') return s.inception_date || '—'
-                                    if (key === 'expiry_date') return s.expiry_date || '—'
-                                    if (key === 'limit_currency') return s.limit_currency || '—'
-                                    if (key === 'limit_amount') return s.limit_amount != null ? Number(s.limit_amount).toLocaleString() : '—'
-                                    if (key === 'limit_loss_qualifier') return s.limit_loss_qualifier || '—'
-                                    if (key === 'excess_currency') return s.excess_currency || '—'
-                                    if (key === 'excess_amount') return s.excess_amount != null ? Number(s.excess_amount).toLocaleString() : '—'
-                                    if (key === 'excess_loss_qualifier') return s.excess_loss_qualifier || '—'
-                                    if (key === 'sum_insured_currency') return s.sum_insured_currency || '—'
-                                    if (key === 'sum_insured_amount') return s.sum_insured_amount != null ? Number(s.sum_insured_amount).toLocaleString() : '—'
-                                    if (key === 'premium_currency') return s.premium_currency || '—'
-                                    if (key === 'gross_gross_premium') return s.gross_gross_premium != null ? Number(s.gross_gross_premium).toLocaleString() : '—'
-                                    if (key === 'gross_premium') return s.gross_premium != null ? Number(s.gross_premium).toLocaleString() : '—'
-                                    if (key === 'deductions') return s.deductions != null ? Number(s.deductions).toLocaleString() : '—'
-                                    if (key === 'net_premium') return s.net_premium != null ? Number(s.net_premium).toLocaleString() : '—'
-                                    if (key === 'annual_gross_premium') return s.annual_gross_premium != null ? Number(s.annual_gross_premium).toLocaleString() : '—'
-                                    if (key === 'annual_net_premium') return s.annual_net_premium != null ? Number(s.annual_net_premium).toLocaleString() : '—'
-                                    if (key === 'written_order') return s.written_order != null ? `${s.written_order}%` : '—'
-                                    if (key === 'signed_order') return s.signed_order != null ? `${s.signed_order}%` : '—'
+                                    if (key === 'class_of_business') return textCell('class_of_business', 'quote-class-of-business-options')
+                                    if (key === 'inception_date') return dateCell('inception_date')
+                                    if (key === 'effective_date') return dateCell('effective_date')
+                                    if (key === 'expiry_date') return dateCell('expiry_date')
+                                    // days_on_cover is server-computed; display only (updates after blur-save of dates)
+                                    if (key === 'days_on_cover') return s.days_on_cover != null ? String(s.days_on_cover) : '—'
+                                    if (key === 'limit_currency') return textCell('limit_currency')
+                                    if (key === 'limit_amount') return numCell('limit_amount')
+                                    if (key === 'limit_loss_qualifier') return textCell('limit_loss_qualifier')
+                                    if (key === 'excess_currency') return textCell('excess_currency')
+                                    if (key === 'excess_amount') return numCell('excess_amount')
+                                    if (key === 'excess_loss_qualifier') return textCell('excess_loss_qualifier')
+                                    if (key === 'sum_insured_currency') return textCell('sum_insured_currency')
+                                    if (key === 'sum_insured_amount') return numCell('sum_insured_amount')
+                                    if (key === 'premium_currency') return textCell('premium_currency')
+                                    if (key === 'gross_gross_premium') return numCell('gross_gross_premium')
+                                    if (key === 'gross_premium') return numCell('gross_premium')
+                                    if (key === 'deductions') return numCell('deductions')
+                                    if (key === 'net_premium') return numCell('net_premium')
+                                    if (key === 'tax_receivable') return numCell('tax_receivable')
+                                    if (key === 'annual_gross_premium') return numCell('annual_gross_premium')
+                                    if (key === 'annual_net_premium') return numCell('annual_net_premium')
+                                    if (key === 'written_order') return numCell('written_order', (v) => `${v}%`)
+                                    if (key === 'signed_order') return numCell('signed_order', (v) => `${v}%`)
+                                    if (key === 'time_basis') return textCell('time_basis')
+                                    if (key === 'written_order_basis') return textCell('written_order_basis')
+                                    if (key === 'signed_order_basis') return textCell('signed_order_basis')
+                                    if (key === 'written_line_total') return numCell('written_line_total')
+                                    if (key === 'signed_line_total') return numCell('signed_line_total')
+                                    if (key === 'delegated_authority_ref') return textCell('delegated_authority_ref')
+                                    if (key === 'delegated_authority_section_ref') return textCell('delegated_authority_section_ref')
                                     return null
                                 }}
                             />
@@ -1118,7 +1352,7 @@ export default function QuoteViewPage() {
             {/* ----------------------------------------------------------------
                 Brokers tab
             ---------------------------------------------------------------- */}
-            {activeTab === 'brokers' && (
+            {!isCreate && activeTab === 'brokers' && (
                 <Card>
                     <div className="p-4 flex flex-col gap-6">
                         {/* Placing Broker sub-section */}
@@ -1143,7 +1377,7 @@ export default function QuoteViewPage() {
                                 )
                             ) : (
                                 <p className="text-sm text-gray-900">
-                                    {brokerFields.placingBrokerParty?.name || (quote.payload?.placingBrokerName as string) || '—'}
+                                    {brokerFields.placingBrokerParty?.name || (quote?.payload?.placingBrokerName as string) || '—'}
                                 </p>
                             )}
                             {/* Broker Contact text input */}
@@ -1185,7 +1419,7 @@ export default function QuoteViewPage() {
                                 )
                             ) : (
                                 <p className="text-sm text-gray-900">
-                                    {brokerFields.surplusLinesBrokerParty?.name || (quote.payload?.surplusLinesBrokerName as string) || '—'}
+                                    {brokerFields.surplusLinesBrokerParty?.name || (quote?.payload?.surplusLinesBrokerName as string) || '—'}
                                 </p>
                             )}
                         </div>
@@ -1196,7 +1430,7 @@ export default function QuoteViewPage() {
             {/* ----------------------------------------------------------------
                 Additional Insureds tab
             ---------------------------------------------------------------- */}
-            {activeTab === 'additional-insureds' && (
+            {!isCreate && activeTab === 'additional-insureds' && (
                 <Card>
                     <div className="p-4 flex flex-col gap-3">
                         <div className="flex items-center justify-between">
@@ -1285,7 +1519,7 @@ export default function QuoteViewPage() {
             {/* ----------------------------------------------------------------
                 Financial Summary tab
             ---------------------------------------------------------------- */}
-            {activeTab === 'financial-summary' && (
+            {!isCreate && activeTab === 'financial-summary' && (
                 <Card>
                     <div className="p-4 flex flex-col gap-4">
                         <h3 className="text-sm font-semibold text-gray-700">Financial Summary</h3>
@@ -1337,7 +1571,7 @@ export default function QuoteViewPage() {
             {/* ----------------------------------------------------------------
                 Audit tab
             ---------------------------------------------------------------- */}
-            {activeTab === 'audit' && (
+            {!isCreate && activeTab === 'audit' && (
                 <AuditTable
                     audit={audit}
                     loading={auditLoading}
@@ -1354,7 +1588,7 @@ export default function QuoteViewPage() {
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-xs text-gray-500 mb-0.5">Class of Business</label>
-                                <input type="text" value={sectionForm.class_of_business ?? ''} onChange={(e) => setSectionForm((v) => ({ ...v, class_of_business: e.target.value }))} className={inputCls} />
+                                <input type="text" list="quote-class-of-business-options" value={sectionForm.class_of_business ?? ''} onChange={(e) => setSectionForm((v) => ({ ...v, class_of_business: e.target.value }))} className={inputCls} />
                             </div>
                             <div>
                                 <label className="block text-xs text-gray-500 mb-0.5">Inception Date</label>
@@ -1442,6 +1676,41 @@ export default function QuoteViewPage() {
                     </div>
                 </div>
             )}
+
+            {/* YOA mismatch warning modal */}
+            {showYoaWarning && (
+                <div className="fixed inset-y-0 left-14 right-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md flex flex-col gap-4">
+                        <h2 className="text-base font-semibold text-amber-700">Year of Account Mismatch</h2>
+                        <p className="text-sm text-gray-700">
+                            Your YOA ({formValues.year_of_account}) isn&apos;t aligned to your Inception Date year ({formValues.inception_date?.slice(0, 4)}). Do you want to proceed?
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowYoaWarning(false)}
+                                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-100"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleYoaConfirmSave}
+                                className="px-4 py-2 text-sm font-medium bg-amber-600 text-white rounded hover:bg-amber-700"
+                            >
+                                Save Anyway
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <datalist id="quote-class-of-business-options">
+                {classesOfBusiness.map((item) => (
+                    <option key={item} value={item} />
+                ))}
+            </datalist>
         </div>
     )
 }
+

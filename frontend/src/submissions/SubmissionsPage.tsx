@@ -7,7 +7,9 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { FiSearch } from 'react-icons/fi'
 import { get } from '@/shared/lib/api-client/api-client'
+import { brandClasses } from '@/shared/lib/design-tokens/brandClasses'
 import ResizableGrid from '@/shared/components/ResizableGrid/ResizableGrid'
 import type { Column, SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
 
@@ -40,6 +42,7 @@ const GRID_COLUMNS: Column[] = [
     { key: 'contractType', label: 'Contract Type', sortable: true, defaultWidth: 160 },
     { key: 'inceptionDate', label: 'Inception Date', sortable: true, defaultWidth: 130 },
     { key: 'status', label: 'Status', sortable: true, defaultWidth: 120 },
+    { key: '_action', label: '', sortable: false, defaultWidth: 44 },
 ]
 
 export default function SubmissionsPage() {
@@ -85,12 +88,16 @@ export default function SubmissionsPage() {
     function renderCell(key: string, row: unknown): React.ReactNode {
         const s = row as SubmissionRow
         if (key === 'reference') {
+            return <span className="font-medium">{s.reference ?? '—'}</span>
+        }
+        if (key === '_action') {
             return (
                 <Link
                     to={`/submissions/${s.id}`}
-                    className="text-brand-600 hover:text-brand-800 hover:underline font-medium"
+                    className={`inline-flex items-center justify-center ${brandClasses.icon.actionOpen}`}
+                    aria-label="View record"
                 >
-                    {s.reference ?? '—'}
+                    <FiSearch size={15} aria-hidden="true" />
                 </Link>
             )
         }

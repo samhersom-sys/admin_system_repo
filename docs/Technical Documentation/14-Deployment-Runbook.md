@@ -333,7 +333,8 @@ If GitHub shows the workflow name instead of individual job names, require the c
 - Website loads on `www.thepolicyforge.com`
 - Website login chooser opens both `app.thepolicyforge.com/login` and `app.uat.thepolicyforge.com/login`
 - SPA loads on `app.thepolicyforge.com`
-- SPA API calls resolve to `api.thepolicyforge.com`
+- SPA API calls resolve to the matching `api.` host for the current app domain
+- Example: `app.thepolicyforge.com` -> `api.thepolicyforge.com`, `app.uat.thepolicyforge.com` -> `api.uat.thepolicyforge.com`
 - Backend health endpoint responds successfully
 - Railway Postgres connection succeeds in production
 - Production database schema is present after manual migration run

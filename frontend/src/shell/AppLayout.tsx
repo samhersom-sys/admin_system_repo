@@ -17,6 +17,8 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import { SidebarContextProvider } from './SidebarContext'
 import { NotificationProvider, NotificationDock } from './NotificationDock'
+import { WorkspaceProvider } from './WorkspaceContext'
+import WorkspaceDock from './WorkspaceDock'
 import { useInactivityLogout } from './useInactivityLogout'
 import './AppLayout.css'
 
@@ -27,15 +29,18 @@ export default function AppLayout() {
   useInactivityLogout(INACTIVITY_TIMEOUT_MS)
   return (
     <NotificationProvider>
-      <SidebarContextProvider>
-        <div className="app-layout">
-          <Sidebar />
-          <main className="app-content">
-            <Outlet />
-          </main>
-        </div>
-        <NotificationDock />
-      </SidebarContextProvider>
+      <WorkspaceProvider>
+        <SidebarContextProvider>
+          <div className="app-layout">
+            <Sidebar />
+            <main className="app-content">
+              <Outlet />
+            </main>
+          </div>
+          <NotificationDock />
+          <WorkspaceDock />
+        </SidebarContextProvider>
+      </WorkspaceProvider>
     </NotificationProvider>
   )
 }

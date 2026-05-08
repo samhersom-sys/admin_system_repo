@@ -31,14 +31,14 @@ Badge meanings:
 | 1 | **Auth** | ✅ | ✅ | — |
 | 2 | **Shell / AppLayout** | ✅ | N/A | — |
 | 3 | **Shared Lib** | ✅ | N/A | OQ-008 (permissions partial) |
-| 4 | **Audit Service** | ✅ | 🔶 `detectConcurrentUsers` not wired | — |
+| 4 | **Audit Service** | ✅ | ✅ `detectConcurrentUsers` wired | — |
 | 5 | **Home / Dashboard** | 🔶 Widgets exist; AppHomePage entry route incomplete | ✅ | — |
-| 6 | **Submissions** | 🔶 Core pages done; Clearance, BindingAuthority tab, Related tab partial | ✅ | — |
-| 7 | **Quotes** | 🔶 Core done; Risk Codes tab missing | ✅ | OQ-003 (financial calcs) |
-| 8 | **Parties** | 🔶 List/search done; PartyViewPage missing | ✅ | — |
-| 9 | **Search** | 🔶 Components done; SearchPage wrapper context missing | ✅ | — |
-| 10 | **Profile** | ❌ Stub only | ❌ | OQ-004 |
-| 11 | **Settings** | 🔶 Platform admin done; Rating Rules, Products, Data Quality, Org Hierarchy missing | ❌ | — |
+| 6 | **Submissions** | ✅ Core pages, Clearance, BA tab, Related tab done | ✅ | — |
+| 7 | **Quotes** | ✅ Core done; Risk Codes tab + Copy done | ✅ | OQ-003 (financial calcs) |
+| 8 | **Parties** | ✅ List (row nav), PartyViewPage (6 tabs, SIC editable) done | ✅ | — |
+| 9 | **Search** | ✅ Complete | ✅ | — |
+| 10 | **Profile** | ✅ Full profile + change password | ✅ | — |
+| 11 | **Settings** | ✅ Rating Rules, Products, Data Quality, Org done | ✅ | — |
 | 12 | **Workflow** | ❌ Stub only | ❌ | — |
 | 13 | **Policies** | ❌ Stub only | ❌ | OQ-003, OQ-013 |
 | 14 | **Claims** | ❌ Not started | ❌ | — |
@@ -734,3 +734,4 @@ The `Sidebar.tsx` in cleaned must expose navigation links for all implemented do
 | Date | Change |
 |------|--------|
 | 2026-03-26 | Initial gap analysis created from backup vs cleaned comparison |
+| 2026-07-06 | Batches A, B, C verified complete. PartyListPage row navigation added. PartyViewPage SIC fields made editable in edit mode. All 3 test layers green: L1 61/61 (1199), L2 8/8 (207), L3 17/17 (414). |

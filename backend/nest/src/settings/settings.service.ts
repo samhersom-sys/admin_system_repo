@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
+import { logError } from '../shared/log-error'
 
 /**
  * SettingsService — REQ-SETTINGS-BE-F-001 through F-005
@@ -35,7 +36,10 @@ export class SettingsService {
        WHERE id = $1 AND org_code = $2`,
             [id, orgCode],
         )
-        if (!rows.length) throw new NotFoundException({ error: 'Product not found' })
+        if (!rows.length) {
+            await logError(this.dataSource, orgCode, null, 'GET /api/settings/products/:id', 'ERR_PRODUCT_NOT_FOUND', 'Product not found', { id })
+            throw new NotFoundException({ error: 'Product not found' })
+        }
         return rows[0]
     }
 

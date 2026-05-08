@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { getRepositoryToken } from '@nestjs/typeorm'
+import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm'
 import { NotFoundException } from '@nestjs/common'
 import { BindingAuthoritiesService } from './binding-authorities.service'
 import { BindingAuthority } from '../entities/binding-authority.entity'
@@ -7,6 +7,9 @@ import { BASection } from '../entities/ba-section.entity'
 import { BATransaction } from '../entities/ba-transaction.entity'
 import { BASectionParticipation } from '../entities/ba-section-participation.entity'
 import { BASectionAuthorizedRisk } from '../entities/ba-section-authorized-risk.entity'
+import { BADocument } from '../entities/ba-document.entity'
+import { BABordereauConfig } from '../entities/ba-bordereau-config.entity'
+import { AuditService } from '../audit/audit.service'
 
 const ORG = 'ORG1'
 const OTHER_ORG = 'ORG2'
@@ -34,9 +37,9 @@ const PARTICIPATION: Partial<BASectionParticipation> = {
 }
 
 const TRANSACTION: Partial<BATransaction> = {
-  id: 1, bindingAuthorityId: 1, type: 'premium', status: 'draft',
+  id: 1, bindingAuthorityId: 1, type: 'Administrative', status: 'Draft',
   effectiveDate: '2025-01-15', description: 'Q1 premium',
-  payload: { amount: 10000, currency: 'USD' },
+  payload: { sub_type: null },
   createdByOrgCode: ORG, createdAt: new Date(),
 }
 
@@ -51,6 +54,7 @@ describe('BindingAuthoritiesService', () => {
   let transactionRepo: any
   let participationRepo: any
   let riskRepo: any
+  let auditService: any
 
   beforeEach(async () => {
     const mockQB = () => ({
@@ -79,6 +83,10 @@ describe('BindingAuthoritiesService', () => {
         { provide: getRepositoryToken(BATransaction), useValue: mockRepo() },
         { provide: getRepositoryToken(BASectionParticipation), useValue: mockRepo() },
         { provide: getRepositoryToken(BASectionAuthorizedRisk), useValue: mockRepo() },
+        { provide: getRepositoryToken(BADocument), useValue: mockRepo() },
+        { provide: getRepositoryToken(BABordereauConfig), useValue: mockRepo() },
+        { provide: AuditService, useValue: { getHistory: jest.fn(), writeEvent: jest.fn() } },
+        { provide: getDataSourceToken(), useValue: { query: jest.fn() } },
       ],
     }).compile()
 
@@ -88,6 +96,7 @@ describe('BindingAuthoritiesService', () => {
     transactionRepo = module.get(getRepositoryToken(BATransaction))
     participationRepo = module.get(getRepositoryToken(BASectionParticipation))
     riskRepo = module.get(getRepositoryToken(BASectionAuthorizedRisk))
+    auditService = module.get(AuditService)
   })
 
   // ---------------------------------------------------------------------------
@@ -192,6 +201,47 @@ describe('BindingAuthoritiesService', () => {
     })
   })
 
+  describe('audit', () => {
+    it('returns binding authority audit after ownership check', async () => {
+      baRepo.findOne.mockResolvedValue(BA)
+      auditService.getHistory.mockResolvedValue([{ action: 'Binding Authority Opened' }])
+
+      const result = await service.getAudit(ORG, 1)
+
+      expect(auditService.getHistory).toHaveBeenCalledWith('Binding Authority', 1)
+      expect(result).toEqual([{ action: 'Binding Authority Opened' }])
+    })
+
+    it('posts binding authority audit events through AuditService', async () => {
+      baRepo.findOne.mockResolvedValue(BA)
+      auditService.writeEvent.mockResolvedValue({ created: true })
+
+      const result = await service.postAudit(ORG, 1, { id: 9, username: 'local-admin' }, { action: 'Binding Authority Opened' })
+
+      expect(auditService.writeEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ entityType: 'Binding Authority', entityId: 1, action: 'Binding Authority Opened' }),
+        expect.objectContaining({ username: 'local-admin' }),
+      )
+      expect(result).toEqual({ created: true })
+    })
+
+    it('lists active classes of business in name order', async () => {
+      baRepo.manager = { query: jest.fn().mockResolvedValue([{ code: 'MARINE', name: 'Marine' }, { code: 'PROPERTY', name: 'Property' }]) }
+
+      const result = await service.listClassesOfBusiness()
+
+      expect(result).toEqual([{ code: 'MARINE', name: 'Marine' }, { code: 'PROPERTY', name: 'Property' }])
+    })
+
+    it('lists active currencies in code order', async () => {
+      baRepo.manager = { query: jest.fn().mockResolvedValue([{ code: 'EUR' }, { code: 'GBP' }]) }
+
+      const result = await service.listCurrencies()
+
+      expect(result).toEqual(['EUR', 'GBP'])
+    })
+  })
+
   // ---------------------------------------------------------------------------
   // getSections
   // ---------------------------------------------------------------------------
@@ -229,6 +279,30 @@ describe('BindingAuthoritiesService', () => {
 
       expect(sectionRepo.save).toHaveBeenCalled()
       expect(result).toMatchObject({ binding_authority_id: 1 })
+    })
+
+    it('normalises blank section fields to null before save', async () => {
+      baRepo.findOne.mockResolvedValue(BA)
+      sectionRepo.count.mockResolvedValue(0)
+      sectionRepo.create.mockImplementation((payload: any) => payload)
+      sectionRepo.save.mockImplementation(async (payload: any) => ({ ...SECTION, ...payload }))
+
+      await service.createSection(ORG, 1, {
+        class_of_business: 'Marine',
+        time_basis: '',
+        inception_date: '',
+        expiry_date: '',
+        currency: '',
+      })
+
+      expect(sectionRepo.create).toHaveBeenCalledWith(expect.objectContaining({
+        classOfBusiness: 'Marine',
+        timeBasis: null,
+        inceptionDate: null,
+        expiryDate: null,
+        limitCurrency: null,
+        limitAmount: null,
+      }))
     })
   })
 
@@ -354,8 +428,8 @@ describe('BindingAuthoritiesService', () => {
 
       expect(result).toHaveLength(1)
       expect(result[0]).toMatchObject({
-        id: 1, binding_authority_id: 1, type: 'premium', amount: 10000, currency: 'USD',
-        date: '2025-01-15',
+        id: 1, binding_authority_id: 1, type: 'Administrative', status: 'Draft',
+        effective_date: '2025-01-15', description: 'Q1 premium',
       })
     })
   })
@@ -364,15 +438,22 @@ describe('BindingAuthoritiesService', () => {
   // createTransaction
   // ---------------------------------------------------------------------------
   describe('createTransaction', () => {
-    it('creates transaction with payload for amount/currency', async () => {
+    it('creates transaction with status Draft by default (REQ-BA-FE-F-136)', async () => {
       baRepo.findOne.mockResolvedValue(BA)
-      transactionRepo.create.mockReturnValue({ ...TRANSACTION })
-      transactionRepo.save.mockResolvedValue({ ...TRANSACTION })
+      // Override QB mock to return null (no duplicate draft) for Administrative type check
+      transactionRepo.createQueryBuilder.mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      })
+      const createSpy = jest.spyOn(transactionRepo, 'create')
+      transactionRepo.create.mockReturnValue({ ...TRANSACTION, status: 'Draft' })
+      transactionRepo.save.mockResolvedValue({ ...TRANSACTION, status: 'Draft' })
 
-      const result = await service.createTransaction(ORG, 1, { type: 'premium', amount: 10000, currency: 'USD', date: '2025-01-15' }, 'user@test.com')
+      await service.createTransaction(ORG, 1, { type: 'Administrative' }, 'user@test.com')
 
+      expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ status: 'Draft' }))
       expect(transactionRepo.save).toHaveBeenCalled()
-      expect(result).toMatchObject({ type: 'premium', amount: 10000 })
     })
   })
 
@@ -383,12 +464,12 @@ describe('BindingAuthoritiesService', () => {
     it('updates transaction fields and returns view', async () => {
       baRepo.findOne.mockResolvedValue(BA)
       transactionRepo.findOne.mockResolvedValue({ ...TRANSACTION })
-      transactionRepo.save.mockResolvedValue({ ...TRANSACTION, type: 'adjustment', payload: { amount: 5000, currency: 'USD' } })
+      transactionRepo.save.mockResolvedValue({ ...TRANSACTION, type: 'Contractual', payload: { sub_type: 'Section Addition' } })
 
-      const result = await service.updateTransaction(ORG, 1, 1, { type: 'adjustment', amount: 5000 })
+      const result = await service.updateTransaction(ORG, 1, 1, { type: 'Contractual', sub_type: 'Section Addition' })
 
       expect(transactionRepo.save).toHaveBeenCalled()
-      expect(result).toMatchObject({ type: 'adjustment' })
+      expect(result).toMatchObject({ type: 'Contractual' })
     })
 
     it('throws NotFoundException when transaction not found', async () => {

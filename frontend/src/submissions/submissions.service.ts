@@ -48,6 +48,26 @@ export interface Submission {
     hasQuote?: boolean
     /** Server-computed: true when at least one policy exists for this submission */
     hasPolicy?: boolean
+    // Gap-fill fields — migrations 091, 106–108 (REQ-SUB-FE-F-001)
+    workflowStatus?: string | null
+    workflowAssignedTo?: number | null
+    lastOpenedDate?: string | null
+    workflowNotes?: string | null
+    aiExtracted?: boolean | null
+    reviewRequired?: boolean | null
+    emailSource?: string | null
+    emailReceivedDate?: string | null
+    emailProcessedDate?: string | null
+    extractionConfidence?: string | null
+    assignedBy?: number | null
+    assignedDate?: string | null
+    clearanceStatus?: string | null
+    clearanceStatusCode?: string | null
+    clearanceNotes?: string | null
+    clearanceMatchedSubmissions?: Record<string, unknown>[] | null
+    clearanceReviewedBy?: number | null
+    clearanceReviewedDate?: string | null
+    autoClearanceChecked?: boolean | null
 }
 
 export interface SubmissionEditLock {

@@ -38,6 +38,7 @@ import { getSession } from '@/shared/lib/auth-session/auth-session'
 import BrokerSearch from '@/parties/BrokerSearch/BrokerSearch'
 import AuditTable from '@/shared/components/AuditTable/AuditTable'
 import Card from '@/shared/Card/Card'
+import FieldGroup from '@/shared/components/FieldGroup/FieldGroup'
 import TabsNav from '@/shared/components/TabsNav/TabsNav'
 import type { TabItem } from '@/shared/components/TabsNav/TabsNav'
 import ResizableGrid from '@/shared/components/ResizableGrid/ResizableGrid'
@@ -67,14 +68,38 @@ const TABS: TabItem[] = [
 ]
 
 const SECTION_COLUMNS: Column[] = [
-    { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 200 },
-    { key: 'class_of_business', label: 'Class of Business', sortable: true, defaultWidth: 150 },
-    { key: 'inception_date', label: 'Inception', sortable: true, defaultWidth: 120 },
-    { key: 'expiry_date', label: 'Expiry', sortable: true, defaultWidth: 120 },
-    { key: 'sum_insured_currency', label: 'SI Ccy', sortable: false, defaultWidth: 80 },
-    { key: 'sum_insured_amount', label: 'Sum Insured', sortable: true, defaultWidth: 120 },
-    { key: 'written_order', label: 'Written Order', sortable: true, defaultWidth: 110 },
-    { key: 'signed_order', label: 'Signed Order', sortable: true, defaultWidth: 110 },
+    { key: '_actions', label: 'Action', sortable: false, defaultWidth: 72 },
+    { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 120 },
+    { key: 'class_of_business', label: 'Class of Business', sortable: true, defaultWidth: 200 },
+    { key: 'inception_date', label: 'Inception Date', sortable: true, defaultWidth: 130 },
+    { key: 'effective_date', label: 'Effective Date', sortable: true, defaultWidth: 130 },
+    { key: 'expiry_date', label: 'Expiry Date', sortable: true, defaultWidth: 130 },
+    { key: 'days_on_cover', label: 'Days on Cover', sortable: true, defaultWidth: 120 },
+    { key: 'limit_currency', label: 'Limit Currency', sortable: false, defaultWidth: 120 },
+    { key: 'limit_amount', label: 'Limit Amount', sortable: true, defaultWidth: 150 },
+    { key: 'limit_loss_qualifier', label: 'Limit Loss Qualifier', sortable: false, defaultWidth: 160 },
+    { key: 'excess_currency', label: 'Excess Currency', sortable: false, defaultWidth: 120 },
+    { key: 'excess_amount', label: 'Excess Amount', sortable: true, defaultWidth: 150 },
+    { key: 'excess_loss_qualifier', label: 'Excess Loss Qualifier', sortable: false, defaultWidth: 160 },
+    { key: 'sum_insured_currency', label: 'Sum Insured Currency', sortable: false, defaultWidth: 160 },
+    { key: 'sum_insured_amount', label: 'Sum Insured', sortable: true, defaultWidth: 150 },
+    { key: 'premium_currency', label: 'Premium Currency', sortable: false, defaultWidth: 140 },
+    { key: 'gross_gross_premium', label: 'Gross Gross Premium', sortable: true, defaultWidth: 180 },
+    { key: 'gross_premium', label: 'Gross Premium', sortable: true, defaultWidth: 160 },
+    { key: 'deductions', label: 'Deductions', sortable: true, defaultWidth: 140 },
+    { key: 'net_premium', label: 'Net Premium', sortable: true, defaultWidth: 140 },
+    { key: 'tax_receivable', label: 'Tax Receivable', sortable: true, defaultWidth: 140 },
+    { key: 'annual_gross_premium', label: 'Annual Rated GP', sortable: true, defaultWidth: 180 },
+    { key: 'annual_net_premium', label: 'Annual Rated NP', sortable: true, defaultWidth: 180 },
+    { key: 'written_order', label: 'Written Order %', sortable: true, defaultWidth: 130 },
+    { key: 'signed_order', label: 'Signed Order %', sortable: true, defaultWidth: 130 },
+    { key: 'time_basis', label: 'Time Basis', sortable: true, defaultWidth: 140 },
+    { key: 'written_order_basis', label: 'Written Order Basis', sortable: true, defaultWidth: 170 },
+    { key: 'signed_order_basis', label: 'Signed Order Basis', sortable: true, defaultWidth: 170 },
+    { key: 'written_line_total', label: 'Written Line Total', sortable: true, defaultWidth: 160 },
+    { key: 'signed_line_total', label: 'Signed Line Total', sortable: true, defaultWidth: 160 },
+    { key: 'delegated_authority_ref', label: 'DA Ref', sortable: true, defaultWidth: 130 },
+    { key: 'delegated_authority_section_ref', label: 'DA Section Ref', sortable: true, defaultWidth: 160 },
 ]
 
 const INVOICE_COLUMNS: Column[] = [
@@ -86,11 +111,14 @@ const INVOICE_COLUMNS: Column[] = [
 ]
 
 const TRANSACTION_COLUMNS: Column[] = [
-    { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 160 },
-    { key: 'transaction_type', label: 'Type', sortable: true, defaultWidth: 130 },
+    { key: '_txn_num', label: '#', sortable: true, defaultWidth: 70 },
+    { key: 'transaction_type', label: 'Type', sortable: true, defaultWidth: 180 },
     { key: 'effective_date', label: 'Effective Date', sortable: true, defaultWidth: 130 },
     { key: 'status', label: 'Status', sortable: true, defaultWidth: 130 },
+    { key: 'created_by', label: 'Created By', sortable: true, defaultWidth: 140 },
+    { key: 'created_at', label: 'Created Date', sortable: true, defaultWidth: 140 },
     { key: 'description', label: 'Description', sortable: false, defaultWidth: 200 },
+    { key: '_actions', label: '', sortable: false, defaultWidth: 90 },
 ]
 
 // Module-level constant — required by useSidebarSection stable-ref rule (Guideline 14)
@@ -99,7 +127,7 @@ const SIDEBAR_SECTION: SidebarSection = {
     items: [
         { label: 'Edit', icon: FiEdit2, event: 'policy:edit' },
         { label: 'Generate Document', icon: FiFileText, event: 'policy:generate-document' },
-        { label: 'Endorse', icon: FiEdit, event: 'policy:endorse' },
+        { label: 'Endorse Policy', icon: FiEdit, event: 'policy:endorse' },
         { label: 'Audit', icon: FiClock, event: 'policy:audit' },
     ],
 }
@@ -181,35 +209,61 @@ export default function PolicyViewPage() {
     const idRef = useRef(id)
     useEffect(() => { idRef.current = id }, [id])
 
+    // closeTimerRef lets the Opened effect cancel a pending Closed post that
+    // was scheduled during a React StrictMode fake-unmount cycle (REQ-POL-FE-F-017).
+    const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
     useEffect(() => {
         return () => {
-            if (!idRef.current) return
+            // Only post Closed if Opened was actually posted this session.
+            // Defer via setTimeout(0) so StrictMode remount can cancel it.
+            if (!idRef.current || !auditPostedRef.current) return
+            const capturedId = idRef.current
             const session = getSession()
-            postPolicyAudit(Number(idRef.current), {
-                action: 'Policy Closed',
-                entityType: 'Policy',
-                entityId: Number(idRef.current),
-                performedBy: session?.user?.name,
-            }).catch(() => undefined) // best-effort; do not surface on unmount
+            closeTimerRef.current = setTimeout(() => {
+                closeTimerRef.current = null
+                postPolicyAudit(Number(capturedId), {
+                    action: 'Policy Closed',
+                    entityType: 'Policy',
+                    entityId: Number(capturedId),
+                    performedBy: session?.user?.name,
+                }).catch(() => undefined)
+            }, 0)
         }
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // REQ-POL-FE-F-014 — POST Policy Opened on initial page load
+    useEffect(() => {
+        // If StrictMode queued a Closed from the previous fake unmount, cancel it now.
+        if (closeTimerRef.current !== null) {
+            clearTimeout(closeTimerRef.current)
+            closeTimerRef.current = null
+        }
+        if (!id || auditPostedRef.current) return
+        auditPostedRef.current = true
+        const session = getSession()
+        postPolicyAudit(Number(id), {
+            action: 'Policy Opened',
+            entityType: 'Policy',
+            entityId: Number(id),
+            performedBy: session?.user?.name,
+        })
+            .catch(() => undefined)
+            .finally(() => {
+                getPolicyAudit(Number(id))
+                    .then(setAudit)
+                    .catch(() => undefined)
+            })
+    }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     function handleTabChange(key: string) {
         setActiveTab(key)
 
-        // REQ-POL-FE-F-014 — POST Policy Opened on first Audit tab activation
-        if (key === 'audit' && !auditPostedRef.current) {
-            auditPostedRef.current = true
-            const session = getSession()
+        // Audit tab displays latest history
+        if (key === 'audit') {
             getPolicyAudit(Number(id!))
                 .then(setAudit)
                 .catch(() => undefined)
-            postPolicyAudit(Number(id!), {
-                action: 'Policy Opened',
-                entityType: 'Policy',
-                entityId: Number(id),
-                performedBy: session?.user?.name,
-            }).catch(() => undefined)
         }
 
         if (key === 'invoices' && !invoicesLoaded) {
@@ -251,6 +305,32 @@ export default function PolicyViewPage() {
         }
     }, [handleEdit, handleEndorse])
 
+    const transactionNumberById = useMemo(() => {
+        const ordered = [...transactions].sort((left, right) => {
+            const leftIsInitial = left.transaction_type === 'Initial Transaction'
+            const rightIsInitial = right.transaction_type === 'Initial Transaction'
+            if (leftIsInitial && !rightIsInitial) return -1
+            if (!leftIsInitial && rightIsInitial) return 1
+
+            const leftTimestamp = left.created_at ?? left.effective_date ?? ''
+            const rightTimestamp = right.created_at ?? right.effective_date ?? ''
+            if (leftTimestamp < rightTimestamp) return -1
+            if (leftTimestamp > rightTimestamp) return 1
+
+            return left.id - right.id
+        })
+
+        return new Map(ordered.map((tx, index) => [tx.id, tx.sequence_number ?? tx.number ?? index + 1]))
+    }, [transactions])
+
+    const sortedTransactions = useMemo(() => {
+        return [...transactions].sort((left, right) => {
+            const leftNumber = transactionNumberById.get(left.id) ?? left.id
+            const rightNumber = transactionNumberById.get(right.id) ?? right.id
+            return rightNumber - leftNumber
+        })
+    }, [transactionNumberById, transactions])
+
     // ---------------------------------------------------------------------------
     // Render states
     // ---------------------------------------------------------------------------
@@ -274,6 +354,12 @@ export default function PolicyViewPage() {
             ? policy.gross_premium - policy.net_premium
             : null
 
+    const readPolicy = (snake: keyof Policy, camel?: string): string => {
+        const val = (policy as unknown as Record<string, unknown>)[snake as string]
+            ?? (camel ? (policy as unknown as Record<string, unknown>)[camel] : undefined)
+        return val != null && String(val).length > 0 ? String(val) : '—'
+    }
+
     const sortedSections = [...sections].sort((a, b) => {
         const av = (a as Record<string, unknown>)[sectionSort.key] ?? ''
         const bv = (b as Record<string, unknown>)[sectionSort.key] ?? ''
@@ -284,6 +370,18 @@ export default function PolicyViewPage() {
 
     function renderSectionCell(key: string, row: unknown): React.ReactNode {
         const s = row as PolicySection
+        if (key === '_actions') {
+            return (
+                <button
+                    type="button"
+                    title="Open Section"
+                    className="text-gray-500 hover:text-gray-700"
+                    onClick={() => navigate(`/policies/${policy!.id}/sections/${s.id}`)}
+                >
+                    <FiSearch size={14} />
+                </button>
+            )
+        }
         if (key === 'reference') {
             return (
                 <Link
@@ -294,8 +392,46 @@ export default function PolicyViewPage() {
                 </Link>
             )
         }
-        const val = (s as Record<string, unknown>)[key]
-        return val != null ? String(val) : '—'
+        if (key === 'class_of_business') return s.class_of_business || '—'
+        if (key === 'inception_date') return s.inception_date || '—'
+        if (key === 'effective_date') return s.effective_date || '—'
+        if (key === 'expiry_date') return s.expiry_date || '—'
+        if (key === 'days_on_cover') return s.days_on_cover != null ? String(s.days_on_cover) : '—'
+        if (key === 'limit_currency') return s.limit_currency || '—'
+        if (key === 'limit_loss_qualifier') return s.limit_loss_qualifier || '—'
+        if (key === 'limit_amount') return s.limit_amount != null ? Number(s.limit_amount).toLocaleString() : '—'
+        if (key === 'excess_currency') return s.excess_currency || '—'
+        if (key === 'excess_loss_qualifier') return s.excess_loss_qualifier || '—'
+        if (key === 'excess_amount') return s.excess_amount != null ? Number(s.excess_amount).toLocaleString() : '—'
+        if (key === 'sum_insured_currency') return s.sum_insured_currency || '—'
+        if (key === 'sum_insured_amount') {
+            const val = s.sum_insured_amount ?? s.sum_insured
+            return val != null ? Number(val).toLocaleString() : '—'
+        }
+        if (key === 'premium_currency') return s.premium_currency || '—'
+        if (key === 'gross_gross_premium') return s.gross_gross_premium != null ? Number(s.gross_gross_premium).toLocaleString() : '—'
+        if (key === 'gross_premium') return s.gross_premium != null ? Number(s.gross_premium).toLocaleString() : '—'
+        if (key === 'deductions') return s.deductions != null ? Number(s.deductions).toLocaleString() : '—'
+        if (key === 'net_premium') return s.net_premium != null ? Number(s.net_premium).toLocaleString() : '—'
+        if (key === 'tax_receivable') return s.tax_receivable != null ? Number(s.tax_receivable).toLocaleString() : '—'
+        if (key === 'annual_gross_premium') {
+            const val = s.annual_gross_premium ?? s.annual_gross
+            return val != null ? Number(val).toLocaleString() : '—'
+        }
+        if (key === 'annual_net_premium') {
+            const val = s.annual_net_premium ?? s.annual_net
+            return val != null ? Number(val).toLocaleString() : '—'
+        }
+        if (key === 'written_order') return s.written_order != null ? `${s.written_order}%` : '—'
+        if (key === 'signed_order') return s.signed_order != null ? `${s.signed_order}%` : '—'
+        if (key === 'time_basis') return s.time_basis || '—'
+        if (key === 'written_order_basis') return s.written_order_basis || '—'
+        if (key === 'signed_order_basis') return s.signed_order_basis || '—'
+        if (key === 'written_line_total') return s.written_line_total != null ? Number(s.written_line_total).toLocaleString() : '—'
+        if (key === 'signed_line_total') return s.signed_line_total != null ? Number(s.signed_line_total).toLocaleString() : '—'
+        if (key === 'delegated_authority_ref') return s.delegated_authority_ref || '—'
+        if (key === 'delegated_authority_section_ref') return s.delegated_authority_section_ref || '—'
+        return '—'
     }
 
     function renderInvoiceCell(key: string, row: unknown): React.ReactNode {
@@ -306,19 +442,54 @@ export default function PolicyViewPage() {
 
     function renderTransactionCell(key: string, row: unknown): React.ReactNode {
         const txn = row as PolicyTransaction
-        if (key === 'reference') {
-            const isEndorsement =
-                txn.transaction_type === 'Endorsement' || txn.transaction_type === 'Cancellation'
-            if (isEndorsement) {
+        const isEndorsement = ['Administrative', 'Contractual'].includes(txn.transaction_type)
+        const isEditableEndorsement = isEndorsement && ['Draft', 'Bound'].includes(txn.status)
+
+        if (key === '_txn_num') {
+            return transactionNumberById.get(txn.id) ?? '—'
+        }
+        if (key === 'transaction_type') {
+            const subType = txn.sub_type
+                ?? (typeof txn.payload?.sub_type === 'string' ? txn.payload.sub_type : null)
+            return subType ? `${txn.transaction_type} - ${subType}` : txn.transaction_type
+        }
+        if (key === 'status') {
+            const cls = STATUS_CLASSES[txn.status] ?? 'bg-gray-100 text-gray-600'
+            return (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
+                    {txn.status ?? '—'}
+                </span>
+            )
+        }
+        if (key === 'created_at') {
+            return txn.created_at ?? '—'
+        }
+        if (key === '_actions') {
+            if (isEditableEndorsement) {
                 return (
-                    <Link
-                        to={`/policies/${policy!.id}/endorsements/${txn.id}/edit`}
-                        className="text-brand-600 hover:text-brand-800 hover:underline"
+                    <button
+                        type="button"
+                        aria-label="Edit endorsement"
+                        title="Edit endorsement"
+                        className="text-green-600 hover:text-green-800"
+                        onClick={() => navigate(`/policies/${policy!.id}/endorsements/${txn.id}/edit`)}
                     >
-                        {txn.reference ?? txn.id}
-                    </Link>
+                        <FiEdit2 size={14} />
+                    </button>
                 )
             }
+
+            return (
+                <button
+                    type="button"
+                    aria-label="View transaction"
+                    title="View transaction"
+                    className="text-green-600 hover:text-green-800"
+                    onClick={() => navigate(`/policies/${policy!.id}/transactions/${txn.id}`)}
+                >
+                    <FiSearch size={14} />
+                </button>
+            )
         }
         const val = (txn as Record<string, unknown>)[key]
         return val != null ? String(val) : '—'
@@ -340,26 +511,103 @@ export default function PolicyViewPage() {
                     </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                    <div>
-                        <p className="text-xs text-gray-500">Class of Business</p>
-                        <p className="text-gray-900">{policy.class_of_business ?? '—'}</p>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="flex flex-col gap-4">
+                        <FieldGroup title="Contract & Reference">
+                            <div className="flex flex-col gap-3 text-sm">
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Class of Business</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('class_of_business', 'classOfBusiness')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Business Type</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('business_type', 'businessType')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">New or Renewal</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('new_or_renewal', 'newOrRenewal')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Currency</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('policy_currency', 'policyCurrency')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Placing Broker</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('placing_broker', 'placingBroker')}</p>
+                                </div>
+                            </div>
+                        </FieldGroup>
+
+                        <FieldGroup title="Insured">
+                            <p className="text-sm text-gray-900">{policy.insured ?? '—'}</p>
+                        </FieldGroup>
                     </div>
-                    <div>
-                        <p className="text-xs text-gray-500">Currency</p>
-                        <p className="text-gray-900">{policy.policy_currency ?? '—'}</p>
-                    </div>
-                    <div>
-                        <p className="text-xs text-gray-500">Inception Date</p>
-                        <p className="text-gray-900">{policy.inception_date ?? '—'}</p>
-                    </div>
-                    <div>
-                        <p className="text-xs text-gray-500">Expiry Date</p>
-                        <p className="text-gray-900">{policy.expiry_date ?? '—'}</p>
-                    </div>
-                    <div>
-                        <p className="text-xs text-gray-500">Placing Broker</p>
-                        <p className="text-gray-900">{policy.placing_broker ?? '—'}</p>
+
+                    <div className="flex flex-col gap-4">
+                        <FieldGroup title="Dates">
+                            <div className="flex flex-col gap-3 text-sm">
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Inception Date</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('inception_date', 'inceptionDate')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Inception Time</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('inception_time', 'inceptionTime')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Expiry Date</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('expiry_date', 'expiryDate')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Expiry Time</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('expiry_time', 'expiryTime')}</p>
+                                </div>
+                                <label className="flex items-center gap-2 text-sm text-gray-700 select-none">
+                                    <input
+                                        type="checkbox"
+                                        aria-label="LTA Applicable"
+                                        checked={readPolicy('lta_applicable', 'ltaApplicable') === 'true'}
+                                        disabled
+                                        className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                                    />
+                                    LTA Applicable
+                                </label>
+                            </div>
+                        </FieldGroup>
+
+                        <FieldGroup title="Contract / Placement">
+                            <div className="flex flex-col gap-3 text-sm">
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Contract Type</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('contract_type', 'contractType')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Method of Placement</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('method_of_placement', 'methodOfPlacement')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Unique Market Reference</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('unique_market_reference', 'uniqueMarketReference')}</p>
+                                </div>
+                            </div>
+                        </FieldGroup>
+
+                        <FieldGroup title="Renewal">
+                            <div className="flex flex-col gap-3 text-sm">
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Renewable</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('renewable_indicator', 'renewable')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Renewal Date</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('renewal_date', 'renewalDate')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Renewal Status</p>
+                                    <p className="text-sm text-gray-900">{readPolicy('renewal_status', 'renewalStatus')}</p>
+                                </div>
+                            </div>
+                        </FieldGroup>
                     </div>
                 </div>
             </Card>
@@ -481,7 +729,7 @@ export default function PolicyViewPage() {
                 <Card>
                     <ResizableGrid
                         columns={TRANSACTION_COLUMNS}
-                        rows={transactions}
+                        rows={sortedTransactions}
                         sortConfig={{ key: 'effective_date', direction: 'desc' }}
                         onSort={() => undefined}
                         renderCell={renderTransactionCell}

@@ -30,6 +30,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard'
  *   POST   /api/report-templates/:id/run      R06 — execute report
  *   GET    /api/report-templates/:id/history  R07 — execution history
  *   GET    /api/report-field-mappings/:domain R08 — semantic field list
+ *   GET    /api/date-basis                    R09 — date basis options
+ *   GET    /api/login-activity                R10 — core report datasource
  */
 @Controller()
 @UseGuards(JwtAuthGuard)
@@ -85,9 +87,27 @@ export class ReportingController {
         return this.reportingService.getHistory(req.user.orgCode, id)
     }
 
-    // R08 — Semantic field mappings for a domain (no org-scope needed)
+    // R08 — Semantic field mappings for a domain (dimensions + org-scoped measures)
     @Get('report-field-mappings/:domain')
-    getFieldMappings(@Param('domain') domain: string) {
-        return this.reportingService.getFieldMappings(domain)
+    getFieldMappings(@Req() req: any, @Param('domain') domain: string) {
+        return this.reportingService.getFieldMappings(domain, req.user.orgCode)
+    }
+
+    // R09 — Date basis options (static lookup)
+    @Get('date-basis')
+    getDateBasisOptions() {
+        return this.reportingService.getDateBasisOptions()
+    }
+
+    // R10 — User login activity datasource for core reports
+    @Get('login-activity')
+    getLoginActivity(@Req() req: any) {
+        return this.reportingService.getLoginActivity(req.user.orgCode)
+    }
+
+    @Post('dashboards/widgets/data')
+    @HttpCode(HttpStatus.OK)
+    getDashboardWidgetData(@Req() req: any, @Body() body: Record<string, any>) {
+        return this.reportingService.getDashboardWidgetData(req.user.orgCode, body.widget, body.filters)
     }
 }

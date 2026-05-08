@@ -12,6 +12,7 @@ import * as bcryptjs from 'bcryptjs'
 import * as crypto from 'crypto'
 import * as jwt from 'jsonwebtoken'
 import { User } from '../entities/user.entity'
+import { logError } from '../shared/log-error'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 const MAX_LOGIN_ATTEMPTS = 5
@@ -29,6 +30,7 @@ export class AuthService {
 
   async login(email: string, password: string) {
     if (!email || !password) {
+      await logError(this.dataSource, null, email ?? null, 'POST /api/auth/login', 'ERR_AUTH_LOGIN_MISSING_FIELDS', 'Email and password are required', { emailProvided: Boolean(email), passwordProvided: Boolean(password) })
       throw new BadRequestException({ error: 'Email and password are required' })
     }
 
@@ -50,12 +52,14 @@ export class AuthService {
     })
 
     if (!user) {
+      await logError(this.dataSource, null, email, 'POST /api/auth/login', 'ERR_AUTH_INVALID_CREDENTIALS', 'Invalid email or password', { email })
       throw new UnauthorizedException({ error: 'Invalid email or password' })
     }
 
     // Account locked?
     if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
       const minutesLeft = Math.ceil((new Date(user.lockedUntil).getTime() - Date.now()) / 60000)
+      await logError(this.dataSource, user.orgCode ?? null, user.username ?? user.email ?? null, 'POST /api/auth/login', 'ERR_AUTH_ACCOUNT_LOCKED', 'Account is locked', { userId: user.id, minutesLeft })
       throw new HttpException(
         { error: `Account is locked. Try again in ${minutesLeft} minute(s).` },
         423,
@@ -64,6 +68,7 @@ export class AuthService {
 
     // Account deactivated?
     if (!user.isActive) {
+      await logError(this.dataSource, user.orgCode ?? null, user.username ?? user.email ?? null, 'POST /api/auth/login', 'ERR_AUTH_ACCOUNT_DEACTIVATED', 'Account is deactivated', { userId: user.id })
       throw new ForbiddenException({ error: 'Account is deactivated' })
     }
 
@@ -77,6 +82,7 @@ export class AuthService {
         user.failedLoginAttempts = newAttempts
         user.lockedUntil = lockUntil
         await this.userRepo.save(user)
+        await logError(this.dataSource, user.orgCode ?? null, user.username ?? user.email ?? null, 'POST /api/auth/login', 'ERR_AUTH_TOO_MANY_ATTEMPTS', 'Account locked due to failed login attempts', { userId: user.id, failedAttempts: newAttempts })
         throw new HttpException(
           {
             error: `Account locked for ${LOCKOUT_DURATION_MINUTES} minutes after ${MAX_LOGIN_ATTEMPTS} failed attempts.`,
@@ -87,6 +93,7 @@ export class AuthService {
 
       user.failedLoginAttempts = newAttempts
       await this.userRepo.save(user)
+      await logError(this.dataSource, user.orgCode ?? null, user.username ?? user.email ?? null, 'POST /api/auth/login', 'ERR_AUTH_INVALID_CREDENTIALS', 'Invalid email or password', { userId: user.id, failedAttempts: newAttempts })
       throw new UnauthorizedException({
         error: 'Invalid email or password',
         attemptsRemaining: MAX_LOGIN_ATTEMPTS - newAttempts,
@@ -134,6 +141,7 @@ export class AuthService {
       select: { id: true, username: true, email: true, fullName: true, orgCode: true, role: true },
     })
     if (!user) {
+      await logError(this.dataSource, null, String(userId), 'GET /api/auth/me', 'ERR_AUTH_USER_NOT_FOUND', 'User not found', { userId })
       throw new NotFoundException({ error: 'User not found' })
     }
     return user
@@ -155,9 +163,11 @@ export class AuthService {
       select: { id: true, isActive: true },
     })
     if (!dbUser) {
+      await logError(this.dataSource, user.orgCode ?? null, user.username ?? user.email ?? null, 'POST /api/auth/refresh', 'ERR_AUTH_USER_NOT_FOUND', 'User not found', { userId: user.id })
       throw new ForbiddenException({ error: 'User not found' })
     }
     if (!dbUser.isActive) {
+      await logError(this.dataSource, user.orgCode ?? null, user.username ?? user.email ?? null, 'POST /api/auth/refresh', 'ERR_AUTH_ACCOUNT_DEACTIVATED', 'Account is deactivated', { userId: user.id })
       throw new ForbiddenException({ error: 'Account is deactivated' })
     }
 
@@ -178,6 +188,7 @@ export class AuthService {
 
   async generateResetToken(adminUserId: number, targetUserId: number) {
     if (!targetUserId) {
+      await logError(this.dataSource, null, String(adminUserId), 'POST /api/auth/generate-reset-token', 'ERR_AUTH_RESET_USERID_REQUIRED', 'userId is required', { adminUserId })
       throw new BadRequestException({ error: 'userId is required' })
     }
 
@@ -186,6 +197,7 @@ export class AuthService {
       select: { id: true },
     })
     if (!targetUser) {
+      await logError(this.dataSource, null, String(adminUserId), 'POST /api/auth/generate-reset-token', 'ERR_AUTH_TARGET_USER_NOT_FOUND', 'User not found', { adminUserId, targetUserId })
       throw new NotFoundException({ error: 'User not found' })
     }
 
@@ -205,9 +217,11 @@ export class AuthService {
 
   async resetPassword(token: string, newPassword: string) {
     if (!token) {
+      await logError(this.dataSource, null, null, 'POST /api/auth/reset-password', 'ERR_AUTH_RESET_TOKEN_REQUIRED', 'token is required', {})
       throw new BadRequestException({ error: 'token is required' })
     }
     if (!newPassword) {
+      await logError(this.dataSource, null, null, 'POST /api/auth/reset-password', 'ERR_AUTH_RESET_PASSWORD_REQUIRED', 'newPassword is required', {})
       throw new BadRequestException({ error: 'newPassword is required' })
     }
 
@@ -220,15 +234,18 @@ export class AuthService {
     )
 
     if (!tokenRows.length) {
+      await logError(this.dataSource, null, null, 'POST /api/auth/reset-password', 'ERR_AUTH_RESET_INVALID_TOKEN', 'Invalid or expired token', {})
       throw new BadRequestException({ error: 'Invalid or expired token' })
     }
 
     const tokenRow = tokenRows[0]
 
     if (tokenRow.used) {
+      await logError(this.dataSource, null, null, 'POST /api/auth/reset-password', 'ERR_AUTH_RESET_TOKEN_USED', 'Token has already been used', { tokenId: tokenRow.id })
       throw new BadRequestException({ error: 'Token has already been used' })
     }
     if (new Date(tokenRow.expires_at) < new Date()) {
+      await logError(this.dataSource, null, null, 'POST /api/auth/reset-password', 'ERR_AUTH_RESET_TOKEN_EXPIRED', 'Token has expired', { tokenId: tokenRow.id })
       throw new BadRequestException({ error: 'Token has expired' })
     }
 
@@ -256,14 +273,17 @@ export class AuthService {
 
   async updateProfile(userId: number, name: string) {
     if (!name || !name.trim()) {
+      await logError(this.dataSource, null, String(userId), 'PUT /api/auth/profile', 'ERR_AUTH_PROFILE_NAME_REQUIRED', 'Name is required', { userId })
       throw new BadRequestException({ error: 'Name is required' })
     }
     if (name.trim().length > 100) {
+      await logError(this.dataSource, null, String(userId), 'PUT /api/auth/profile', 'ERR_AUTH_PROFILE_NAME_TOO_LONG', 'Name must be 100 characters or fewer', { userId, length: name.trim().length })
       throw new BadRequestException({ error: 'Name must be 100 characters or fewer' })
     }
 
     const user = await this.userRepo.findOne({ where: { id: userId } })
     if (!user) {
+      await logError(this.dataSource, null, String(userId), 'PUT /api/auth/profile', 'ERR_AUTH_USER_NOT_FOUND', 'User not found', { userId })
       throw new NotFoundException({ error: 'User not found' })
     }
 
@@ -275,6 +295,7 @@ export class AuthService {
 
   async changePassword(userId: number, currentPassword: string, newPassword: string) {
     if (!currentPassword || !newPassword) {
+      await logError(this.dataSource, null, String(userId), 'POST /api/auth/change-password', 'ERR_AUTH_PASSWORD_FIELDS_REQUIRED', 'currentPassword and newPassword are required', { userId })
       throw new BadRequestException({ error: 'currentPassword and newPassword are required' })
     }
 
@@ -283,11 +304,13 @@ export class AuthService {
       select: { id: true, passwordHash: true },
     })
     if (!user) {
+      await logError(this.dataSource, null, String(userId), 'POST /api/auth/change-password', 'ERR_AUTH_USER_NOT_FOUND', 'User not found', { userId })
       throw new NotFoundException({ error: 'User not found' })
     }
 
     const isMatch = await bcryptjs.compare(currentPassword, user.passwordHash)
     if (!isMatch) {
+      await logError(this.dataSource, null, String(userId), 'POST /api/auth/change-password', 'ERR_AUTH_CURRENT_PASSWORD_INCORRECT', 'Current password is incorrect', { userId })
       throw new UnauthorizedException({ error: 'Current password is incorrect' })
     }
 

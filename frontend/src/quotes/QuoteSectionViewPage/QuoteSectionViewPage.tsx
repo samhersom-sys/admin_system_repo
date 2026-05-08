@@ -27,6 +27,7 @@ import {
     listCoverages,
     listParticipations,
     saveParticipations,
+    getClassesOfBusiness,
     getRiskCodes,
     type Quote,
     type QuoteSection,
@@ -415,6 +416,7 @@ export default function QuoteSectionViewPage() {
     // Risk Codes tab state — sourced from section.payload.riskSplits
     const [riskSplitRows, setRiskSplitRows] = useState<RiskSplitRow[]>([])
     const [riskCodeOptions, setRiskCodeOptions] = useState<string[]>([])
+    const [classesOfBusiness, setClassesOfBusiness] = useState<string[]>([])
 
     // Participations tab state
     const [participations, setParticipations] = useState<Participation[]>([])
@@ -481,6 +483,12 @@ export default function QuoteSectionViewPage() {
     // ---------------------------------------------------------------------------
     // Load risk code lookup on mount (F-057)
     // ---------------------------------------------------------------------------
+
+    useEffect(() => {
+        getClassesOfBusiness()
+            .then((items) => setClassesOfBusiness(items ?? []))
+            .catch(() => setClassesOfBusiness([]))
+    }, [])
 
     useEffect(() => {
         getRiskCodes()
@@ -623,6 +631,7 @@ export default function QuoteSectionViewPage() {
                             {editable ? (
                                 <input
                                     type="text"
+                                    list="quote-section-class-of-business-options"
                                     className="input-field"
                                     value={section.class_of_business ?? ''}
                                     onChange={(e) =>
@@ -1024,7 +1033,7 @@ export default function QuoteSectionViewPage() {
                             storageKey="table-widths-section-coverages"
                             columns={[
                                 { key: 'reference', label: 'Reference', sortable: true, defaultWidth: 120 },
-                                { key: 'coverage_name', label: 'Coverage Name', sortable: true, defaultWidth: 200 },
+                                { key: 'coverage', label: 'Coverage', sortable: true, defaultWidth: 200 },
                                 { key: 'effective_date', label: 'Effective Date', sortable: true, defaultWidth: 130 },
                                 { key: 'expiry_date', label: 'Expiry Date', defaultWidth: 130 },
                                 { key: 'annual_gross_premium', label: 'Annual Gross Premium', defaultWidth: 170 },
@@ -1045,7 +1054,7 @@ export default function QuoteSectionViewPage() {
                                                         id: Date.now(),
                                                         section_id: Number(sectionId),
                                                         reference: '',
-                                                        coverage_name: '',
+                                                        coverage: '',
                                                         effective_date: null,
                                                         expiry_date: null,
                                                         annual_gross_premium: null,
@@ -1081,7 +1090,7 @@ export default function QuoteSectionViewPage() {
                             renderCell={(key, row) => {
                                 const cov = row as Coverage
                                 if (key === 'reference') return cov.reference || '—'
-                                if (key === 'coverage_name') return cov.coverage_name ?? '—'
+                                if (key === 'coverage') return cov.coverage ?? '—'
                                 if (key === 'effective_date') return cov.effective_date ?? '—'
                                 if (key === 'expiry_date') return cov.expiry_date ?? '—'
                                 if (key === 'annual_gross_premium') return cov.annual_gross_premium?.toLocaleString() ?? '—'
@@ -1325,6 +1334,12 @@ export default function QuoteSectionViewPage() {
                     )}
                 </div>
             )}
+
+            <datalist id="quote-section-class-of-business-options">
+                {classesOfBusiness.map((item) => (
+                    <option key={item} value={item} />
+                ))}
+            </datalist>
         </div>
     )
 }

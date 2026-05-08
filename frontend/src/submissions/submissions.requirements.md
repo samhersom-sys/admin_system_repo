@@ -19,7 +19,7 @@
 
 ### 2.1 Type definitions
 
-**REQ-SUB-DOM-F-001:** The domain shall export a `Submission` TypeScript interface with the mandatory fields: `id`, `reference`, `submissionType`, `insured`, `insuredId`, `placingBroker`, `placingBrokerId`, `contractType`, `inceptionDate`, `expiryDate`, `status`, `createdDate`, `createdBy`, `createdByOrgCode` — all typed with no `any`.
+**REQ-SUB-DOM-F-001:** The domain shall export a `Submission` TypeScript interface with the mandatory fields: `id`, `reference`, `submissionType`, `insured`, `insuredId`, `placingBroker`, `placingBrokerId`, `contractType`, `inceptionDate`, `expiryDate`, `status`, `createdDate`, `createdBy`, `createdByOrgCode` — all typed with no `any`. The interface shall also include the following optional fields from migrations 091, 106, 107, 108 (all nullable): `workflowStatus`, `workflowAssignedTo`, `lastOpenedDate`, `workflowNotes`, `aiExtracted`, `reviewRequired`, `emailSource`, `emailReceivedDate`, `emailProcessedDate`, `extractionConfidence`, `assignedBy`, `assignedDate`, `clearanceStatus`, `clearanceStatusCode`, `clearanceNotes`, `clearanceMatchedSubmissions`, `clearanceReviewedBy`, `clearanceReviewedDate`, `autoClearanceChecked`.
 
 **REQ-SUB-DOM-F-002:** The domain shall export a `SubmissionStatus` union type constrained to exactly the values `'Created' | 'In Review' | 'Outstanding' | 'Declined' | 'Quote Created' | 'Quoted' | 'Bound'`, and the `status` field on `Submission` shall use this type.
 

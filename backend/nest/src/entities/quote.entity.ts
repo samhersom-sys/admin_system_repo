@@ -11,6 +11,7 @@ import {
  * Schema source:
  *   db/migrations/008-create-quotes-table.js      (base table)
  *   db/migrations/074-alter-quotes-add-deleted-at.js (deleted_at)
+ *   db/migrations/105-alter-quotes-add-renewal-time.js (renewal_time)
  */
 @Entity('quotes')
 @Index('idx_quotes_submission_id', ['submissionId'])
@@ -106,6 +107,10 @@ export class Quote {
   @Column({ name: 'renewal_status', type: 'text', nullable: true })
   renewalStatus: string | null
 
+  // Added in migration 105
+  @Column({ name: 'renewal_time', type: 'time', precision: 3, nullable: true })
+  renewalTime: string | null
+
   // Added in migration 074
   @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deletedAt: Date | null
@@ -142,6 +147,7 @@ export class Quote {
       renewable_indicator: this.renewableIndicator,
       renewal_date: this.renewalDate,
       renewal_status: this.renewalStatus,
+      renewal_time: this.renewalTime,
       deleted_at: this.deletedAt,
     }
   }

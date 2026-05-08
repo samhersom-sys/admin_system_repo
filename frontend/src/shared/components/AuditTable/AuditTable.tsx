@@ -12,7 +12,7 @@
  * REQ-SHARED-AUDIT-F-006 — null details renders em-dash
  */
 
-import React from 'react'
+import React, { useMemo, useState } from 'react'
 import type { AuditEvent } from '@/shared/lib/hooks/useAudit'
 
 interface AuditTableProps {
@@ -20,6 +20,15 @@ interface AuditTableProps {
     loading?: boolean
     error?: string | null
     entityType?: string
+    emptyMessage?: string
+}
+
+type SortKey = 'action' | 'user' | 'date'
+type SortDir = 'asc' | 'desc'
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+    if (!active) return <span className="ml-1 text-gray-300 text-xs">⇅</span>
+    return <span className="ml-1 text-xs">{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
 function formatDate(dateStr: string): string {
@@ -56,7 +65,39 @@ export default function AuditTable({
     loading,
     error,
     entityType = 'record',
+    emptyMessage,
 }: AuditTableProps) {
+    // REQ-SHARED-AUDIT-F-007 — default sort: date descending (newest first)
+    const [sortKey, setSortKey] = useState<SortKey>('date')
+    const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+    function handleSort(key: SortKey) {
+        if (sortKey === key) {
+            setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+        } else {
+            setSortKey(key)
+            setSortDir(key === 'date' ? 'desc' : 'asc')
+        }
+    }
+
+    const sortedAudit = useMemo(() => {
+        return [...audit].sort((a, b) => {
+            let va: string, vb: string
+            if (sortKey === 'date') {
+                va = a.date ?? ''
+                vb = b.date ?? ''
+            } else if (sortKey === 'action') {
+                va = (a.action ?? '').toLowerCase()
+                vb = (b.action ?? '').toLowerCase()
+            } else {
+                va = (a.user ?? '').toLowerCase()
+                vb = (b.user ?? '').toLowerCase()
+            }
+            const cmp = va < vb ? -1 : va > vb ? 1 : 0
+            return sortDir === 'asc' ? cmp : -cmp
+        })
+    }, [audit, sortKey, sortDir])
+
     if (loading) {
         return (
             <p className="text-sm text-gray-400 py-4 text-center">
@@ -74,21 +115,27 @@ export default function AuditTable({
             <table className="app-table w-full">
                 <thead>
                     <tr>
-                        <th scope="col">Action</th>
-                        <th scope="col">User</th>
-                        <th scope="col">Date &amp; Time</th>
+                        <th scope="col" onClick={() => handleSort('action')} className="cursor-pointer select-none whitespace-nowrap">
+                            Action <SortIcon active={sortKey === 'action'} dir={sortDir} />
+                        </th>
+                        <th scope="col" onClick={() => handleSort('user')} className="cursor-pointer select-none whitespace-nowrap">
+                            User <SortIcon active={sortKey === 'user'} dir={sortDir} />
+                        </th>
+                        <th scope="col" onClick={() => handleSort('date')} className="cursor-pointer select-none whitespace-nowrap">
+                            Date &amp; Time <SortIcon active={sortKey === 'date'} dir={sortDir} />
+                        </th>
                         <th scope="col">Details</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {audit.length === 0 ? (
+                    {sortedAudit.length === 0 ? (
                         <tr>
                             <td colSpan={4} className="text-center text-gray-400 py-10 text-sm italic">
-                                No audit history available for this {entityType}.
+                                {emptyMessage ?? `No audit history available for this ${entityType}.`}
                             </td>
                         </tr>
                     ) : (
-                        audit.map((event, i) => (
+                        sortedAudit.map((event, i) => (
                             <tr key={i}>
                                 <td className="font-medium">{event.action}</td>
                                 <td>{event.user ?? '\u2014'}</td>
