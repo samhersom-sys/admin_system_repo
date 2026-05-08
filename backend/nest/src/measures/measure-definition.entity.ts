@@ -5,6 +5,7 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     Index,
+    Unique,
 } from 'typeorm'
 
 /**
@@ -24,6 +25,7 @@ import {
 @Index('idx_measure_definitions_source_key', ['sourceKey'])
 @Index('idx_measure_definitions_org_code', ['orgCode'])
 @Index('idx_measure_definitions_active', ['isActive'])
+@Unique(['key', 'orgCode'])
 export class MeasureDefinition {
     @PrimaryGeneratedColumn()
     id: number
