@@ -302,3 +302,17 @@ export class LookupTaxRule {
   @Column({ name: 'is_active', type: 'boolean', default: true }) isActive: boolean
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt: Date
 }
+
+// System error catalog — static reference table for standard error codes
+// Schema source: db/seeds/023-system-error-catalog.js
+
+@Entity('system_error_catalog')
+export class SystemErrorCatalog {
+  @PrimaryGeneratedColumn() id: number
+  @Column({ name: 'error_code', type: 'varchar', length: 50, unique: true }) errorCode: string
+  @Column({ type: 'varchar', length: 50, nullable: true }) category: string | null
+  @Column({ type: 'varchar', length: 20, nullable: true }) severity: string | null
+  @Column({ name: 'message_template', type: 'text', nullable: true }) messageTemplate: string | null
+  @Column({ name: 'resolution_hint', type: 'text', nullable: true }) resolutionHint: string | null
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt: Date
+}

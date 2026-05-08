@@ -56,6 +56,7 @@ import {
   LookupCoverage, LookupCoverageDetailType, LookupCoverageDetailSubType,
   LookupCurrency, LookupCountry, LookupRegion, LookupSubdivision,
   LookupSicCode, LookupRiskCode, LookupClassRiskCode, LookupTaxRule,
+  SystemErrorCatalog,
 } from '../entities/lookup.entity'
 
 // Auth and security
@@ -132,6 +133,7 @@ export const typeOrmOptions: DataSourceOptions = {
     LookupCoverage, LookupCoverageDetailType, LookupCoverageDetailSubType,
     LookupCurrency, LookupCountry, LookupRegion, LookupSubdivision,
     LookupSicCode, LookupRiskCode, LookupClassRiskCode, LookupTaxRule,
+    SystemErrorCatalog,
 
     // Auth and security
     PasswordResetToken, PasswordAuditLog, ErrorLog,
