@@ -21,6 +21,59 @@ import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { ReportingService } from './reporting.service'
 import { ReportTemplate } from '../entities/report-template.entity'
 import { ReportExecutionHistory } from '../entities/report-execution-history.entity'
+import { MeasuresService } from '../measures/measures.service'
+import { DATA_SOURCES } from './field-mappings'
+
+// ---------------------------------------------------------------------------
+// Measures catalog fixtures — mirrors seed 032 (measures removed from field-mappings)
+// ---------------------------------------------------------------------------
+
+const SEED_MEASURES: Record<string, Array<{ key: string; label: string; col: string; type?: string; filterExpr?: string; ratioNumerator?: string; ratioDenominator?: string }>> = {
+    submissions: [
+        { key: 'countAll', label: 'Count of Submissions', col: '*', type: 'count' },
+    ],
+    policies: [
+        { key: 'countAll', label: 'Count of Policies', col: '*', type: 'count' },
+        { key: 'countActive', label: 'Count of Active Policies', col: '*', type: 'count', filterExpr: "status = 'Active'" },
+        { key: 'countLapsed', label: 'Count of Lapsed Policies', col: '*', type: 'count', filterExpr: "status = 'Expired'" },
+        { key: 'countRenewed', label: 'Count of Renewed Policies', col: '*', type: 'count', filterExpr: "status = 'Renewed'" },
+        { key: 'countRenewable', label: 'Count of Renewable Policies', col: '*', type: 'count', filterExpr: "renewable = 'Renewable'" },
+        { key: 'retentionRatio', label: 'Retention Ratio', col: '*', type: 'ratio', ratioNumerator: "status = 'Renewed'", ratioDenominator: "renewable = 'Renewable'" },
+    ],
+    quotes: [
+        { key: 'countAll', label: 'Count of Quotes', col: '*', type: 'count' },
+        { key: 'countDeclined', label: 'Count of Declined Quotes', col: '*', type: 'count', filterExpr: "status = 'declined'" },
+        { key: 'countRenewable', label: 'Count of Renewable Quotes', col: '*', type: 'count', filterExpr: "renewable_indicator = 'Yes'" },
+        { key: 'countRenewed', label: 'Count of Renewed Quotes', col: '*', type: 'count', filterExpr: "renewal_status = 'renewed'" },
+        { key: 'countNewBusiness', label: 'Count of New Business Quotes', col: '*', type: 'count', filterExpr: "new_or_renewal = 'New'" },
+        { key: 'countRenewalBusiness', label: 'Count of Renewal Business Quotes', col: '*', type: 'count', filterExpr: "new_or_renewal = 'Renewal'" },
+    ],
+    bindingAuthorities: [
+        { key: 'countAll', label: 'Count of Binding Authorities', col: '*', type: 'count' },
+    ],
+}
+
+function augmentedSources(sourceKeys: string[]) {
+    const result: Record<string, any> = {}
+    for (const key of sourceKeys) {
+        if (DATA_SOURCES[key]) {
+            result[key] = {
+                ...DATA_SOURCES[key],
+                fields: [...(SEED_MEASURES[key] ?? []), ...DATA_SOURCES[key].fields],
+            }
+        }
+    }
+    return result
+}
+
+function augmentedSource(sourceKey: string) {
+    const base = DATA_SOURCES[sourceKey]
+    if (!base) return null
+    return {
+        ...base,
+        fields: [...(SEED_MEASURES[sourceKey] ?? []), ...base.fields],
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -71,6 +124,7 @@ describe('ReportingService', () => {
     let mockTemplateRepo: Record<string, jest.Mock>
     let mockHistoryRepo: Record<string, jest.Mock>
     let mockDataSource: Record<string, jest.Mock>
+    let mockMeasuresService: Partial<Record<string, jest.Mock>>
 
     beforeEach(async () => {
         mockTemplateRepo = {
@@ -100,12 +154,22 @@ describe('ReportingService', () => {
             query: jest.fn(),
         }
 
+        mockMeasuresService = {
+            getAugmentedDataSources: jest.fn().mockImplementation((sourceKeys: string[]) =>
+                Promise.resolve(augmentedSources(sourceKeys))
+            ),
+            getAugmentedSourceConfig: jest.fn().mockImplementation((sourceKey: string) =>
+                Promise.resolve(augmentedSource(sourceKey))
+            ),
+        }
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 ReportingService,
                 { provide: getRepositoryToken(ReportTemplate), useValue: mockTemplateRepo },
                 { provide: getRepositoryToken(ReportExecutionHistory), useValue: mockHistoryRepo },
                 { provide: DataSource, useValue: mockDataSource },
+                { provide: MeasuresService, useValue: mockMeasuresService },
             ],
         }).compile()
 
@@ -331,29 +395,150 @@ describe('ReportingService', () => {
     // R08 — getFieldMappings (semantic layer)
     // -------------------------------------------------------------------------
     describe('getFieldMappings', () => {
-        it('returns field list for a known domain', () => {
-            const fields = service.getFieldMappings('submissions')
+        it('returns field list for a known domain', async () => {
+            const fields = await service.getFieldMappings('submissions', 'TST')
             expect(fields.length).toBeGreaterThan(0)
             expect(fields[0]).toHaveProperty('key')
             expect(fields[0]).toHaveProperty('label')
         })
 
-        it('returns empty array for unknown domain', () => {
-            expect(service.getFieldMappings('unknown_domain')).toEqual([])
+        it('returns empty array for unknown domain', async () => {
+            expect(await service.getFieldMappings('unknown_domain', 'TST')).toEqual([])
         })
 
-        it('returns field list for policies domain', () => {
-            const fields = service.getFieldMappings('policies')
+        it('returns field list for policies domain', async () => {
+            const fields = await service.getFieldMappings('policies', 'TST')
             expect(fields.some((f) => f.key === 'reference')).toBe(true)
         })
 
-        it('returns field list for quotes domain', () => {
-            expect(service.getFieldMappings('quotes').length).toBeGreaterThan(0)
+        it('returns field list for quotes domain', async () => {
+            expect((await service.getFieldMappings('quotes', 'TST')).length).toBeGreaterThan(0)
         })
 
-        it('returns field list for parties domain', () => {
-            const fields = service.getFieldMappings('parties')
+        it('returns field list for parties domain', async () => {
+            const fields = await service.getFieldMappings('parties', 'TST')
             expect(fields.some((f) => f.key === 'name')).toBe(true)
+        })
+
+        it('returns field list for quoteSections domain including numeric premium measures', async () => {
+            const fields = await service.getFieldMappings('quoteSections', 'TST')
+            expect(fields.length).toBeGreaterThan(0)
+            const numericKeys = ['grossPremium', 'netPremium', 'annualGrossPremium', 'annualNetPremium', 'writtenLineTotal', 'signedLineTotal']
+            numericKeys.forEach((key) => {
+                const field = fields.find((f) => f.key === key)
+                expect(field).toBeDefined()
+                expect(field?.type).toBe('number')
+            })
+        })
+
+        it('returns field list for policyTransactions domain with transactionType and effectiveDate', async () => {
+            const fields = await service.getFieldMappings('policyTransactions', 'TST')
+            expect(fields.length).toBeGreaterThan(0)
+            expect(fields.some((f) => f.key === 'transactionType')).toBe(true)
+            expect(fields.some((f) => f.key === 'effectiveDate' && f.type === 'date')).toBe(true)
+        })
+
+        it('submissions domain includes workflowStatus and clearanceStatus fields', async () => {
+            const fields = await service.getFieldMappings('submissions', 'TST')
+            expect(fields.some((f) => f.key === 'workflowStatus')).toBe(true)
+            expect(fields.some((f) => f.key === 'clearanceStatus')).toBe(true)
+        })
+
+        it('policies domain includes businessType and contractType fields', async () => {
+            const fields = await service.getFieldMappings('policies', 'TST')
+            expect(fields.some((f) => f.key === 'businessType')).toBe(true)
+            expect(fields.some((f) => f.key === 'contractType')).toBe(true)
+        })
+
+        // REQ-RPT-BE-F-049 — curated Measures catalog (now served from measure_definitions DB)
+        it('T-RPT-BE-R049a — submissions domain exposes a countAll measure with type count and label "Count of Submissions"', async () => {
+            const fields = await service.getFieldMappings('submissions', 'TST')
+            const measure = fields.find((f) => f.key === 'countAll')
+            expect(measure).toBeDefined()
+            expect(measure?.label).toBe('Count of Submissions')
+            expect(measure?.type).toBe('count')
+        })
+
+        it('T-RPT-BE-R049b — quotes domain exposes countAll, countDeclined, countRenewable, countRenewed, countNewBusiness, countRenewalBusiness measures', async () => {
+            const fields = await service.getFieldMappings('quotes', 'TST')
+            const keys = fields.map((f) => f.key)
+            expect(keys).toContain('countAll')
+            expect(keys).toContain('countDeclined')
+            expect(keys).toContain('countRenewable')
+            expect(keys).toContain('countRenewed')
+            expect(keys).toContain('countNewBusiness')
+            expect(keys).toContain('countRenewalBusiness')
+            expect(fields.find((f) => f.key === 'countAll')?.label).toBe('Count of Quotes')
+            expect(fields.find((f) => f.key === 'countDeclined')?.label).toBe('Count of Declined Quotes')
+            expect(fields.find((f) => f.key === 'countNewBusiness')?.label).toBe('Count of New Business Quotes')
+            expect(fields.find((f) => f.key === 'countRenewalBusiness')?.label).toBe('Count of Renewal Business Quotes')
+        })
+
+        it('T-RPT-BE-R049c — policies domain exposes countAll, countActive, countLapsed, countRenewed, countRenewable and retentionRatio measures', async () => {
+            const fields = await service.getFieldMappings('policies', 'TST')
+            const keys = fields.map((f) => f.key)
+            expect(fields.find((f) => f.key === 'countAll')?.label).toBe('Count of Policies')
+            expect(fields.find((f) => f.key === 'countActive')?.label).toBe('Count of Active Policies')
+            expect(fields.find((f) => f.key === 'grossWrittenPremium')?.label).toBe('Gross Net Written Premium')
+            expect(keys).toContain('countLapsed')
+            expect(keys).toContain('countRenewed')
+            expect(keys).toContain('countRenewable')
+            expect(keys).toContain('retentionRatio')
+            expect(fields.find((f) => f.key === 'countLapsed')?.label).toBe('Count of Lapsed Policies')
+            expect(fields.find((f) => f.key === 'countRenewed')?.label).toBe('Count of Renewed Policies')
+            expect(fields.find((f) => f.key === 'countRenewable')?.label).toBe('Count of Renewable Policies')
+            expect(fields.find((f) => f.key === 'retentionRatio')?.label).toBe('Retention Ratio')
+            expect(fields.find((f) => f.key === 'retentionRatio')?.type).toBe('ratio')
+        })
+
+        it('T-RPT-BE-R049d — bindingAuthorities domain exposes countAll measure labelled "Count of Binding Authorities"', async () => {
+            const fields = await service.getFieldMappings('bindingAuthorities', 'TST')
+            expect(fields.length).toBeGreaterThan(0)
+            expect(fields.find((f) => f.key === 'countAll')?.label).toBe('Count of Binding Authorities')
+        })
+    })
+
+    describe('getLoginActivity', () => {
+        it('returns org-scoped login activity rows ordered by latest login', async () => {
+            mockDataSource.query.mockResolvedValue([
+                {
+                    user: 'System Administrator',
+                    loggedInDate: '2026-05-07T10:00:00.000Z',
+                    durationSeconds: 3900,
+                },
+            ])
+
+            const result = await service.getLoginActivity('TST')
+
+            expect(result).toEqual([
+                {
+                    user: 'System Administrator',
+                    loggedInDate: '2026-05-07T10:00:00.000Z',
+                    durationOfLogin: '1h 5m',
+                },
+            ])
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('org_code IS NOT DISTINCT FROM $1'),
+                ['TST'],
+            )
+        })
+
+        it('formats short durations as minutes only', async () => {
+            mockDataSource.query.mockResolvedValue([
+                {
+                    user: 'Alice',
+                    loggedInDate: '2026-05-07T10:00:00.000Z',
+                    durationSeconds: 540,
+                },
+            ])
+
+            const result = await service.getLoginActivity('TST')
+            expect(result[0]).toMatchObject({ durationOfLogin: '9m' })
+        })
+
+        it('returns an empty list when no users have logged in', async () => {
+            mockDataSource.query.mockResolvedValue([])
+            await expect(service.getLoginActivity('TST')).resolves.toEqual([])
         })
     })
 
@@ -398,9 +583,24 @@ describe('ReportingService', () => {
                 aggregation: 'sum',
             }, undefined)
 
-            expect(result).toEqual({ type: 'metric', value: 245000.5, label: 'Gross Written Premium' })
+            expect(result).toEqual({ type: 'metric', value: 245000.5, label: 'Gross Net Written Premium' })
             expect(mockDataSource.query).toHaveBeenCalledWith(
                 expect.stringContaining('FROM policies'),
+                expect.arrayContaining(['TST']),
+            )
+        })
+
+        it('T-RPT-BE-R057 — executes a ratio metric widget using NULLIF division SQL expression', async () => {
+            mockDataSource.query.mockResolvedValue([{ value: '0.857143' }])
+
+            const result = await service.getDashboardWidgetData('TST', {
+                type: 'metric',
+                metric: 'policies::retentionRatio',
+            }, undefined)
+
+            expect(result).toMatchObject({ type: 'metric', label: 'Retention Ratio' })
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('NULLIF(SUM(CASE WHEN'),
                 expect.arrayContaining(['TST']),
             )
         })

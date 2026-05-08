@@ -96,21 +96,37 @@ export class DashboardService {
     }
 
     // REQ-DASH-STUB-F-008 — org-scoped recent records across dashboard entity types
-    async getRecentRecords(orgCode: string): Promise<any> {
+        async getRecentRecords(orgCode: string, userId?: number | string | null, userName?: string | null): Promise<any> {
         const auditRows = await this.dataSource.query(
-            `SELECT ae.entity_type, ae.entity_id, MAX(ae.created_at) AS last_opened
-             FROM public.audit_event ae
-             WHERE ae.entity_type IN ('Submission', 'Quote', 'Policy', 'BindingAuthority')
-               AND (ae.action ILIKE '%Opened%' OR ae.action ILIKE '%Updated%')
-             GROUP BY ae.entity_type, ae.entity_id
-             ORDER BY last_opened DESC
+                        `SELECT ae.entity_type,
+                                        ae.entity_id,
+                                        ae.created_at AS last_opened,
+                                        ae.user_name,
+                                        ROW_NUMBER() OVER (
+                                            PARTITION BY ae.entity_type, ae.entity_id
+                                            ORDER BY ae.created_at DESC, ae.id DESC
+                                        ) AS row_rank
+                         FROM public.audit_event ae
+                         WHERE ae.entity_type IN ('Submission', 'Quote', 'Policy', 'Binding Authority')
+                             AND (ae.action ILIKE '%Opened%' OR ae.action ILIKE '%Updated%')
+                             AND (
+                                 ($1::text IS NOT NULL AND ae.user_id::text = $1::text)
+                                 OR ($2::text IS NOT NULL AND ae.user_name = $2 AND ae.user_id IS NULL)
+                             )
+                         ORDER BY ae.created_at DESC, ae.id DESC
              LIMIT 120`,
-        ).catch(() => [])
+                        [userId ?? null, userName ?? null],
+                ).catch(() => [])
 
-        const auditByType: Record<string, Array<{ id: number; lastOpenedDate: string }>> = {}
+                const auditByType: Record<string, Array<{ id: number; lastOpenedDate: string; lastAuditUser: string | null }>> = {}
         for (const row of auditRows) {
+                        if (Number(row.row_rank) !== 1) continue
             if (!auditByType[row.entity_type]) auditByType[row.entity_type] = []
-            auditByType[row.entity_type].push({ id: Number(row.entity_id), lastOpenedDate: row.last_opened })
+                        auditByType[row.entity_type].push({
+                                id: Number(row.entity_id),
+                                lastOpenedDate: row.last_opened,
+                                lastAuditUser: row.user_name ?? null,
+                        })
         }
 
         const submissionRows = await this.fetchWithAuditOrFallback(
@@ -134,7 +150,7 @@ export class DashboardService {
                 [ids, orgCode],
             ),
             () => this.dataSource.query(
-            `SELECT
+                `SELECT
                  s.id,
                  s.reference,
                  s."submissionType"     AS "submissionType",
@@ -150,7 +166,7 @@ export class DashboardService {
              WHERE s."createdByOrgCode" = $1
              ORDER BY s."createdDate" DESC
              LIMIT 25`,
-            [orgCode],
+                [orgCode],
             ),
         ).catch(() => [])
 
@@ -175,7 +191,7 @@ export class DashboardService {
                 [ids, orgCode],
             ),
             () => this.dataSource.query(
-            `SELECT
+                `SELECT
                  q.id,
                  q.reference,
                  COALESCE(p.name, q.insured) AS "insuredName",
@@ -191,7 +207,7 @@ export class DashboardService {
                AND q.deleted_at IS NULL
              ORDER BY q.created_date DESC
              LIMIT 25`,
-            [orgCode],
+                [orgCode],
             ),
         ).catch(() => [])
 
@@ -215,7 +231,7 @@ export class DashboardService {
                 [ids, orgCode],
             ),
             () => this.dataSource.query(
-            `SELECT
+                `SELECT
                  policy.id,
                  policy.reference,
                  COALESCE(p.name, policy.insured) AS "insuredName",
@@ -230,12 +246,12 @@ export class DashboardService {
                AND policy.deleted_at IS NULL
              ORDER BY policy.created_date DESC
              LIMIT 25`,
-            [orgCode],
+                [orgCode],
             ),
         ).catch(() => [])
 
         const bindingAuthorityRows = await this.fetchWithAuditOrFallback(
-            auditByType['BindingAuthority'],
+            auditByType['Binding Authority'],
             (ids) => this.dataSource.query(
                 `SELECT
                      ba.id,
@@ -249,7 +265,7 @@ export class DashboardService {
                 [ids, orgCode],
             ),
             () => this.dataSource.query(
-            `SELECT
+                `SELECT
                  ba.id,
                  ba.reference,
                  ba.status,
@@ -259,7 +275,7 @@ export class DashboardService {
                AND ba.deleted_at IS NULL
              ORDER BY ba.created_at DESC
              LIMIT 25`,
-            [orgCode],
+                [orgCode],
             ),
         ).catch(() => [])
 
@@ -272,7 +288,7 @@ export class DashboardService {
     }
 
     private async fetchWithAuditOrFallback(
-        auditEntries: Array<{ id: number; lastOpenedDate: string }> | undefined,
+        auditEntries: Array<{ id: number; lastOpenedDate: string; lastAuditUser: string | null }> | undefined,
         fetchByIds: (ids: number[]) => Promise<any[]>,
         fetchFallback: () => Promise<any[]>,
     ): Promise<any[]> {
@@ -287,12 +303,22 @@ export class DashboardService {
                 .map((entry) => {
                     const row = rowMap.get(entry.id)
                     if (!row) return null
-                    return { ...row, lastOpenedDate: entry.lastOpenedDate }
+                    return {
+                        ...row,
+                        lastOpenedDate: entry.lastOpenedDate,
+                        lastAuditTimestamp: entry.lastOpenedDate,
+                        lastAuditUser: entry.lastAuditUser,
+                    }
                 })
                 .filter(Boolean)
         }
 
         const fallbackRows = await fetchFallback()
-        return fallbackRows.map((row) => ({ ...row, lastOpenedDate: row.createdDate ?? null }))
+        return fallbackRows.map((row) => ({
+            ...row,
+            lastOpenedDate: row.createdDate ?? null,
+            lastAuditTimestamp: row.createdDate ?? null,
+            lastAuditUser: null,
+        }))
     }
 }

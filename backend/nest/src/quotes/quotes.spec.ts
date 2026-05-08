@@ -131,6 +131,54 @@ describe('QuotesService', () => {
             expect(qb.where).toHaveBeenCalledWith('q.createdByOrgCode = :orgCode', { orgCode: 'TST' })
             expect(qb.orderBy).toHaveBeenCalledWith('q.createdDate', 'DESC')
         })
+
+        it('T-QUO-BE-NE-R01-date-a: applies dateFrom >= filter on correct column for inception basis', async () => {
+            const qb = buildQueryBuilderMock(null)
+            qb.getMany = jest.fn().mockResolvedValue([])
+            mockQuoteRepo.createQueryBuilder.mockReturnValue(qb)
+
+            await service.findAll('TST', undefined, undefined, 'inception', '2026-01-01', undefined)
+
+            expect(qb.andWhere).toHaveBeenCalledWith(
+                expect.stringContaining('q.inceptionDate'),
+                expect.objectContaining({ dateFrom: '2026-01-01' }),
+            )
+        })
+
+        it('T-QUO-BE-NE-R01-date-b: applies dateTo <= filter on expiry column for expiry basis', async () => {
+            const qb = buildQueryBuilderMock(null)
+            qb.getMany = jest.fn().mockResolvedValue([])
+            mockQuoteRepo.createQueryBuilder.mockReturnValue(qb)
+
+            await service.findAll('TST', undefined, undefined, 'expiry', undefined, '2026-12-31')
+
+            expect(qb.andWhere).toHaveBeenCalledWith(
+                expect.stringContaining('q.expiryDate'),
+                expect.objectContaining({ dateTo: '2026-12-31' }),
+            )
+        })
+
+        it('T-QUO-BE-NE-R01-date-c: filters on createdDate column for created basis', async () => {
+            const qb = buildQueryBuilderMock(null)
+            qb.getMany = jest.fn().mockResolvedValue([])
+            mockQuoteRepo.createQueryBuilder.mockReturnValue(qb)
+
+            await service.findAll('TST', undefined, undefined, 'created', '2026-03-01', '2026-03-31')
+
+            const allCalls = qb.andWhere.mock.calls.map((c: unknown[]) => c[0])
+            expect(allCalls.some((c: unknown) => typeof c === 'string' && c.includes('q.createdDate'))).toBe(true)
+        })
+
+        it('T-QUO-BE-NE-R01-date-d: unknown dateBasis falls back to createdDate column', async () => {
+            const qb = buildQueryBuilderMock(null)
+            qb.getMany = jest.fn().mockResolvedValue([])
+            mockQuoteRepo.createQueryBuilder.mockReturnValue(qb)
+
+            await service.findAll('TST', undefined, undefined, 'unknownBasis', '2026-01-01', undefined)
+
+            const allCalls = qb.andWhere.mock.calls.map((c: unknown[]) => c[0])
+            expect(allCalls.some((c: unknown) => typeof c === 'string' && c.includes('q.createdDate'))).toBe(true)
+        })
     })
 
     // -------------------------------------------------------------------------
@@ -248,6 +296,16 @@ describe('QuotesService', () => {
             // result.status should not have changed to 'Bound' via update
             const savedArg: Quote = mockQuoteRepo.save.mock.calls[0][0]
             expect(savedArg.status).toBe('Draft')
+        })
+
+        it('T-QUO-BE-NE-R04e: persists renewal_time when provided in update body (REQ-QUO-BE-NE-F-004, migration 105)', async () => {
+            const quote = makeQuote({ status: 'Draft' })
+            mockQuoteRepo.findOne.mockResolvedValue(quote)
+            mockQuoteRepo.save.mockResolvedValue({ ...quote, renewalTime: '12:00:00' })
+
+            await service.update(1, 'TST', { renewal_time: '12:00:00' }, 'user')
+            const savedArg: Quote = mockQuoteRepo.save.mock.calls[0][0]
+            expect((savedArg as any).renewalTime).toBe('12:00:00')
         })
     })
 
@@ -616,6 +674,102 @@ describe('QuotesService', () => {
 
             await expect(service.updateSection(1, 1, 'TST', 'user', {}))
                 .rejects.toThrow(ForbiddenException)
+        })
+
+        it('T-QUO-BE-NE-R14f: persists effective_date and tax_receivable to the section entity', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const section: any = {
+                id: 1, quoteId: 1, payload: {}, deletedAt: null,
+                effectiveDate: null, taxReceivable: null,
+                inceptionDate: '2026-06-01', expiryDate: '2027-06-01',
+            }
+            mockSectionRepo.findOne.mockResolvedValue(section)
+            mockSectionRepo.save.mockImplementation((s: any) => Promise.resolve(s))
+
+            await service.updateSection(1, 1, 'TST', 'user', {
+                effective_date: '2026-07-01',
+                tax_receivable: 1250,
+            })
+            expect(section.effectiveDate).toBe('2026-07-01')
+            expect(section.taxReceivable).toBe(1250)
+        })
+
+        it('T-QUO-BE-NE-R14g: auto-computes days_on_cover from inceptionDate and expiryDate', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const section: any = {
+                id: 1, quoteId: 1, payload: {}, deletedAt: null,
+                inceptionDate: '2026-06-01', expiryDate: '2027-06-01',
+                daysOnCover: null,
+            }
+            mockSectionRepo.findOne.mockResolvedValue(section)
+            mockSectionRepo.save.mockImplementation((s: any) => Promise.resolve(s))
+
+            await service.updateSection(1, 1, 'TST', 'user', {})
+            // 2026-06-01 to 2027-06-01 inclusive = 366 days (crosses leap-year boundary)
+            expect(section.daysOnCover).toBe(
+                Math.round(
+                    (new Date('2027-06-01').getTime() - new Date('2026-06-01').getTime()) / 86400000
+                ) + 1
+            )
+        })
+
+        it('T-QUO-BE-NE-R14h: sets days_on_cover to null when inceptionDate is absent', async () => {
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const section: any = {
+                id: 1, quoteId: 1, payload: {}, deletedAt: null,
+                inceptionDate: null, expiryDate: '2027-06-01',
+                daysOnCover: 365,
+            }
+            mockSectionRepo.findOne.mockResolvedValue(section)
+            mockSectionRepo.save.mockImplementation((s: any) => Promise.resolve(s))
+
+            await service.updateSection(1, 1, 'TST', 'user', {})
+            expect(section.daysOnCover).toBeNull()
+        })
+
+        it('T-QUO-BE-NE-R14i: persists time_basis, written_order_basis, signed_order_basis to section entity', async () => {
+            // REQ-QUO-BE-NE-F-020c: new order/time fields are patched individually
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const section: any = {
+                id: 1, quoteId: 1, payload: {}, deletedAt: null,
+                inceptionDate: '2026-01-01', expiryDate: '2026-12-31',
+                timeBasis: null, writtenOrderBasis: null, signedOrderBasis: null,
+            }
+            mockSectionRepo.findOne.mockResolvedValue(section)
+            mockSectionRepo.save.mockImplementation((s: any) => Promise.resolve(s))
+
+            await service.updateSection(1, 1, 'TST', 'user', {
+                time_basis: 'Local Standard Time',
+                written_order_basis: 'Percentage of Order',
+                signed_order_basis: 'Percentage of Whole',
+            })
+            expect(section.timeBasis).toBe('Local Standard Time')
+            expect(section.writtenOrderBasis).toBe('Percentage of Order')
+            expect(section.signedOrderBasis).toBe('Percentage of Whole')
+        })
+
+        it('T-QUO-BE-NE-R14j: persists written_line_total, signed_line_total, annual_gross_premium, annual_net_premium', async () => {
+            // REQ-QUO-BE-NE-F-020c: new financial fields are patched individually
+            mockQuoteRepo.findOne.mockResolvedValue(makeQuote())
+            const section: any = {
+                id: 1, quoteId: 1, payload: {}, deletedAt: null,
+                inceptionDate: '2026-01-01', expiryDate: '2026-12-31',
+                writtenLineTotal: null, signedLineTotal: null,
+                annualGrossPremium: null, annualNetPremium: null,
+            }
+            mockSectionRepo.findOne.mockResolvedValue(section)
+            mockSectionRepo.save.mockImplementation((s: any) => Promise.resolve(s))
+
+            await service.updateSection(1, 1, 'TST', 'user', {
+                written_line_total: 500000,
+                signed_line_total: 450000,
+                annual_gross_premium: 50000,
+                annual_net_premium: 45000,
+            })
+            expect(section.writtenLineTotal).toBe(500000)
+            expect(section.signedLineTotal).toBe(450000)
+            expect(section.annualGrossPremium).toBe(50000)
+            expect(section.annualNetPremium).toBe(45000)
         })
     })
 

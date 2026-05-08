@@ -484,6 +484,7 @@ At the end of every session in which code, routes, migrations, or guideline file
 - [ ] Were any stub routes added? If yes, are they tracked in the Gap Analysis?
 - [ ] Were any guideline files changed? If yes, was existing code checked against the new rules?
 - [ ] Does anything in this session create debt that the user should be explicitly aware of?
+- [ ] Were any route handlers that query real DB tables left inside a stub file? If yes, extract them per §9.12.5 and run the Backend Route Change Protocol (§9.13).
 
 If any item is unchecked, the AI must flag it before ending the session — not silently skip it.
 

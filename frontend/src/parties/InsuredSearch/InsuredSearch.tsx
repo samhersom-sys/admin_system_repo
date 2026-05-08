@@ -19,6 +19,7 @@ export interface InsuredSearchProps {
     selectedParty?: Party | null
     onSelect: (party: Party) => void
     hideLabel?: boolean
+    inputClassName?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +146,7 @@ function InsuredSearchModal({ isOpen, onClose, onSelect }: ModalProps) {
 // ---------------------------------------------------------------------------
 // InsuredSearch — trigger field + modal
 // ---------------------------------------------------------------------------
-export default function InsuredSearch({ selectedParty, onSelect, hideLabel }: InsuredSearchProps) {
+export default function InsuredSearch({ selectedParty, onSelect, hideLabel, inputClassName }: InsuredSearchProps) {
     const [modalOpen, setModalOpen] = useState(false)
 
     function handleSelect(party: Party) {
@@ -172,7 +173,7 @@ export default function InsuredSearch({ selectedParty, onSelect, hideLabel }: In
                     placeholder="Search insured…"
                     value={selectedParty?.name ?? ''}
                     onClick={() => setModalOpen(true)}
-                    className="w-full border border-gray-300 rounded-md pl-3 pr-10 py-2 text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    className={`w-full border rounded-md pl-3 pr-10 py-2 text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 ${inputClassName ?? 'border-gray-300'}`}
                 />
                 <button
                     type="button"

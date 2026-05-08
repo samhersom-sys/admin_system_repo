@@ -430,24 +430,24 @@ db/
 | Rule | Description |
 |------|-------------|
 | **Schema lives in `db/` only** | No `CREATE TABLE`, `ALTER TABLE`, or `DROP TABLE` statements anywhere in `backend/` or `frontend/src/`. |
-| **Migrations are numbered** | Each file is prefixed `NNN-` and run in numeric order.  Never rename a migration after it has been run against any database. |
-| **Migrations are idempotent** | Every migration must be safe to re-run (`CREATE TABLE IF NOT EXISTS`, `IF NOT EXISTS` index checks, conditional `ALTER TABLE` blocks). |
-| **One concern per migration** | A migration file creates or modifies one table or one group of tightly related columns.  Do not bundle unrelated schema changes. |
-| **No application logic in migrations** | Migrations may read environment variables and connect to Postgres.  They must not import from `backend/routes/` or `frontend/src/`. |
-| **Seeds are separate from migrations** | Reference data (lookup tables, default admin user) goes in `db/seeds/`, not embedded inside migration files, except for the initial admin bootstrap which may remain in `001-create-users-table.js`. |
+| **Schema is consolidated** | Schema files live in `db/schema/`; contributors update the relevant file in place instead of adding incremental migration files. |
+| **Schema files are idempotent** | Every schema script must be safe to re-run (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, guarded indexes/constraints). |
+| **One concern per schema file** | A schema file owns one table or one tightly related domain group. Do not spread one table across many files. |
+| **No application logic in schema files** | Schema scripts may read environment variables and connect to Postgres. They must not import from `backend/routes/` or `frontend/src/`. |
+| **Seeds are separate from schema** | Reference data (lookups, defaults) goes in `db/seeds/`, never embedded in schema scripts. |
 | **`backend/db.js` is not a migration** | `backend/db.js` is the connection pool module used at runtime by the API.  It belongs in `backend/` because it is consumed by routes.  It must never contain `CREATE TABLE` statements. |
 
 ### npm Scripts
 
 | Script | Command |
 |--------|---------|
-| `npm run db:migrate` | Runs all migration files in order |
+| `npm run db:migrate` | Runs all consolidated schema files in order |
 | `npm run db:seed` | *(to be added)* Runs all seed files in order |
 
-### Adding a new migration
+### Updating schema
 
-1. Create `db/migrations/NNN-describe-the-change.js` (next number in sequence)
-2. Follow the pattern of existing files: dotenv load, Pool, idempotent SQL, log output, error exit
-3. Add it to the `db:migrate` script in `package.json` (append with `&&`)
-4. Write the requirements for the schema change before writing the migration
-5. One migration per PR — do not bundle schema changes with feature code
+1. Update the relevant `db/schema/*.js` file (do not add a new `db/migrations/*` file)
+2. Follow the existing pattern: dotenv load, Pool, idempotent SQL, log output, error exit
+3. Keep `db:migrate` in `package.json` aligned with `db/schema/` file order
+4. Write the requirements for the schema change before writing code
+5. Keep schema changes isolated from unrelated feature code

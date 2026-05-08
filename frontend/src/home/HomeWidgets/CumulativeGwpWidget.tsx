@@ -77,6 +77,7 @@ export default function CumulativeGwpWidget({ orgCode }: { orgCode: string }) {
         },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
           plugins: { legend: { position: 'top' } },
           scales: {
             x: { ticks: { color: brandColors.chart.axis.ticks } },
@@ -107,7 +108,9 @@ export default function CumulativeGwpWidget({ orgCode }: { orgCode: string }) {
           </div>
         )}
         {!loading && !error && (
-          <canvas ref={canvasRef} aria-label="Cumulative GWP chart" />
+          <div className="h-[22vh] min-h-[140px] max-h-[320px]">
+            <canvas ref={canvasRef} aria-label="Cumulative GWP chart" />
+          </div>
         )}
       </Card>
     </div>

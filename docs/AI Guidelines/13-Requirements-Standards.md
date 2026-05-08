@@ -177,14 +177,14 @@ The **Impact Analysis** section must appear in every requirements file — wheth
 
 ### Database Impact
 <!-- Which tables or columns are added, altered, or removed?
-     Reference the migration number (e.g. db/migrations/004-...).
+     Reference the schema file (e.g. db/schema/03-core-submissions.js).
      State "None" if there are no schema changes. -->
 ```
 
 **Rules:**
 - All three subsections are required. Write "None" if a layer is unaffected — never omit the subsection.
 - When a requirement changes, the Impact Analysis must be updated in the same commit/PR.
-- New migrations referenced here must exist in `db/migrations/` before the requirements file may be marked **Agreed — ready for code**.
+- New schema changes referenced here must exist in `db/schema/` before the requirements file may be marked **Agreed — ready for code**.
 - API changes must be defined in the API contract (Guideline 09 §3) before the Impact Analysis is written.
 
 ---

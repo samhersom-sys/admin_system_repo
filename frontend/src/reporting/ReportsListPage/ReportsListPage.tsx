@@ -21,6 +21,7 @@ const CORE_TEMPLATES: ReportTemplate[] = [
     { id: -2, name: 'New Business Report', description: 'New policies written in the selected period.', type: 'core', data_source: 'quotes', created_by: 'System' },
     { id: -3, name: 'Parties Report', description: 'Party directory with roles and contact info.', type: 'core', data_source: 'parties', created_by: 'System' },
     { id: -4, name: 'Policies Report', description: 'All policies with premium and expiry data.', type: 'core', data_source: 'policies', created_by: 'System' },
+    { id: -5, name: 'User Login Activity Report', description: 'Users, latest login timestamp, and login duration.', type: 'core', data_source: 'login-activity', created_by: 'System' },
 ]
 
 const CORE_COLUMNS: Column[] = [

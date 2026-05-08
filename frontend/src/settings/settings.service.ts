@@ -220,3 +220,38 @@ export async function getUsers(): Promise<User[]> {
 export async function getGlobalHierarchyLevels(): Promise<GlobalLevel[]> {
     return apiClient.get<GlobalLevel[]>('/api/organisation-hierarchy')
 }
+
+// ---------------------------------------------------------------------------
+// Dashboard & Reporting — Measures (REQ-SETTINGS-DASH-F-001 through F-007)
+// ---------------------------------------------------------------------------
+
+export interface Measure {
+    id: number
+    key: string
+    label: string
+    sourceKey: string
+    measureType: 'count' | 'sum' | 'ratio'
+    scope: 'org' | 'user' | 'both'
+    createdByType: 'internal' | 'tenant'
+    orgCode: string | null
+    isActive: boolean
+}
+
+export interface CreateMeasurePayload {
+    key: string
+    label: string
+    sourceKey: string
+    measureType: 'count' | 'sum' | 'ratio'
+}
+
+export async function getMeasures(): Promise<Measure[]> {
+    return apiClient.get<Measure[]>('/api/measures')
+}
+
+export async function createMeasure(payload: CreateMeasurePayload): Promise<Measure> {
+    return apiClient.post<Measure>('/api/measures', payload)
+}
+
+export async function deactivateMeasure(id: number): Promise<void> {
+    return apiClient.del(`/api/measures/${id}`)
+}

@@ -64,6 +64,7 @@ export default function DashboardCreatePage() {
     const [dashboardName, setDashboardName] = useState('')
     const [description, setDescription] = useState('')
     const [showMetadata, setShowMetadata] = useState(true)
+    const [showOnHomepage, setShowOnHomepage] = useState(false)
     const [pages, setPages] = useState<DashboardPage[]>([blankPage(1)])
 
     // Template selector state
@@ -93,6 +94,7 @@ export default function DashboardCreatePage() {
             setDashboardName(dash.name)
             setDescription(dash.description ?? '')
             setShowMetadata(dash.dashboardConfig.showMetadata)
+            setShowOnHomepage(dash.dashboardConfig.showOnHomepage ?? false)
             setPages(
                 dash.dashboardConfig.pages.length > 0
                     ? dash.dashboardConfig.pages
@@ -202,7 +204,7 @@ export default function DashboardCreatePage() {
             return
         }
 
-        const config = { pages, showMetadata }
+        const config = { pages, showMetadata, showOnHomepage }
         try {
             setSaving(true)
             if (isEdit && id) {
@@ -281,17 +283,31 @@ export default function DashboardCreatePage() {
                         />
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <input
-                            id="show-metadata"
-                            type="checkbox"
-                            checked={showMetadata}
-                            onChange={(e) => setShowMetadata(e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                        />
-                        <label htmlFor="show-metadata" className="text-sm text-gray-700">
-                            Show Dashboard Metadata
-                        </label>
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-3">
+                            <input
+                                id="show-metadata"
+                                type="checkbox"
+                                checked={showMetadata}
+                                onChange={(e) => setShowMetadata(e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                            />
+                            <label htmlFor="show-metadata" className="text-sm text-gray-700">
+                                Show Dashboard Metadata
+                            </label>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <input
+                                id="show-on-homepage"
+                                type="checkbox"
+                                checked={showOnHomepage}
+                                onChange={(e) => setShowOnHomepage(e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                            />
+                            <label htmlFor="show-on-homepage" className="text-sm text-gray-700">
+                                Show on Homepage
+                            </label>
+                        </div>
                     </div>
                 </div>
             </Card>

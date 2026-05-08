@@ -402,6 +402,61 @@ describe('SubmissionsService', () => {
 
       await expect(service.update('TST', 99, { insured: 'X' }, user)).rejects.toThrow(NotFoundException)
     })
+
+    // REQ-SUB-BE-F-026 — gap-fill fields from migrations 106–108
+    it('T-SUB-BE-NE-R06e: persists workflow/AI fields when supplied (REQ-SUB-BE-F-026, migrations 106-108)', async () => {
+      const s = makeSubmission()
+      mockSubmissionRepo.findOne.mockResolvedValue(s)
+      mockDataSource.query.mockResolvedValue([LOCK_ROW])
+      mockSubmissionRepo.save.mockImplementation(async (sub: any) => sub)
+
+      await service.update('TST', 1, {
+        workflowNotes: 'Awaiting review',
+        aiExtracted: true,
+        reviewRequired: false,
+        emailSource: 'broker@example.com',
+        extractionConfidence: '0.95',
+      }, user)
+
+      const savedArg = mockSubmissionRepo.save.mock.calls[0][0]
+      expect(savedArg.workflowNotes).toBe('Awaiting review')
+      expect(savedArg.aiExtracted).toBe(true)
+      expect(savedArg.reviewRequired).toBe(false)
+      expect(savedArg.emailSource).toBe('broker@example.com')
+      expect(savedArg.extractionConfidence).toBe('0.95')
+    })
+
+    it('T-SUB-BE-NE-R06f: persists clearance fields when supplied (REQ-SUB-BE-F-026, migration 108)', async () => {
+      const s = makeSubmission()
+      mockSubmissionRepo.findOne.mockResolvedValue(s)
+      mockDataSource.query.mockResolvedValue([LOCK_ROW])
+      mockSubmissionRepo.save.mockImplementation(async (sub: any) => sub)
+
+      await service.update('TST', 1, {
+        clearanceStatus: 'Cleared',
+        clearanceStatusCode: 'CLR-001',
+        clearanceNotes: 'No issues found',
+        autoClearanceChecked: true,
+      }, user)
+
+      const savedArg = mockSubmissionRepo.save.mock.calls[0][0]
+      expect(savedArg.clearanceStatus).toBe('Cleared')
+      expect(savedArg.clearanceStatusCode).toBe('CLR-001')
+      expect(savedArg.clearanceNotes).toBe('No issues found')
+      expect(savedArg.autoClearanceChecked).toBe(true)
+    })
+
+    it('T-SUB-BE-NE-R06g: null workflow/clearance fields are skipped (COALESCE pattern)', async () => {
+      const s = makeSubmission()
+        ; (s as any).workflowNotes = 'Original notes'
+      mockSubmissionRepo.findOne.mockResolvedValue(s)
+      mockDataSource.query.mockResolvedValue([LOCK_ROW])
+      mockSubmissionRepo.save.mockImplementation(async (sub: any) => sub)
+
+      await service.update('TST', 1, { workflowNotes: null }, user)
+      const savedArg = mockSubmissionRepo.save.mock.calls[0][0]
+      expect(savedArg.workflowNotes).toBe('Original notes')
+    })
   })
 
   // -------------------------------------------------------------------------

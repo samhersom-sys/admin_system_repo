@@ -1,10 +1,11 @@
 ﻿import { Injectable, BadRequestException } from '@nestjs/common'
 import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
+import { logError } from '../shared/log-error'
 
 // Valid canonical entity types (REQ-AUDIT-BE-F-002)
 const VALID_ENTITY_TYPES = new Set([
-    'Submission', 'Quote', 'Policy', 'BindingAuthority', 'Party', 'Claim',
+    'Submission', 'Quote', 'Policy', 'Binding Authority', 'Party', 'Claim',
     // Allow test entity type in non-production environments
     ...(process.env['NODE_ENV'] !== 'production' ? ['TestEntity'] : []),
 ])
@@ -14,33 +15,38 @@ export class AuditService {
     constructor(
         @InjectDataSource()
         private readonly dataSource: DataSource,
-    ) {}
+    ) { }
 
     // ---------------------------------------------------------------------------
     // POST /api/audit/event  â€” REQ-AUDIT-BE-F-001 through F-007
     // ---------------------------------------------------------------------------
     async writeEvent(body: any, user: any): Promise<any> {
         const { entityType, entityId, action, details } = body ?? {}
+        const orgCode = user?.orgCode ?? null
+        const userName = user?.username || user?.email || user?.name || 'System'
 
         if (!entityType || typeof entityType !== 'string') {
+            await logError(this.dataSource, orgCode, userName, 'POST /api/audit/event', 'ERR_AUDIT_ENTITY_TYPE_REQUIRED', 'entityType is required and must be a string', { body })
             throw new BadRequestException('entityType is required and must be a string')
         }
         if (entityId === undefined || entityId === null || !Number.isInteger(Number(entityId)) || isNaN(Number(entityId))) {
+            await logError(this.dataSource, orgCode, userName, 'POST /api/audit/event', 'ERR_AUDIT_ENTITY_ID_INVALID', 'entityId is required and must be an integer', { body })
             throw new BadRequestException('entityId is required and must be an integer')
         }
         if (!action || typeof action !== 'string') {
+            await logError(this.dataSource, orgCode, userName, 'POST /api/audit/event', 'ERR_AUDIT_ACTION_REQUIRED', 'action is required and must be a string', { body })
             throw new BadRequestException('action is required and must be a string')
         }
 
         // REQ-AUDIT-BE-F-002 â€” validate entity type
         if (!VALID_ENTITY_TYPES.has(entityType)) {
+            await logError(this.dataSource, orgCode, userName, 'POST /api/audit/event', 'ERR_AUDIT_ENTITY_TYPE_INVALID', 'entityType must be one of the allowed values', { entityType })
             throw new BadRequestException(`entityType must be one of: ${[...VALID_ENTITY_TYPES].join(', ')}`)
         }
 
         const entityIdInt = Number(entityId)
 
         // REQ-AUDIT-BE-F-004 â€” user identity always from JWT
-        const userName = user.username || user.email || 'System'
         const userId = user.id ?? null
 
         // REQ-AUDIT-BE-F-005 â€” duplicate-event guard (same entity+action+user within 10 seconds)
@@ -91,6 +97,7 @@ export class AuditService {
     async getHistory(type: string, id: string | number): Promise<any[]> {
         const entityId = Number(id)
         if (!Number.isInteger(entityId) || isNaN(entityId)) {
+            await logError(this.dataSource, null, null, 'GET /api/audit/:type/:id', 'ERR_AUDIT_ID_INVALID', 'id must be a valid integer', { type, id })
             throw new BadRequestException('id must be a valid integer')
         }
 

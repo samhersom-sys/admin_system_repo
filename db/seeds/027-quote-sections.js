@@ -16,6 +16,10 @@
  *   QUO-2024-002 (Quoted, Global Electronics)— 2 sections: Property, Marine Cargo
  *   QUO-2024-003 (Bound, Coastal Shipping)  — 2 sections: Marine Hull, Marine Cargo
  *   QUO-2025-001 (Draft, Skyline Hospitality)— 1 section: Property
+ *   QUO-2025-D02 (Quoted, Demo Logistics)   — 1 section: Liability
+ *
+ * Note: QUO-2025-D01 (Draft) and QUO-2024-004 (Declined) intentionally have no sections.
+ *   Draft quotes may have no sections yet. Declined quotes were rejected before sections.
  */
 
 'use strict'
@@ -160,6 +164,25 @@ const SECTIONS = [
         netPremium: 162000.00,
         limitCurrency: 'EUR',
         limitAmount: 12000000.00,
+    },
+    // QUO-2025-D02 (Quoted, Demo Logistics) — Liability section
+    // Referential integrity: a Quoted quote must have at least one section.
+    {
+        quoteRef: 'QUO-2025-D02',
+        reference: 'QUO-2025-D02-SEC-001',
+        classOfBusiness: 'Liability',
+        inceptionDate: '2025-07-01',
+        effectiveDate: '2025-07-01',
+        expiryDate: '2026-06-30',
+        daysOnCover: 365,
+        sumInsuredCurrency: 'GBP',
+        sumInsured: 5000000.00,
+        premiumCurrency: 'GBP',
+        grossGrossPremium: 55000.00,
+        grossPremium: 55000.00,
+        netPremium: 49500.00,
+        limitCurrency: 'GBP',
+        limitAmount: 10000000.00,
     },
 ]
 

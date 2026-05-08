@@ -40,6 +40,7 @@ The following NestJS endpoints are covered by this requirements file. All endpoi
 | GET | `/api/quotes/:id/sections` | `listSections` | Implemented — raw SQL pending TypeORM migration |
 | POST | `/api/quotes/:id/sections` | `createSection` | Implemented — raw SQL pending TypeORM migration |
 | DELETE | `/api/quotes/:id/sections/:sectionId` | `deleteSection` | Implemented — raw SQL pending TypeORM migration |
+| PUT | `/api/quotes/:id/sections/:sectionId` | `updateSection` | Implemented — TypeORM |
 
 ### Database Impact
 - `db/migrations/008-create-quotes-table.js` — base table (pre-existing)
@@ -49,6 +50,13 @@ The following NestJS endpoints are covered by this requirements file. All endpoi
 - `db/migrations/093-alter-quotes-add-block2-fields.js` — 12 Block 2 columns (`year_of_account`, `lta_applicable`, `lta_start_date/time`, `lta_expiry_date/time`, `contract_type`, `method_of_placement`, `unique_market_reference`, `renewable_indicator`, `renewal_date`, `renewal_status`) — must be reflected in entity before REQ-QUO-BE-NE-F-012 is satisfied
 - `db/migrations/012-create-quote-sections-table.js` — `quote_sections` table (pre-existing)
 - `db/migrations/078-alter-quote_sections-add-deleted-at.js` — `deleted_at` on sections (pre-existing)
+- `db/migrations/102-alter-quote-sections-add-order-time-fields.js` — `time_basis`, `written_order_basis`, `signed_order_basis`, `written_line_total`, `signed_line_total` (gap-fill)
+- `db/migrations/103-alter-quote-sections-add-annual-premiums.js` — `annual_gross_premium`, `annual_net_premium` promoted from payload (gap-fill with data migration)
+- `db/migrations/104-alter-quote-sections-add-da-ref-strings.js` — `delegated_authority_ref`, `delegated_authority_section_ref` convenience text columns (gap-fill)
+- `db/migrations/105-alter-quotes-add-renewal-time.js` — `renewal_time` on quotes (gap-fill)
+- `db/migrations/106-alter-submission-add-workflow-ai-fields.js` — `workflow_notes`, AI pipeline columns (gap-fill, schema-only)
+- `db/migrations/107-alter-submission-add-assignment-fields.js` — `assigned_by`, `assigned_date` (gap-fill, schema-only)
+- `db/migrations/108-alter-submission-add-clearance-fields.js` — clearance workflow columns (gap-fill, schema-only)
 
 ---
 
@@ -56,13 +64,13 @@ The following NestJS endpoints are covered by this requirements file. All endpoi
 
 ### CRUD Operations
 
-**REQ-QUO-BE-NE-F-001:** The `QuotesService.findAll` method shall return all quote records whose `created_by_org_code` matches the caller's `orgCode`, ordered by `created_date` descending. When `submissionId` is provided, the result shall be further filtered to only records whose `submission_id` matches. When `status` is provided, the result shall be further filtered to only records with that status value.
+**REQ-QUO-BE-NE-F-001:** The `QuotesService.findAll` method shall return all quote records whose `created_by_org_code` matches the caller's `orgCode`, ordered by `created_date` descending. When `submissionId` is provided, the result shall be further filtered to only records whose `submission_id` matches. When `status` is provided, the result shall be further filtered to only records with that status value. When both `dateBasis` and at least one of `dateFrom` / `dateTo` are provided, the result shall be further filtered by the corresponding date column: `dateBasis = 'inception'` filters on `inception_date`, `dateBasis = 'expiry'` filters on `expiry_date`, `dateBasis = 'created'` filters on `created_date`. An unrecognised `dateBasis` value shall fall back to filtering on `created_date`. `dateFrom` applies an inclusive lower bound (`>=`); `dateTo` applies an inclusive upper bound (`<=`). Neither bound is required — providing only `dateFrom` or only `dateTo` is valid. (See OQ-033 for timezone casting concern.)
 
 **REQ-QUO-BE-NE-F-002:** The `QuotesService.create` method shall reject with `BadRequestException` when the `insured` field is absent or blank. On a valid payload it shall generate a unique reference in the format `QUO-{ORG}-{YYYYMMDD}-{NNN}` where `NNN` is a zero-padded sequence of existing references for that org-date prefix, incremented by one. The created quote shall have `status = 'Draft'`, `inception_time` defaulting to `'00:00:00'`, `expiry_time` defaulting to `'23:59:59'`, `quote_currency` defaulting to `'USD'`, and `expiry_date` auto-computed as inception + 365 days when not supplied.
 
 **REQ-QUO-BE-NE-F-003:** The `QuotesService.findOne` method shall return the quote record when the query scoped to the caller's `orgCode` returns a match (`WHERE id = :id AND created_by_org_code = :orgCode`). It shall throw `NotFoundException` when no record matching both conditions is found. Org-level access control is enforced structurally at the query level; a separate `ForbiddenException` (403) is not applied in this method — from the caller's perspective, another org's quote simply does not exist (see OQ-QUO-BE-NE-003).
 
-**REQ-QUO-BE-NE-F-004:** The `QuotesService.update` method shall throw `NotFoundException` when no record exists. It shall throw `ForbiddenException` when `created_by_org_code` does not match. It shall throw `BadRequestException` when the quote status is `'Bound'` or `'Declined'`. On a valid request it shall apply only the explicitly enumerated mutable fields (`insured`, `insured_id`, `submission_id`, `business_type`, `inception_date`, `expiry_date`, `inception_time`, `expiry_time`, `quote_currency`, `payload`) and return the updated record. It shall never allow mutation of `reference`, `id`, `status`, `created_date`, or `created_by_org_code` via this method.
+**REQ-QUO-BE-NE-F-004:** The `QuotesService.update` method shall throw `NotFoundException` when no record exists. It shall throw `ForbiddenException` when `created_by_org_code` does not match. It shall throw `BadRequestException` when the quote status is `'Bound'` or `'Declined'`. On a valid request it shall apply only the explicitly enumerated mutable fields (`insured`, `insured_id`, `submission_id`, `business_type`, `inception_date`, `expiry_date`, `inception_time`, `expiry_time`, `quote_currency`, `payload`, all Block 2 fields from migration 093 per OQ-QUO-BE-NE-002: `year_of_account`, `lta_applicable`, `lta_start_date`, `lta_start_time`, `lta_expiry_date`, `lta_expiry_time`, `contract_type`, `method_of_placement`, `unique_market_reference`, `renewable_indicator`, `renewal_date`, `renewal_status`, and `renewal_time` from migration 105) and return the updated record. It shall never allow mutation of `reference`, `id`, `status`, `created_date`, or `created_by_org_code` via this method.
 
 ### Lifecycle Transitions
 
@@ -91,6 +99,14 @@ The following NestJS endpoints are covered by this requirements file. All endpoi
 **REQ-QUO-BE-NE-F-012:** The `QuotesService.createSection` method shall insert a new row into `quote_sections` with an auto-generated reference derived from the parent quote reference and the next available sequence number (e.g. `{quoteRef}-S01`). It shall throw `BadRequestException` when the parent quote status is `'Bound'` or `'Declined'`. It shall throw `NotFoundException` when the parent quote does not exist. It shall throw `ForbiddenException` when `orgCode` does not match. The response shall be the newly created section row and the HTTP status shall be 201.
 
 **REQ-QUO-BE-NE-F-013:** The `QuotesService.deleteSection` method shall soft-delete the section record by setting `deleted_at = NOW()`. It shall throw `NotFoundException` when the section does not exist for the given `id` and `sectionId`, or has already been soft-deleted. It shall throw `ForbiddenException` when the parent quote's `orgCode` does not match. The response shall be `{ message: 'Section deleted' }`.
+
+**REQ-QUO-BE-NE-F-020:** The `QuotesService.updateSection` method shall apply only the enumerated mutable fields from the request body to the identified `quote_sections` row and return the updated record. Fields that are absent from the body SHALL be left unchanged. It shall throw `NotFoundException` when the section does not exist for the given `id` and `sectionId`, or has already been soft-deleted. It shall throw `ForbiddenException` when the parent quote's `orgCode` (from the JWT) does not match `created_by_org_code` on the parent quote.
+
+**REQ-QUO-BE-NE-F-020a:** When `effective_date`, `effective_time`, or `tax_receivable` are present in the request body, they SHALL be persisted to the corresponding entity columns (`effectiveDate`, `effectiveTime`, `taxReceivable`).
+
+**REQ-QUO-BE-NE-F-020b:** After applying field updates, the server SHALL auto-compute `days_on_cover` using the formula `Math.round((new Date(expiryDate) - new Date(inceptionDate)) / 86400000) + 1`, where `inceptionDate` and `expiryDate` are taken from the saved entity state (after the update). If either `inceptionDate` or `expiryDate` is null or absent, `days_on_cover` SHALL be set to `null`.
+
+**REQ-QUO-BE-NE-F-020c:** The `updateSection` whitelist SHALL include the following additional columns added by migrations 102–104: `time_basis` (TEXT), `written_order_basis` (TEXT), `signed_order_basis` (TEXT), `written_line_total` (NUMERIC), `signed_line_total` (NUMERIC), `annual_gross_premium` (NUMERIC), `annual_net_premium` (NUMERIC), `delegated_authority_ref` (TEXT), `delegated_authority_section_ref` (TEXT). Fields absent from the request body SHALL be left unchanged (partial patch semantics — consistent with F-020).
 
 ### Coverages
 
@@ -128,7 +144,7 @@ The following NestJS endpoints are covered by this requirements file. All endpoi
 
 | Requirement ID | Test file | Test ID(s) |
 |---|---|---|
-| REQ-QUO-BE-NE-F-001 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R01 |
+| REQ-QUO-BE-NE-F-001 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R01, T-QUO-BE-NE-R01-date-a, T-QUO-BE-NE-R01-date-b, T-QUO-BE-NE-R01-date-c, T-QUO-BE-NE-R01-date-d |
 | REQ-QUO-BE-NE-F-002 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R02a, R02b, R02c |
 | REQ-QUO-BE-NE-F-003 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R03a, R03b, R03c |
 | REQ-QUO-BE-NE-F-004 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R04a, R04b, R04c, R04d |
@@ -146,6 +162,10 @@ The following NestJS endpoints are covered by this requirements file. All endpoi
 | REQ-QUO-BE-NE-F-011 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R11a, R11b |
 | REQ-QUO-BE-NE-F-012 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R12a, R12b, R12c |
 | REQ-QUO-BE-NE-F-013 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R13a, R13b |
+| REQ-QUO-BE-NE-F-020 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R14a, R14b, R14c, R14d, R14e |
+| REQ-QUO-BE-NE-F-020a | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R14f |
+| REQ-QUO-BE-NE-F-020b | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R14g, R14h |
+| REQ-QUO-BE-NE-F-020c | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R14i, R14j |
 | REQ-QUO-BE-NE-S-001 | controller integration test | pending |
 | REQ-QUO-BE-NE-S-002 | `backend/nest/src/quotes/quotes.spec.ts` | (NotFoundException / ForbiddenException paths above) |
 | REQ-QUO-BE-NE-S-003 | `backend/nest/src/quotes/quotes.spec.ts` | T-QUO-BE-NE-R04a |
@@ -178,3 +198,4 @@ The following NestJS endpoints are covered by this requirements file. All endpoi
 | 2026-03-25 | Initial creation — retroactive compliance with §03 Three-Artifact Rule. Covers all currently-implemented NestJS quotes service methods (F-001 to F-009, F-011 to F-013) plus planned Copy endpoint (F-010). Three violations acknowledged: sections added without requirements, copy not yet in NestJS, Block 2 entity gap. |
 | 2026-03-25 | F-003 amended — ForbiddenException removed; org-scoping enforced at query level (OQ-QUO-BE-NE-003). F-008/F-009 amended — delegate to AuditService; no direct DataSource.query (OQ-QUO-BE-NE-006). F-009 response shape updated to include `{ success, audit, otherUsersOpen }`. F-014 added — concurrent-user detection in postAudit response (OQ-AUDIT-001). F-010 amended — copy available from all statuses including Declined; declinature reason not copied (OQ-QUO-BE-NE-007). C-002/C-003 superseded. |
 | 2026-03-25 | F-010 further amended (Stage 2 prerequisite) — ForbiddenException for orgCode mismatch removed; replaced with NotFoundException (query-scoped lookup consistent with F-003). Traceability: R10c updated, R10d added. |
+| 2026-05-22 | F-001 amended — date range filtering added. `dateBasis` (`inception`/`expiry`/`created`) + `dateFrom`/`dateTo` params applied as inclusive bounds on the corresponding date column. Unrecognised `dateBasis` falls back to `created_date`. OQ-033 raised for timezone casting concern. Traceability: R01-date-a to R01-date-d added. |

@@ -24,6 +24,8 @@
   - `GET /api/report-templates/:id/history`
   - `GET /api/report-field-mappings/:domain`
   - `GET /api/date-basis`
+- New core-report datasource route:
+  - `GET /api/login-activity`
 - New route:
   - `POST /api/dashboards/widgets/data`
 
@@ -133,6 +135,16 @@ Acceptance criteria:
 - Metric responses contain exactly one computed numeric value.
 - Chart responses return grouped rows with labels and numeric values by measure.
 - Table responses return raw row objects keyed by the selected table column aliases.
+
+### R06 — Core Report: User Login Activity
+`GET /api/login-activity` shall return org-scoped login activity rows for the Reporting core report.
+
+Acceptance criteria:
+- The route is JWT-protected using the existing reporting controller guard.
+- Rows are limited to users with `last_login` populated.
+- Each row includes `user`, `loggedInDate`, and `durationOfLogin`.
+- `durationOfLogin` is returned as a human-readable string (`Xm` or `Xh Ym`).
+- Results are ordered by most recent `last_login` first.
 
 ## 5. Open Questions
 

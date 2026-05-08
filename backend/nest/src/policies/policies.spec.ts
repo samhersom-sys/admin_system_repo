@@ -407,13 +407,13 @@ describe('PoliciesService', () => {
     describe('getEndorsements', () => {
         it('T-POL-BE-R11a: returns endorsements for a valid policy', async () => {
             mockPolicyRepo.findOne.mockResolvedValue(makePolicy())
-            const endorsements = [{ id: 1, policy_id: 1, endorsement_type: 'Mid Term Adjustment' }]
+            const endorsements = [{ id: 1, policy_id: 1, transaction_type: 'Contractual', sub_type: 'Mid Term Adjustment' }]
             mockDataSource.query.mockResolvedValue(endorsements)
 
             const result = await service.getEndorsements(1, 'TST')
             expect(result).toEqual(endorsements)
             expect(mockDataSource.query).toHaveBeenCalledWith(
-                expect.stringContaining('policy_endorsements'),
+                expect.stringContaining('policy_transactions'),
                 [1],
             )
         })
@@ -429,9 +429,9 @@ describe('PoliciesService', () => {
     // REQ-POL-BE-F-012 — createEndorsement
     // -------------------------------------------------------------------------
     describe('createEndorsement', () => {
-        it('T-POL-BE-R12a: creates endorsement with Open status and returns it', async () => {
+        it('T-POL-BE-R12a: creates endorsement as a Draft policy transaction and returns it', async () => {
             mockPolicyRepo.findOne.mockResolvedValue(makePolicy())
-            const created = { id: 5, policy_id: 1, status: 'Open', endorsement_type: 'Mid Term Adjustment' }
+            const created = { id: 5, policy_id: 1, status: 'Draft', transaction_type: 'Contractual' }
             mockDataSource.query.mockResolvedValue([created])
 
             const result = await service.createEndorsement(
@@ -440,10 +440,10 @@ describe('PoliciesService', () => {
                 { endorsement_type: 'Mid Term Adjustment', effective_date: '2026-06-01' },
                 'user',
             )
-            expect(result).toEqual(created)
+            expect(result).toEqual({ ...created, sub_type: 'Mid Term Adjustment' })
             expect(mockDataSource.query).toHaveBeenCalledWith(
-                expect.stringContaining('policy_endorsements'),
-                expect.arrayContaining([1, 'Mid Term Adjustment', '2026-06-01']),
+                expect.stringContaining('policy_transactions'),
+                expect.arrayContaining([1, 'Contractual', '2026-06-01']),
             )
         })
 
@@ -476,15 +476,18 @@ describe('PoliciesService', () => {
     // REQ-POL-BE-F-013 — issueEndorsement
     // -------------------------------------------------------------------------
     describe('issueEndorsement', () => {
-        it('T-POL-BE-R13a: issues endorsement and returns updated record', async () => {
+        it('T-POL-BE-R13a: issues endorsement and returns policy + endorsement', async () => {
             mockPolicyRepo.findOne.mockResolvedValue(makePolicy())
-            const issued = { id: 5, policy_id: 1, status: 'Issued' }
+            const issued = { id: 5, policy_id: 1, status: 'Issued', payload: {} }
             mockDataSource.query.mockResolvedValue([issued])
 
             const result = await service.issueEndorsement(1, 5, 'TST', 'user')
-            expect(result).toEqual(issued)
+            expect(result).toEqual({
+                policy: makePolicy(),
+                endorsement: { ...issued, sub_type: null },
+            })
             expect(mockDataSource.query).toHaveBeenCalledWith(
-                expect.stringContaining('Issued'),
+                expect.stringContaining('Endorsed'),
                 expect.arrayContaining(['user', 5, 1]),
             )
         })

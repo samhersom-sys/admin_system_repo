@@ -2,17 +2,16 @@
  * TESTS — Settings Page tile grid & Platform Admin Panel
  *
  * Requirements: settings.requirements.md
- * Test IDs: T-SETTINGS-GRID-R* / T-SETTINGS-ADMIN-R*
+ * Test IDs: T-SETTINGS-GRID-R* / T-SETTINGS-ADMIN-R* / T-SETTINGS-DASH-R*
  */
 import React from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import SettingsPage from './index'
 import PlatformAdminPanel from './PlatformAdminPanel'
+import DashboardReportingSettingsPage from './DashboardReportingSettingsPage'
 
-// ---------------------------------------------------------------------------
 // Mocks
-// ---------------------------------------------------------------------------
 
 let mockRole = ''
 
@@ -21,6 +20,17 @@ jest.mock('@/shared/lib/auth-session/auth-session', () => ({
     token: 'tok',
     user: { id: '1', email: 'a@b.com', name: 'Test User', orgCode: 'TST', role: mockRole },
   }),
+}))
+
+jest.mock('./settings.service', () => ({
+  getMeasures: jest.fn(),
+  createMeasure: jest.fn(),
+  deactivateMeasure: jest.fn(),
+}))
+
+const mockAddNotification = jest.fn()
+jest.mock('@/shell/NotificationDock', () => ({
+  useNotifications: () => ({ addNotification: mockAddNotification }),
 }))
 
 // Wrap in MemoryRouter since tiles use <Link> / navigate
@@ -32,12 +42,14 @@ function renderSettings() {
   )
 }
 
+const { getMeasures, createMeasure, deactivateMeasure } = jest.requireMock('./settings.service')
+
 // ---------------------------------------------------------------------------
 // Tile grid — role visibility
 // ---------------------------------------------------------------------------
 
 describe('T-SETTINGS-GRID-R01: tiles shown to client_admin', () => {
-  it('renders all five standard tiles for client_admin', () => {
+  it('renders all six standard tiles for client_admin', () => {
     mockRole = 'client_admin'
     renderSettings()
     expect(screen.getByText('Account Administration')).toBeInTheDocument()
@@ -45,6 +57,7 @@ describe('T-SETTINGS-GRID-R01: tiles shown to client_admin', () => {
     expect(screen.getByText('Organisation Configuration')).toBeInTheDocument()
     expect(screen.getByText('Rating Rules')).toBeInTheDocument()
     expect(screen.getByText('Data Quality Configuration')).toBeInTheDocument()
+    expect(screen.getByText('Dashboard & Reporting')).toBeInTheDocument()
   })
 
   it('does NOT render Module Licensing tile for client_admin', () => {
@@ -55,7 +68,7 @@ describe('T-SETTINGS-GRID-R01: tiles shown to client_admin', () => {
 })
 
 describe('T-SETTINGS-GRID-R02: tiles shown to internal_admin', () => {
-  it('renders all six tiles including Module Licensing for internal_admin', () => {
+  it('renders all seven tiles including Module Licensing and Dashboard & Reporting for internal_admin', () => {
     mockRole = 'internal_admin'
     renderSettings()
     expect(screen.getByText('Account Administration')).toBeInTheDocument()
@@ -64,6 +77,7 @@ describe('T-SETTINGS-GRID-R02: tiles shown to internal_admin', () => {
     expect(screen.getByText('Rating Rules')).toBeInTheDocument()
     expect(screen.getByText('Data Quality Configuration')).toBeInTheDocument()
     expect(screen.getByText('Module Licensing')).toBeInTheDocument()
+    expect(screen.getByText('Dashboard & Reporting')).toBeInTheDocument()
   })
 })
 
@@ -167,3 +181,111 @@ describe('T-SETTINGS-ADMIN-R05: disabling Binding Authorities auto-disables Bord
   })
 })
 
+// ---------------------------------------------------------------------------
+// Dashboard & Reporting Settings page
+// ---------------------------------------------------------------------------
+
+const INTERNAL_MEASURE = {
+  id: 1, key: 'countAll', label: 'Count of Policies', sourceKey: 'policies',
+  measureType: 'count', scope: 'both', createdByType: 'internal', orgCode: null, isActive: true,
+}
+const TENANT_MEASURE = {
+  id: 2, key: 'countMine', label: 'My Custom Count', sourceKey: 'policies',
+  measureType: 'count', scope: 'org', createdByType: 'tenant', orgCode: 'TST', isActive: true,
+}
+
+function renderDashPage() {
+  return render(
+    <MemoryRouter>
+      <DashboardReportingSettingsPage />
+    </MemoryRouter>
+  )
+}
+
+describe('T-SETTINGS-DASH-R001: Dashboard & Reporting tile is present on settings page', () => {
+  it('shows Dashboard & Reporting tile for client_admin', () => {
+    mockRole = 'client_admin'
+    renderSettings()
+    expect(screen.getByText('Dashboard & Reporting')).toBeInTheDocument()
+  })
+
+  it('shows Dashboard & Reporting tile for internal_admin', () => {
+    mockRole = 'internal_admin'
+    renderSettings()
+    expect(screen.getByText('Dashboard & Reporting')).toBeInTheDocument()
+  })
+
+  it('does NOT show Dashboard & Reporting tile for underwriter', () => {
+    mockRole = 'underwriter'
+    renderSettings()
+    expect(screen.queryByText('Dashboard & Reporting')).not.toBeInTheDocument()
+  })
+})
+
+describe('T-SETTINGS-DASH-R002a: DashboardReportingSettingsPage loading state', () => {
+  it('shows a loading spinner while measures are loading', () => {
+    getMeasures.mockReturnValue(new Promise(() => {}))
+    renderDashPage()
+    expect(screen.getByLabelText('Loading measures')).toBeInTheDocument()
+  })
+})
+
+describe('T-SETTINGS-DASH-R002b: DashboardReportingSettingsPage error state', () => {
+  it('shows error message when API fails', async () => {
+    getMeasures.mockRejectedValue(new Error('Network error'))
+    renderDashPage()
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Network error'))
+  })
+})
+
+describe('T-SETTINGS-DASH-R001: page renders internal and custom measures in separate sections', () => {
+  it('shows internal measures as read-only and custom measures with deactivate button', async () => {
+    getMeasures.mockResolvedValue([INTERNAL_MEASURE, TENANT_MEASURE])
+    renderDashPage()
+
+    await waitFor(() => expect(screen.getByText('Count of Policies')).toBeInTheDocument())
+
+    expect(screen.getByText('My Custom Count')).toBeInTheDocument()
+
+    // Deactivate button only for tenant measure
+    expect(screen.getByRole('button', { name: /Deactivate My Custom Count/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Deactivate Count of Policies/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('T-SETTINGS-DASH-R003a: deactivate success removes row from list', () => {
+  it('removes tenant measure row after successful deactivation', async () => {
+    getMeasures.mockResolvedValue([TENANT_MEASURE])
+    deactivateMeasure.mockResolvedValue(undefined)
+    renderDashPage()
+
+    await waitFor(() => expect(screen.getByText('My Custom Count')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: /Deactivate My Custom Count/ }))
+
+    await waitFor(() => expect(screen.queryByText('My Custom Count')).not.toBeInTheDocument())
+    expect(deactivateMeasure).toHaveBeenCalledWith(2)
+  })
+})
+
+describe('T-SETTINGS-DASH-R004: Add Custom Measure form creates a new measure', () => {
+  it('shows form on click and submits POST, adding the new row', async () => {
+    getMeasures.mockResolvedValue([])
+    createMeasure.mockResolvedValue({ ...TENANT_MEASURE, key: 'myNew', label: 'Brand New Measure' })
+    renderDashPage()
+
+    await waitFor(() => expect(screen.getByText('Add Custom Measure')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByText('Add Custom Measure'))
+
+    expect(screen.getByRole('form', { name: 'Add custom measure form' })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByPlaceholderText(/e.g. countActiveRenewals/), { target: { value: 'myNew' } })
+    fireEvent.change(screen.getByPlaceholderText(/e.g. Active Renewals/), { target: { value: 'Brand New Measure' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Measure' }))
+
+    await waitFor(() => expect(screen.getByText('Brand New Measure')).toBeInTheDocument())
+    expect(createMeasure).toHaveBeenCalledWith(expect.objectContaining({ key: 'myNew', label: 'Brand New Measure' }))
+  })
+})

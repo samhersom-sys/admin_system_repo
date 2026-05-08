@@ -47,7 +47,7 @@ export class DashboardController {
     // REQ-DASH-STUB-F-008
     @Get('recent-records-data')
     getRecentRecords(@Req() req: any) {
-        return this.dashboardService.getRecentRecords(req.user.orgCode)
+        return this.dashboardService.getRecentRecords(req.user.orgCode, req.user.id, req.user.username ?? req.user.email ?? null)
     }
 
     // REQ-DASH-STUB-F-009

@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  HttpStatus,
   Post,
   Put,
   Delete,
@@ -33,6 +34,27 @@ export class BindingAuthoritiesController {
   @Get('binding-authorities/:id')
   findOne(@Req() req: any, @Param('id') id: string) {
     return this.baService.findOne(req.user.orgCode, +id)
+  }
+
+  @Get('binding-authorities/:id/audit')
+  getAudit(@Req() req: any, @Param('id') id: string) {
+    return this.baService.getAudit(req.user.orgCode, +id)
+  }
+
+  @Post('binding-authorities/:id/audit')
+  @HttpCode(HttpStatus.CREATED)
+  postAudit(@Req() req: any, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.baService.postAudit(req.user.orgCode, +id, req.user, body)
+  }
+
+  @Get('lookups/classesOfBusiness')
+  listClassesOfBusiness() {
+    return this.baService.listClassesOfBusiness()
+  }
+
+  @Get('lookups/currencies')
+  listCurrencies() {
+    return this.baService.listCurrencies()
   }
 
   @Post('binding-authorities')
@@ -143,6 +165,51 @@ export class BindingAuthoritiesController {
     @Body() body: Record<string, unknown>,
   ) {
     return this.baService.updateTransaction(req.user.orgCode, +id, +transId, body)
+  }
+
+  @Get('binding-authorities/:id/transactions/:txId/sections/:sectionId')
+  getBASectionTransaction(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('txId') txId: string,
+    @Param('sectionId') sectionId: string,
+  ) {
+    return this.baService.getSectionTransaction(req.user.orgCode, +id, +txId, +sectionId)
+  }
+
+  // ------------------------------------------------------------------
+  // Bordereau Configs
+  // ------------------------------------------------------------------
+
+  @Get('binding-authorities/:id/bordereau-configs')
+  getBordereauConfigs(@Req() req: any, @Param('id') id: string) {
+    return this.baService.getBordereauConfigs(req.user.orgCode, +id)
+  }
+
+  @Post('binding-authorities/:id/bordereau-configs')
+  @HttpCode(201)
+  createBordereauConfig(@Req() req: any, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.baService.createBordereauConfig(req.user.orgCode, +id, body)
+  }
+
+  @Put('binding-authorities/:id/bordereau-configs/:configId')
+  updateBordereauConfig(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('configId') configId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.baService.updateBordereauConfig(req.user.orgCode, +id, configId, body)
+  }
+
+  @Delete('binding-authorities/:id/bordereau-configs/:configId')
+  @HttpCode(204)
+  deleteBordereauConfig(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('configId') configId: string,
+  ) {
+    return this.baService.deleteBordereauConfig(req.user.orgCode, +id, configId)
   }
 
   // ------------------------------------------------------------------

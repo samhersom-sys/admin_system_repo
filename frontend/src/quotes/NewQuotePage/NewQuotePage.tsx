@@ -12,7 +12,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { FiSave } from 'react-icons/fi'
+import { FiSave, FiTrash2 } from 'react-icons/fi'
 import { getSession } from '@/shared/lib/auth-session/auth-session'
 import { createQuote, defaultQuoteExpiry } from '@/quotes/quotes.service'
 import { getSubmission } from '@/submissions/submissions.service'
@@ -187,16 +187,17 @@ export default function NewQuotePage() {
                 <div className="p-4 flex flex-col gap-3">
                     <h2 className="text-sm font-semibold text-gray-700">Linked Submission <span className="text-red-500">*</span></h2>
                     {linkedSubmission ? (
-                        <div className="flex items-center gap-3">
-                            <span className="text-sm font-medium text-brand-700">{linkedSubmission.reference}</span>
-                            <span className="text-sm text-gray-500">{linkedSubmission.insured}</span>
+                        <div className="flex items-center w-full border border-gray-300 rounded px-3 py-1.5 text-sm">
+                            <span className="text-gray-700 font-medium">{linkedSubmission.reference}</span>
+                            {linkedSubmission.insured && <span className="text-gray-500 ml-2">{linkedSubmission.insured}</span>}
                             {!linkedSubmissionId && (
                                 <button
                                     type="button"
+                                    aria-label="Unlink submission"
                                     onClick={() => { setLinkedSubmission(null); setSubmissionError(null) }}
-                                    className="text-xs text-red-600 hover:text-red-800 ml-auto"
+                                    className="ml-auto text-gray-400 hover:text-red-600 flex-shrink-0"
                                 >
-                                    Unlink
+                                    <FiTrash2 size={14} />
                                 </button>
                             )}
                         </div>

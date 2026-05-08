@@ -7,6 +7,7 @@ import {
   FiSliders,
   FiAlertTriangle,
   FiLayers,
+  FiBarChart2,
   FiChevronRight,
 } from 'react-icons/fi'
 import { getSession } from '@/shared/lib/auth-session/auth-session'
@@ -69,6 +70,13 @@ const ALL_TILES: Tile[] = [
     icon: FiLayers,
     path: '/settings/module-licensing',
     roles: ['internal_admin'],
+  },
+  {
+    title: 'Dashboard & Reporting',
+    description: 'Manage custom measures and reporting configuration for your organisation.',
+    icon: FiBarChart2,
+    path: '/settings/dashboard-reporting',
+    roles: ['client_admin', 'internal_admin'],
   },
 ]
 

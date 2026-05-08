@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { FiPlus, FiSave, FiTrash2, FiX } from 'react-icons/fi'
+import { FiEdit2, FiPlus, FiSave, FiTrash2, FiX } from 'react-icons/fi'
 import Card from '@/shared/Card/Card'
 import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
 import { useNotifications } from '@/shell/NotificationDock'
@@ -15,6 +15,7 @@ import {
     type DashboardWidget,
     type DashboardWidgetType,
     type DashboardChartType,
+    type DashboardWidgetFilter,
     type FieldMapping,
 } from '@/reporting/reporting.service'
 import { DASHBOARD_TEMPLATES } from '@/reporting/DashboardCreatePage/DashboardTemplates'
@@ -82,6 +83,9 @@ function normalizeWidget(widget: Partial<DashboardWidget>): DashboardWidget {
         categoryLabel: widget.categoryLabel ?? '',
         aggregation: widget.aggregation ?? 'count',
         note: widget.note ?? '',
+        filters: Array.isArray(widget.filters) ? widget.filters : [],
+        ignoresDashboardFilters: widget.ignoresDashboardFilters ?? false,
+        showTitle: widget.showTitle ?? true,
     }
 }
 
@@ -167,13 +171,11 @@ export default function DashboardConfigurePage() {
         }))), [fieldMappings])
 
     const allMeasureFields = useMemo(() => {
-        const numeric = allFields.filter((field) => field.type === 'number')
-        return numeric.length > 0 ? numeric : allFields
+        return allFields.filter((field) => field.type === 'count' || field.type === 'number')
     }, [allFields])
 
     const allAttributeFields = useMemo(() => {
-        const attributes = allFields.filter((field) => field.type !== 'number')
-        return attributes.length > 0 ? attributes : allFields
+        return allFields.filter((field) => field.type !== 'count' && field.type !== 'number')
     }, [allFields])
 
     function isMeasureField(value: string | null | undefined) {
@@ -233,10 +235,6 @@ export default function DashboardConfigurePage() {
             addNotification('Widget title is required.', 'error')
             return
         }
-        if (draftWidget.type === 'metric' && !draftWidget.metric) {
-            addNotification('Select a measure for the metric widget.', 'error')
-            return
-        }
         if (draftWidget.type === 'chart' && (!draftWidget.attribute || getChartMeasures(draftWidget).length === 0)) {
             addNotification('Chart widgets require an attribute and at least one measure.', 'error')
             return
@@ -280,6 +278,23 @@ export default function DashboardConfigurePage() {
         }))
     }
 
+    function addWidgetFilter() {
+        setDraftWidget((prev) => prev ? { ...prev, filters: [...(prev.filters ?? []), { field: '', operator: 'equals' as const, value: '' }] } : prev)
+    }
+
+    function updateWidgetFilter(idx: number, key: 'field' | 'operator' | 'value', value: string) {
+        setDraftWidget((prev) => {
+            if (!prev) return prev
+            const filters = [...(prev.filters ?? [])]
+            filters[idx] = { ...filters[idx], [key]: value }
+            return { ...prev, filters }
+        })
+    }
+
+    function removeWidgetFilter(idx: number) {
+        setDraftWidget((prev) => prev ? { ...prev, filters: (prev.filters ?? []).filter((_, i) => i !== idx) } : prev)
+    }
+
     async function handleSave() {
         if (!id) return
         try {
@@ -312,14 +327,19 @@ export default function DashboardConfigurePage() {
             )
         }
 
+        const maxRow = Math.max(...template.slots.map((s) => s.row + s.rowSpan))
+
         return (
-            <div className="grid grid-cols-4 gap-3 auto-rows-[110px]">
+            <div
+                className="grid grid-cols-4 gap-3 flex-1 min-h-0"
+                style={{ gridTemplateRows: `repeat(${maxRow}, 1fr)` }}
+            >
                 {template.slots.map((slot) => {
                     const widget = getWidgetsForSlot(slot.id, section?.id)[0]
                     return (
                         <div
                             key={`${section?.id ?? 'page'}-${slot.id}`}
-                            className="rounded-xl border border-gray-200 p-3 flex flex-col justify-between"
+                            className="rounded-xl border border-gray-200 p-3 flex flex-col justify-between overflow-hidden"
                             style={{
                                 gridColumn: `span ${gridSpan(slot.colSpan)} / span ${gridSpan(slot.colSpan)}`,
                                 gridRow: `span ${gridSpan(slot.rowSpan)} / span ${gridSpan(slot.rowSpan)}`,
@@ -327,16 +347,29 @@ export default function DashboardConfigurePage() {
                         >
                             <div className="flex items-start justify-between gap-2">
                                 <p className="text-xs font-semibold text-gray-500">Slot {slot.id}</p>
-                                {widget && (
+                                <div className="flex items-center gap-1">
+                                    {widget?.ignoresDashboardFilters && (
+                                        <span className="text-xs bg-amber-100 text-amber-700 rounded px-1" title="Independent widget — ignores dashboard filters">Indep.</span>
+                                    )}
                                     <button
                                         type="button"
-                                        onClick={() => removeWidget(slot.id, section?.id)}
-                                        className="text-gray-400 hover:text-red-600"
-                                        title="Remove widget"
+                                        onClick={() => openEditor(slot.id, section?.id)}
+                                        className="text-gray-400 hover:text-brand-600"
+                                        title={widget ? 'Edit widget' : 'Add widget'}
                                     >
-                                        <FiTrash2 size={14} />
+                                        {widget ? <FiEdit2 size={14} /> : <FiPlus size={14} />}
                                     </button>
-                                )}
+                                    {widget && (
+                                        <button
+                                            type="button"
+                                            onClick={() => removeWidget(slot.id, section?.id)}
+                                            className="text-gray-400 hover:text-red-600"
+                                            title="Remove widget"
+                                        >
+                                            <FiTrash2 size={14} />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex-1 min-h-0">
                                 {widget ? <DashboardLiveWidget widget={widget} filters={liveFilters} getFieldLabel={getFieldLabel} /> : (
@@ -346,17 +379,6 @@ export default function DashboardConfigurePage() {
                                     </div>
                                 )}
                             </div>
-                            {widget && (
-                                <p className="text-xs text-gray-500 truncate">{summarizeWidget(widget)}</p>
-                            )}
-                            <button
-                                type="button"
-                                onClick={() => openEditor(slot.id, section?.id)}
-                                className="inline-flex items-center gap-2 self-start rounded-lg border border-brand-300 bg-white px-3 py-1.5 text-sm text-brand-700 hover:bg-brand-50"
-                            >
-                                <FiPlus size={14} />
-                                {widget ? 'Edit Widget' : 'Add Widget'}
-                            </button>
                         </div>
                     )
                 })}
@@ -367,14 +389,14 @@ export default function DashboardConfigurePage() {
     if (loading) return <LoadingSpinner />
 
     return (
-        <div className="p-6 flex flex-col gap-6" aria-busy={saving}>
+        <div className="p-6 flex flex-col gap-6 h-full" aria-busy={saving}>
             <div>
                 <h2 className="text-2xl font-semibold text-gray-900">Configure Dashboard Widgets</h2>
                 <p className="text-sm text-gray-500">{dashboardName}</p>
             </div>
 
-            <Card>
-                <div className="p-6 flex flex-col gap-4">
+            <div className="rounded-lg border border-gray-200 bg-white shadow-sm flex-1 flex flex-col min-h-0">
+                <div className="p-6 flex flex-col gap-4 flex-1 min-h-0">
                     <div className="flex flex-wrap gap-2">
                         {pages.map((page) => (
                             <button
@@ -401,7 +423,7 @@ export default function DashboardConfigurePage() {
                             ))}
                         </div>
                     ) : currentPage ? (
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-3 flex-1 min-h-0">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-sm font-semibold text-gray-800">{currentPage.name}</h3>
                                 <span className="text-xs text-gray-500">Template: {getTemplateId(currentPage) ?? 'None'}</span>
@@ -410,11 +432,11 @@ export default function DashboardConfigurePage() {
                         </div>
                     ) : null}
                 </div>
-            </Card>
+            </div>
 
             {editor && draftWidget && (
                 <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
-                    <Card className="w-full max-w-xl">
+                    <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                         <div className="p-6 flex flex-col gap-4">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-lg font-semibold text-gray-900">{editor.widget ? 'Edit Widget' : 'Add Widget'}</h3>
@@ -432,6 +454,16 @@ export default function DashboardConfigurePage() {
                                         onChange={(e) => setDraftWidget((prev) => prev ? { ...prev, title: e.target.value } : prev)}
                                         className="border border-gray-300 rounded px-3 py-2 text-sm"
                                     />
+                                </div>
+                                <div className="sm:col-span-2 flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="widget-show-title"
+                                        checked={draftWidget.showTitle ?? true}
+                                        onChange={(e) => setDraftWidget((prev) => prev ? { ...prev, showTitle: e.target.checked } : prev)}
+                                        className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                                    />
+                                    <label htmlFor="widget-show-title" className="text-sm font-medium text-gray-700">Show Title</label>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <label className="text-sm font-medium text-gray-700" htmlFor="widget-type">Widget Type</label>
@@ -481,23 +513,11 @@ export default function DashboardConfigurePage() {
                                             >
                                                 <option value="">Select measure</option>
                                                 {allMeasureFields.map((field) => (
-                                                    <option key={field.compositeKey} value={field.compositeKey}>{field.label} ({field.domain})</option>
+                                                    <option key={field.compositeKey} value={field.compositeKey}>{field.label}</option>
                                                 ))}
                                             </select>
                                         </div>
-                                        <div className="flex flex-col gap-1">
-                                            <label className="text-sm font-medium text-gray-700" htmlFor="widget-aggregation">Aggregation</label>
-                                            <select
-                                                id="widget-aggregation"
-                                                value={draftWidget.aggregation ?? 'count'}
-                                                onChange={(e) => setDraftWidget((prev) => prev ? { ...prev, aggregation: e.target.value as DashboardWidget['aggregation'] } : prev)}
-                                                className="border border-gray-300 rounded px-3 py-2 text-sm"
-                                            >
-                                                {AGGREGATIONS.map((aggregation) => (
-                                                    <option key={aggregation} value={aggregation}>{aggregation}</option>
-                                                ))}
-                                            </select>
-                                        </div>
+
                                     </>
                                 )}
                                 {draftWidget.type === 'chart' && (
@@ -527,7 +547,7 @@ export default function DashboardConfigurePage() {
                                                     >
                                                         <option value="">Select category</option>
                                                         {allAttributeFields.map((field) => (
-                                                            <option key={field.compositeKey} value={field.compositeKey}>{field.label} ({field.domain})</option>
+                                                            <option key={field.compositeKey} value={field.compositeKey}>{field.label}</option>
                                                         ))}
                                                     </select>
                                                 </div>
@@ -555,7 +575,7 @@ export default function DashboardConfigurePage() {
                                                     >
                                                         <option value="">Select x-axis field</option>
                                                         {allFields.map((field) => (
-                                                            <option key={field.compositeKey} value={field.compositeKey}>{field.label} ({field.domain})</option>
+                                                            <option key={field.compositeKey} value={field.compositeKey}>{field.label}</option>
                                                         ))}
                                                     </select>
                                                 </div>
@@ -570,17 +590,6 @@ export default function DashboardConfigurePage() {
                                                         placeholder="e.g. Month"
                                                     />
                                                 </div>
-                                                <div className="flex flex-col gap-1 sm:col-span-2">
-                                                    <label className="text-sm font-medium text-gray-700" htmlFor="widget-y-axis-label">Y-Axis Label</label>
-                                                    <input
-                                                        id="widget-y-axis-label"
-                                                        type="text"
-                                                        value={draftWidget.yAxisLabel ?? ''}
-                                                        onChange={(e) => setDraftWidget((prev) => prev ? { ...prev, yAxisLabel: e.target.value } : prev)}
-                                                        className="border border-gray-300 rounded px-3 py-2 text-sm"
-                                                        placeholder="e.g. Premium"
-                                                    />
-                                                </div>
                                                 <div className="flex flex-col gap-1">
                                                     <label className="text-sm font-medium text-gray-700" htmlFor="widget-y-axis-attribute">Y-Axis Field</label>
                                                     <select
@@ -591,11 +600,22 @@ export default function DashboardConfigurePage() {
                                                     >
                                                         <option value="">Select y-axis field</option>
                                                         {allFields.map((field) => (
-                                                            <option key={field.compositeKey} value={field.compositeKey}>{field.label} ({field.domain})</option>
+                                                            <option key={field.compositeKey} value={field.compositeKey}>{field.label}</option>
                                                         ))}
                                                     </select>
                                                 </div>
                                                 <div className="flex flex-col gap-1">
+                                                    <label className="text-sm font-medium text-gray-700" htmlFor="widget-y-axis-label">Y-Axis Label</label>
+                                                    <input
+                                                        id="widget-y-axis-label"
+                                                        type="text"
+                                                        value={draftWidget.yAxisLabel ?? ''}
+                                                        onChange={(e) => setDraftWidget((prev) => prev ? { ...prev, yAxisLabel: e.target.value } : prev)}
+                                                        className="border border-gray-300 rounded px-3 py-2 text-sm"
+                                                        placeholder="e.g. Premium"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-1 sm:col-span-2">
                                                     <label className="text-sm font-medium text-gray-700" htmlFor="widget-legend-attribute">Legend Split By</label>
                                                     <select
                                                         id="widget-legend-attribute"
@@ -605,28 +625,59 @@ export default function DashboardConfigurePage() {
                                                     >
                                                         <option value="">No legend split</option>
                                                         {allAttributeFields.map((field) => (
-                                                            <option key={field.compositeKey} value={field.compositeKey}>{field.label} ({field.domain})</option>
+                                                            <option key={field.compositeKey} value={field.compositeKey}>{field.label}</option>
                                                         ))}
                                                     </select>
                                                 </div>
                                             </>
                                         )}
-                                        <fieldset className="sm:col-span-2 flex flex-col gap-2">
-                                            <legend className="text-sm font-medium text-gray-700">Measures</legend>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded border border-gray-200 p-3 max-h-44 overflow-y-auto">
-                                                {allMeasureFields.map((field) => (
-                                                    <label key={field.compositeKey} className="flex items-center gap-2 text-sm text-gray-700">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={draftWidget.measures?.includes(field.compositeKey) ?? false}
-                                                            onChange={() => setDraftWidget((prev) => prev ? { ...prev, measures: toggleSelection(prev.measures ?? [], field.compositeKey) } : prev)}
-                                                            className="h-4 w-4 rounded border-gray-300 text-brand-600"
-                                                        />
-                                                        {field.label} ({field.domain})
-                                                    </label>
-                                                ))}
+                                        <div className="sm:col-span-2 flex flex-col gap-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm font-medium text-gray-700">Measures</span>
+                                                {allMeasureFields.filter((f) => !(draftWidget.measures ?? []).includes(f.compositeKey)).length > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const first = allMeasureFields.find((f) => !(draftWidget.measures ?? []).includes(f.compositeKey))
+                                                            if (first) setDraftWidget((prev) => prev ? { ...prev, measures: [...(prev.measures ?? []), first.compositeKey] } : prev)
+                                                        }}
+                                                        className="text-sm text-brand-600 hover:underline"
+                                                    >+ Add Measure</button>
+                                                )}
                                             </div>
-                                        </fieldset>
+                                            {(draftWidget.measures ?? []).length === 0 ? (
+                                                <p className="text-xs text-gray-400">None added.</p>
+                                            ) : (
+                                                (draftWidget.measures ?? []).map((key, idx) => (
+                                                    <div key={key} className="flex items-center gap-2">
+                                                        <select
+                                                            value={key}
+                                                            aria-label={`Measure ${idx + 1}`}
+                                                            onChange={(e) => setDraftWidget((prev) => {
+                                                                if (!prev) return prev
+                                                                const updated = [...(prev.measures ?? [])]
+                                                                updated[idx] = e.target.value
+                                                                return { ...prev, measures: updated }
+                                                            })}
+                                                            className="border border-gray-300 rounded px-2 py-1 text-sm flex-1"
+                                                        >
+                                                            {allMeasureFields
+                                                                .filter((f) => f.compositeKey === key || !(draftWidget.measures ?? []).includes(f.compositeKey))
+                                                                .map((f) => (
+                                                                    <option key={f.compositeKey} value={f.compositeKey}>{f.label}</option>
+                                                                ))}
+                                                        </select>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDraftWidget((prev) => prev ? { ...prev, measures: (prev.measures ?? []).filter((_, i) => i !== idx) } : prev)}
+                                                            className="text-gray-400 hover:text-red-500"
+                                                        >
+                                                            <FiX size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
                                     </>
                                 )}
                                 {draftWidget.type === 'table' && (
@@ -641,14 +692,55 @@ export default function DashboardConfigurePage() {
                                                         onChange={() => setDraftWidget((prev) => prev ? { ...prev, attributes: toggleSelection(prev.attributes ?? [], field.compositeKey) } : prev)}
                                                         className="h-4 w-4 rounded border-gray-300 text-brand-600"
                                                     />
-                                                    {field.label} ({field.domain})
+                                                    {field.label}
                                                 </label>
                                             ))}
                                         </div>
                                     </fieldset>
                                 )}
                             </div>
-                            <div className="flex justify-end gap-2">
+                            {/* ignoresDashboardFilters toggle — REQ-RPT-FE-F-044 */}
+                            <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                                <input
+                                    type="checkbox"
+                                    id="widget-ignore-dashboard-filters"
+                                    checked={draftWidget.ignoresDashboardFilters ?? false}
+                                    onChange={(e) => setDraftWidget((prev) => prev ? { ...prev, ignoresDashboardFilters: e.target.checked } : prev)}
+                                    className="h-4 w-4 rounded border-gray-300 text-brand-600"
+                                />
+                                <label htmlFor="widget-ignore-dashboard-filters" className="text-sm font-medium text-gray-700">
+                                    Independent widget — not affected by dashboard filters
+                                </label>
+                            </div>
+                            {/* Widget Filters — REQ-RPT-FE-F-043 */}
+                            <div className="flex flex-col gap-2 pt-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium text-gray-700">Widget Filters</span>
+                                    <button type="button" onClick={addWidgetFilter} className="text-sm text-brand-600 hover:underline">+ Add filter</button>
+                                </div>
+                                {(draftWidget.filters ?? []).length === 0 ? (
+                                    <p className="text-xs text-gray-400">No widget-specific filters applied.</p>
+                                ) : (
+                                    (draftWidget.filters ?? []).map((filter, idx) => (
+                                        <div key={idx} className="flex items-center gap-2">
+                                            <select value={filter.field} onChange={(e) => updateWidgetFilter(idx, 'field', e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-sm flex-1">
+                                                <option value="">Select field</option>
+                                                {allFields.map((f) => <option key={f.compositeKey} value={f.compositeKey}>{f.label}</option>)}
+                                            </select>
+                                            <select value={filter.operator} onChange={(e) => updateWidgetFilter(idx, 'operator', e.target.value as DashboardWidgetFilter['operator'])} className="border border-gray-300 rounded px-2 py-1 text-sm">
+                                                <option value="equals">equals</option>
+                                                <option value="not_equals">≠</option>
+                                                <option value="contains">contains</option>
+                                                <option value="greater_than">&gt;</option>
+                                                <option value="less_than">&lt;</option>
+                                            </select>
+                                            <input value={filter.value} onChange={(e) => updateWidgetFilter(idx, 'value', e.target.value)} className="border border-gray-300 rounded px-2 py-1 text-sm flex-1" placeholder="Value" />
+                                            <button type="button" onClick={() => removeWidgetFilter(idx)} className="text-gray-400 hover:text-red-600"><FiX size={14} /></button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
                                 <button type="button" onClick={() => { setEditor(null); setDraftWidget(null) }} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
                                 <button type="button" onClick={saveWidgetLocally} className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700">Save Widget</button>
                             </div>

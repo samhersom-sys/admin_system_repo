@@ -36,6 +36,16 @@ const DATA_SOURCES = [
     { key: 'claims', label: 'Claims' },
 ]
 
+const DOMAIN_SINGULAR: Record<string, string> = {
+    submissions: 'Submission',
+    quotes: 'Quote',
+    policies: 'Policy',
+    policyTransactions: 'Policy Transaction',
+    bindingAuthorities: 'Binding Authority',
+    parties: 'Party',
+    claims: 'Claim',
+}
+
 const OPERATORS = [
     'equals', 'not_equals', 'contains', 'not_contains',
     'starts_with', 'ends_with', 'greater_than', 'less_than', 'in',
@@ -652,9 +662,10 @@ export default function ReportCreatePage() {
                                 className="border border-gray-300 rounded px-3 py-2 text-sm"
                             >
                                 <option value="">— Select —</option>
-                                {dateBasisOptions.map((o) => (
-                                    <option key={o} value={o}>{o}</option>
-                                ))}
+                                {dateBasisOptions.map((o) => {
+                                    const prefix = DOMAIN_SINGULAR[form.data_source ?? '']
+                                    return <option key={o} value={o}>{prefix ? `${prefix} ${o}` : o}</option>
+                                })}
                             </select>
                         </div>
                         <div className="flex flex-col gap-1">

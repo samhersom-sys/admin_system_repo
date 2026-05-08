@@ -349,6 +349,23 @@ export class SubmissionsService {
     if (placingBroker != null) existing.placingBroker = placingBroker
     if (placingBrokerId != null) existing.brokerId = placingBrokerId
     if (placingBrokerName != null) existing.placingBrokerName = placingBrokerName
+    // Gap-fill fields — migrations 106–108 (REQ-SUB-BE-F-026)
+    if (body.workflowNotes != null) existing.workflowNotes = body.workflowNotes
+    if (body.aiExtracted != null) existing.aiExtracted = body.aiExtracted
+    if (body.reviewRequired != null) existing.reviewRequired = body.reviewRequired
+    if (body.emailSource != null) existing.emailSource = body.emailSource
+    if (body.emailReceivedDate != null) existing.emailReceivedDate = body.emailReceivedDate
+    if (body.emailProcessedDate != null) existing.emailProcessedDate = body.emailProcessedDate
+    if (body.extractionConfidence != null) existing.extractionConfidence = body.extractionConfidence
+    if (body.assignedBy != null) existing.assignedBy = body.assignedBy
+    if (body.assignedDate != null) existing.assignedDate = body.assignedDate
+    if (body.clearanceStatus != null) existing.clearanceStatus = body.clearanceStatus
+    if (body.clearanceStatusCode != null) existing.clearanceStatusCode = body.clearanceStatusCode
+    if (body.clearanceNotes != null) existing.clearanceNotes = body.clearanceNotes
+    if (body.clearanceMatchedSubmissions != null) existing.clearanceMatchedSubmissions = body.clearanceMatchedSubmissions
+    if (body.clearanceReviewedBy != null) existing.clearanceReviewedBy = body.clearanceReviewedBy
+    if (body.clearanceReviewedDate != null) existing.clearanceReviewedDate = body.clearanceReviewedDate
+    if (body.autoClearanceChecked != null) existing.autoClearanceChecked = body.autoClearanceChecked
 
     return this.submissionRepo.save(existing)
   }
