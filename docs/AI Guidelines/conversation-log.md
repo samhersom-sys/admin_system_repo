@@ -908,3 +908,26 @@ Removed defaultMode and etchWithAuditOrFallback dead code from search.service.t
 
 **Open Questions / Deferred:**
 - None
+
+---
+
+### [2026-05-08] --- Fix CI db:seed failures: missing TypeORM entity columns
+
+**Request:**
+CI backend job was failing at step 8 (db:seed) in every run. Previous session had fixed db:sync (step 7) and added the SystemErrorCatalog entity (seed 023), but step 8 continued to fail in exactly 3 seconds. Objective: identify and fix all remaining seed failures so CI goes fully green.
+
+**Outcome:**
+Reproduced the CI conditions locally by creating a fresh policyforge_test_ci database, running db:sync against it, then running all 32 seed scripts sequentially. Identified three seeds that failed and four entity fixes required:
+- Seed 029 (quote_section_coverages): QuoteSectionCoverage entity was missing days_on_cover column.
+- Seed 031 (binding_authority_transactions): BATransaction entity was missing deleted_at and sequence_number columns; BindingAuthority entity was missing deleted_at (seed 031 queries binding_authorities WHERE deleted_at IS NULL).
+- Seed 032 (measure_definitions): MeasureDefinition entity was missing @Unique(['key','orgCode']) composite constraint required for the seed's ON CONFLICT (key, org_code) DO NOTHING clause.
+All 4 fixes applied, all 32 seeds confirmed passing locally, committed as 3ba2203 and pushed to origin/development. CI run #60 completed with conclusion: success.
+
+**Files Changed:**
+- backend/nest/src/entities/policy-section-coverage.entity.ts -- QuoteSectionCoverage: add daysOnCover column
+- backend/nest/src/entities/ba-transaction.entity.ts -- BATransaction: add deletedAt and sequenceNumber columns
+- backend/nest/src/entities/binding-authority.entity.ts -- BindingAuthority: add deletedAt column
+- backend/nest/src/measures/measure-definition.entity.ts -- MeasureDefinition: add @Unique(['key','orgCode'])
+
+**Open Questions / Deferred:**
+- None
