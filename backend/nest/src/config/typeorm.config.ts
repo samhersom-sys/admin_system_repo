@@ -149,12 +149,16 @@ export const typeOrmOptions: DataSourceOptions = {
     MeasureDefinition, MeasureDefinitionHistory,
   ],
 
-  // NEVER synchronize in production — use db-sync.ts for fresh installs only
+  // NEVER synchronize automatically — use db-sync.ts for fresh installs only
   synchronize: false,
 
-  // No automatic migrations on startup — schema is managed via db-sync.ts (fresh install)
-  // or explicit TypeORM migrations (production releases)
-  migrationsRun: false,
+  // Migration files live in src/migrations/ — one file per release for production schema changes
+  // ts-node (dev/CLI) handles .ts; compiled dist handles .js
+  migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
+
+  // Run any pending migrations automatically on server startup
+  // Migrations use CREATE TABLE IF NOT EXISTS / ALTER TABLE IF NOT EXISTS so re-runs are safe
+  migrationsRun: true,
 
   ssl: shouldUseDatabaseSsl ? { rejectUnauthorized: false } : false,
 
