@@ -66,7 +66,7 @@ describe('AuthService', () => {
     }
 
     mockDataSource = {
-      query: jest.fn(),
+      query: jest.fn().mockResolvedValue([]),
     }
 
     const module: TestingModule = await Test.createTestingModule({

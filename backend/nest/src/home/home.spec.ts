@@ -8,6 +8,7 @@
  *   T-HOME-BE-R019b — getKpiSummary returns KpiSummary shape
  *   T-HOME-BE-R019c — all 4 tables are queried in parallel (Promise.all)
  *   T-HOME-BE-R019d — zero-safe: null DB values coerce to 0
+ *   T-HOME-BE-R019e — gracefully falls back to COUNT(*) when measure_definitions table is unavailable (REQ-HOME-F-019b)
  */
 
 import { Test, TestingModule } from '@nestjs/testing'
@@ -101,5 +102,33 @@ describe('HomeService', () => {
         expect(result.submissions.org).toBe(0)
         expect(result.policies.user).toBe(0)
         expect(result.gwp.org).toBe(0)
+    })
+
+    it('T-HOME-BE-R019e — falls back to COUNT(*) when measure_definitions table is unavailable (REQ-HOME-F-019b)', async () => {
+        mockMeasuresService.findBySourceAndKey.mockRejectedValue(
+            new Error('relation "measure_definitions" does not exist'),
+        )
+        mockDataSource.query
+            .mockResolvedValueOnce([{ org_count: '5', user_count: '2' }])
+            .mockResolvedValueOnce([{ org_count: '3', user_count: '1' }])
+            .mockResolvedValueOnce([{ org_count: '10', user_count: '4', gwp_org: '100000', gwp_user: '40000' }])
+            .mockResolvedValueOnce([{ org_count: '2' }])
+
+        const result = await service.getKpiSummary('DEMO', 'admin')
+
+        expect(result).toEqual({
+            submissions: { org: 5, user: 2 },
+            quotes: { org: 3, user: 1 },
+            policies: { org: 10, user: 4 },
+            bindingAuthorities: { org: 2 },
+            gwp: { org: 100000, user: 40000 },
+        })
+
+        // Policies query must fall back to COUNT(*), not use the measure filterExpr
+        const polCall = mockDataSource.query.mock.calls.find(([sql]: [string]) =>
+            sql.includes('gwp_org'),
+        )
+        expect(polCall![0]).toContain('COUNT(*)')
+        expect(polCall![0]).not.toContain(ACTIVE_FILTER)
     })
 })
