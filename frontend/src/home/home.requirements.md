@@ -338,6 +338,8 @@ Each organisation sees only the data relevant to them.  The widget layout and st
 
 **REQ-HOME-F-019:** The backend `HomeService.getKpiSummary` method shall resolve count SQL predicates for the `policies` domain from the `field-mappings.ts` DATA_SOURCES semantic layer (specifically, the `countActive` measure's `filterExpr`) rather than hardcoding the predicate. This ensures that any change to the `countActive` `filterExpr` in `field-mappings.ts` is automatically applied to the home screen KPI without a separate code change.
 
+**REQ-HOME-F-019b:** If `MeasuresService.findBySourceAndKey` throws a database error (for example, because the `measure_definitions` table does not yet exist in the target database due to schema lag during a migration window), `HomeService.getKpiSummary` shall catch that error and fall back to a simple `COUNT(*)` predicate for the `policies` domain. The endpoint shall still return a valid `KpiSummary` object rather than propagating a 500 error to the client.
+
 **REQ-HOME-F-020:** The `GET /api/home/kpi-summary` endpoint shall return a single JSON object with the following shape, deriving all values from the same data sources and measure definitions used by the reporting/dashboard widget engine:
 ```
 {
@@ -410,6 +412,7 @@ The `submissions` and `quotes` counts are total-count measures (`countAll`). The
 | REQ-HOME-F-016 | `app/features/home/home.test.tsx` | pending |
 | REQ-HOME-F-017 | `app/features/home/home.test.tsx` | pending |
 | REQ-HOME-F-019 | `backend/nest/src/home/home.spec.ts` | T-HOME-BE-R019a, T-HOME-BE-R019b |
+| REQ-HOME-F-019b | `backend/nest/src/home/home.spec.ts` | T-HOME-BE-R019e |
 | REQ-HOME-F-020 | `frontend/src/home/__tests__/home.test.tsx` | T-HOME-KPI-R020 |
 
 ---
