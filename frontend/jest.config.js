@@ -61,4 +61,7 @@ module.exports = {
         '!**/*.requirements.md',
         '!**/node_modules/**',
     ],
+    // Force Jest to exit after all tests complete — prevents open handles
+    // (e.g. jsdom timers, React act() warnings) from causing a non-zero exit code
+    forceExit: true,
 }
