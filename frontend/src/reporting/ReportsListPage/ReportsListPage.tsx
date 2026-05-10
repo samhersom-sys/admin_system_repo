@@ -15,7 +15,6 @@ import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
 import Card from '@/shared/Card/Card'
 import ResizableGrid, { type Column, type SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
 import { getReportTemplates, deleteReportTemplate, type ReportTemplate } from '../reporting.service'
-import { getSession } from '@/shared/lib/auth-session/auth-session'
 
 const CORE_TEMPLATES: ReportTemplate[] = [
     { id: -1, name: 'Submissions Report', description: 'All submissions with status and broker info.', type: 'core', data_source: 'submissions', created_by: 'System' },
@@ -24,8 +23,6 @@ const CORE_TEMPLATES: ReportTemplate[] = [
     { id: -4, name: 'Policies Report', description: 'All policies with premium and expiry data.', type: 'core', data_source: 'policies', created_by: 'System' },
     { id: -5, name: 'User Login Activity Report', description: 'Full login history for users in your organisation. Internal admins see all organisations.', type: 'core', data_source: 'login-activity', created_by: 'System' },
 ]
-
-const ADMIN_ONLY_DATA_SOURCES = new Set(['login-activity'])
 
 const CORE_COLUMNS: Column[] = [
     { key: 'name', label: 'Report Name', sortable: false, defaultWidth: 220 },
@@ -53,14 +50,11 @@ export default function ReportsListPage() {
     const [sortConfig, setSortConfig] = useState<SortConfig | undefined>(undefined)
 
     useEffect(() => {
-        const userRole = getSession()?.user?.role ?? ''
-        const canSeeAdminReports = userRole === 'internal_admin' || userRole === 'client_admin'
         setLoading(true)
         getReportTemplates()
             .then((data) => {
                 // Merge server-returned templates; replace any core placeholders with server versions
                 const mergedCores = CORE_TEMPLATES
-                    .filter((c) => !ADMIN_ONLY_DATA_SOURCES.has(c.data_source ?? '') || canSeeAdminReports)
                     .map((c) => {
                     const found = data.find((t) => t.type === 'core' && t.name === c.name)
                     return found ?? c
