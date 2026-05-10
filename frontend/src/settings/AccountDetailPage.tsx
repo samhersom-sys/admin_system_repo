@@ -145,7 +145,7 @@ export default function AccountDetailPage() {
 
             {/* Header */}
             <div>
-                <h1 className="text-xl font-semibold text-gray-900">{displayName}</h1>
+                <p role="heading" aria-level={1} className="text-xl font-semibold text-gray-900">{displayName}</p>
                 <p className="text-sm text-gray-500 mt-1">{user.email}</p>
             </div>
 
@@ -180,7 +180,7 @@ export default function AccountDetailPage() {
                             Role
                         </label>
                         {isInternal ? (
-                            <div className="text-sm text-gray-700 px-2 py-1.5 border border-gray-200 rounded bg-gray-50">
+                            <div className="text-sm text-gray-700 px-2 py-1.5 border border-gray-200 rounded">
                                 {ROLE_LABELS.internal_admin}
                                 <span className="text-xs text-gray-400 ml-2">(cannot be changed here)</span>
                             </div>

@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiSearch } from 'react-icons/fi'
+import { brandColors } from '@/shared/lib/design-tokens/brandColors'
 import ResizableGrid, { type Column, type SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
 import {
     getAdminUsers,
@@ -166,7 +167,7 @@ export default function AccountAdministrationPage() {
                         aria-label={`View account ${user.fullName ?? user.username}`}
                         title="View account"
                         className="p-1.5 rounded hover:bg-green-50 transition-colors"
-                        style={{ color: '#10b981' }}
+                        style={{ color: brandColors.success }}
                         onClick={() => navigate(`/settings/account/${user.id}`)}
                     >
                         <FiSearch size={16} />
@@ -204,7 +205,7 @@ export default function AccountAdministrationPage() {
         <div className="p-6 flex flex-col gap-4">
             {/* Header */}
             <div>
-                <h1 className="text-xl font-semibold text-gray-900">Account Administration</h1>
+                <p role="heading" aria-level={1} className="text-xl font-semibold text-gray-900">Account Administration</p>
                 <p className="text-sm text-gray-500 mt-1">
                     Manage user accounts, roles and access status across all organisations.
                 </p>
