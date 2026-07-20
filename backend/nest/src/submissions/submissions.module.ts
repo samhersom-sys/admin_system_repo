@@ -9,5 +9,6 @@ import { Quote } from '../entities/quote.entity'
   imports: [TypeOrmModule.forFeature([Submission, Quote])],
   controllers: [SubmissionsController],
   providers: [SubmissionsService],
+  exports: [SubmissionsService],
 })
 export class SubmissionsModule {}

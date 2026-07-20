@@ -26,6 +26,10 @@ The AI must **not**:
 - Skip checkpoints to move faster
 - Assume domain ownership — always confirm with the team
 
+### Multi-Agent Delivery
+
+This project uses a set of specialist AI agents, each with a defined role, tool access, and artifact contract.  When a session involves more than one agent, the rules in `docs/AI Guidelines/17-Agent-Collaboration-Standards.md` are the authority for how agents interact, what they produce, and when they may proceed.  The rules in this section (§1) continue to apply to every agent without exception.
+
 ---
 
 ## 1.2  The Three-Artifact Rule (Mandatory)

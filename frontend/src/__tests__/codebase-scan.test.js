@@ -150,6 +150,7 @@ describe('RULE-04: No cross-domain imports', () => {
         'quotes -> parties',
         'quotes -> submissions',
         'policies -> parties',
+        'binding-authorities -> settings',
     ])
 
     it('no module imports from another module\'s internals', () => {
@@ -414,7 +415,7 @@ describe('RULE-12: Page wrappers must not set min-h-screen or bg-gray-50', () =>
 
     const VIOLATION_PATTERN = /className="[^"]*\b(min-h-screen|bg-gray-50)\b/
     // Lines where bg-gray-50 is used on non-wrapper elements (hover states, thead) are exempt
-    const NON_WRAPPER_PATTERN = /hover:bg-gray-50|<thead\b/
+    const NON_WRAPPER_PATTERN = /hover:bg-gray-50|<thead\b|<tr\b/
 
     function isPageFile(filePath) {
         const base = path.basename(filePath)

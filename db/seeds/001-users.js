@@ -54,6 +54,30 @@ const CORE_USERS = [
         orgCode: 'TESTORG',
         role: 'user',
     },
+    {
+        username: 'underwriter.north',
+        email: 'underwriter.north@policyforge.com',
+        password: 'North123!',
+        fullName: 'North Team Underwriter',
+        orgCode: 'DEMO-TEAM-N1',
+        role: 'client_admin',
+    },
+    {
+        username: 'underwriter.south',
+        email: 'underwriter.south@policyforge.com',
+        password: 'South123!',
+        fullName: 'South Team Underwriter',
+        orgCode: 'DEMO-TEAM-S1',
+        role: 'client_admin',
+    },
+    {
+        username: 'underwriter.partner',
+        email: 'underwriter.partner@policyforge.com',
+        password: 'Partner123!',
+        fullName: 'Partner Team Underwriter',
+        orgCode: 'DEMO-PARTNER-TEAM1',
+        role: 'client_admin',
+    },
 ]
 
 // ---------------------------------------------------------------------------

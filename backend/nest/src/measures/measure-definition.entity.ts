@@ -76,6 +76,10 @@ export class MeasureDefinition {
     @Column({ name: 'is_active', type: 'boolean', default: true })
     isActive: boolean
 
+    /** REQ-EARN-S-004 — true when this measure has earning variant measures (earned/unearned) */
+    @Column({ name: 'has_earning_variants', type: 'boolean', default: false })
+    hasEarningVariants: boolean
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date
 

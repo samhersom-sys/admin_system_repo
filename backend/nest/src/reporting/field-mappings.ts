@@ -80,6 +80,148 @@ export const DATA_SOURCES: Record<string, SourceConfig> = {
             { key: 'newOrRenewal', label: 'New or Renewal', col: 'new_or_renewal', type: 'lookup', lookupValues: ['New', 'Renewal'] },
         ],
     },
+    policyUserSummary: {
+        table: `(
+            WITH RECURSIVE entity_path AS (
+                SELECT
+                    e.id AS leaf_id,
+                    e.parent_entity_id,
+                    e.entity_name,
+                    h.level_order
+                FROM organisation_entities e
+                JOIN organisation_hierarchy h ON h.id = e.hierarchy_level_id
+                WHERE e.is_active = true
+
+                UNION ALL
+
+                SELECT
+                    ep.leaf_id,
+                    p.parent_entity_id,
+                    p.entity_name,
+                    h.level_order
+                FROM entity_path ep
+                JOIN organisation_entities p ON p.id = ep.parent_entity_id
+                JOIN organisation_hierarchy h ON h.id = p.hierarchy_level_id
+                WHERE p.is_active = true
+            ),
+            entity_levels AS (
+                SELECT
+                    leaf_id,
+                    MAX(entity_name) FILTER (WHERE level_order = 1) AS "hierarchyLevel1",
+                    MAX(entity_name) FILTER (WHERE level_order = 2) AS "hierarchyLevel2",
+                    MAX(entity_name) FILTER (WHERE level_order = 3) AS "hierarchyLevel3",
+                    MAX(entity_name) FILTER (WHERE level_order = 4) AS "hierarchyLevel4",
+                    MAX(entity_name) FILTER (WHERE level_order = 5) AS "hierarchyLevel5",
+                    STRING_AGG(entity_name, ' > ' ORDER BY level_order) AS "hierarchyPath"
+                FROM entity_path
+                GROUP BY leaf_id
+            )
+            SELECT
+                COALESCE(NULLIF(p.created_by, ''), 'Unknown User') AS "user",
+                p.created_by_org_code AS org_code,
+                COALESCE(NULLIF(u.org_code, ''), p.created_by_org_code) AS "userOrgCode",
+                COALESCE(el."hierarchyLevel1", 'Unassigned') AS "hierarchyLevel1",
+                COALESCE(el."hierarchyLevel2", 'Unassigned') AS "hierarchyLevel2",
+                COALESCE(el."hierarchyLevel3", 'Unassigned') AS "hierarchyLevel3",
+                COALESCE(el."hierarchyLevel4", 'Unassigned') AS "hierarchyLevel4",
+                COALESCE(el."hierarchyLevel5", 'Unassigned') AS "hierarchyLevel5",
+                COALESCE(el."hierarchyPath", 'Unassigned') AS "hierarchyPath",
+                CONCAT(COALESCE(el."hierarchyPath", 'Unassigned'), ' > ', COALESCE(NULLIF(p.created_by, ''), 'Unknown User')) AS "hierarchy",
+                SUM(CASE WHEN CAST(p.expiry_date AS date) >= CURRENT_DATE THEN 1 ELSE 0 END)::bigint AS "expiringPolicyCount",
+                SUM(CASE WHEN p.renewable = 'Renewable' THEN 1 ELSE 0 END)::bigint AS "renewablePolicyCount",
+                SUM(CASE WHEN p.new_or_renewal = 'New' OR p.business_type = 'New Business' THEN 1 ELSE 0 END)::bigint AS "newBusinessPolicyCount",
+                SUM(CASE WHEN p.status = 'Renewed' THEN 1 ELSE 0 END)::bigint AS "renewedPolicyCount",
+                SUM(CASE WHEN p.status = 'Expired' THEN 1 ELSE 0 END)::bigint AS "lapsedPolicyCount",
+                SUM(CASE WHEN p.status = 'Cancelled' THEN 1 ELSE 0 END)::bigint AS "cancelledPolicyCount",
+                (
+                    SUM(CASE WHEN p.new_or_renewal = 'New' OR p.business_type = 'New Business' THEN 1 ELSE 0 END)
+                    + SUM(CASE WHEN p.status = 'Renewed' THEN 1 ELSE 0 END)
+                    - SUM(CASE WHEN CAST(p.expiry_date AS date) >= CURRENT_DATE THEN 1 ELSE 0 END)
+                )::bigint AS "netNewPolicyCount",
+                COUNT(*)::bigint AS "policyCount",
+                CASE
+                    WHEN SUM(CASE WHEN p.renewable = 'Renewable' THEN 1 ELSE 0 END) = 0 THEN NULL
+                    ELSE LEAST(
+                        100::numeric,
+                        ROUND(
+                            100::numeric * SUM(CASE WHEN p.status = 'Renewed' THEN 1 ELSE 0 END)::numeric
+                            / NULLIF(SUM(CASE WHEN p.renewable = 'Renewable' THEN 1 ELSE 0 END)::numeric, 0),
+                            4
+                        )
+                    )
+                END AS "retentionRatio",
+                COALESCE(SUM(CASE WHEN CAST(p.expiry_date AS date) >= CURRENT_DATE THEN p.gross_written_premium ELSE 0 END), 0)::numeric AS "expiringGrossWrittenPremium",
+                COALESCE(SUM(CASE WHEN p.renewable = 'Renewable' THEN p.gross_written_premium ELSE 0 END), 0)::numeric AS "renewableGrossWrittenPremium",
+                COALESCE(SUM(CASE WHEN p.new_or_renewal = 'New' OR p.business_type = 'New Business' THEN p.gross_written_premium ELSE 0 END), 0)::numeric AS "newBusinessGrossWrittenPremium",
+                COALESCE(SUM(CASE WHEN p.status = 'Renewed' THEN p.gross_written_premium ELSE 0 END), 0)::numeric AS "renewedGrossWrittenPremium",
+                COALESCE(SUM(CASE WHEN p.status = 'Expired' THEN p.gross_written_premium ELSE 0 END), 0)::numeric AS "lapsedGrossWrittenPremium",
+                COALESCE(SUM(CASE WHEN p.status = 'Cancelled' THEN p.gross_written_premium ELSE 0 END), 0)::numeric AS "cancelledGrossWrittenPremium",
+                COALESCE(SUM(p.gross_written_premium), 0)::numeric AS "policyGrossWrittenPremium",
+                (
+                    COALESCE(SUM(CASE WHEN p.new_or_renewal = 'New' OR p.business_type = 'New Business' THEN p.gross_written_premium ELSE 0 END), 0)
+                    + COALESCE(SUM(CASE WHEN p.status = 'Renewed' THEN p.gross_written_premium ELSE 0 END), 0)
+                    - COALESCE(SUM(CASE WHEN CAST(p.expiry_date AS date) >= CURRENT_DATE THEN p.gross_written_premium ELSE 0 END), 0)
+                )::numeric AS "netNewGrossWrittenPremium",
+                CASE
+                    WHEN COALESCE(SUM(CASE WHEN p.renewable = 'Renewable' THEN p.gross_written_premium ELSE 0 END), 0) = 0 THEN NULL
+                    ELSE LEAST(
+                        100::numeric,
+                        ROUND(
+                            100::numeric * COALESCE(SUM(CASE WHEN p.status = 'Renewed' THEN p.gross_written_premium ELSE 0 END), 0)::numeric
+                            / NULLIF(COALESCE(SUM(CASE WHEN p.renewable = 'Renewable' THEN p.gross_written_premium ELSE 0 END), 0)::numeric, 0),
+                            4
+                        )
+                    )
+                END AS "retentionRatioGrossWrittenPremium",
+                COALESCE(SUM(p.gross_written_premium), 0)::numeric AS "totalGrossWrittenPremium"
+            FROM policies p
+            LEFT JOIN users u ON LOWER(u.username) = LOWER(COALESCE(NULLIF(p.created_by, ''), ''))
+            LEFT JOIN organisation_entities leaf ON leaf.entity_code = COALESCE(NULLIF(u.org_code, ''), p.created_by_org_code) AND leaf.is_active = true
+            LEFT JOIN entity_levels el ON el.leaf_id = leaf.id
+            WHERE p.deleted_at IS NULL
+            GROUP BY
+                COALESCE(NULLIF(p.created_by, ''), 'Unknown User'),
+                p.created_by_org_code,
+                COALESCE(NULLIF(u.org_code, ''), p.created_by_org_code),
+                el."hierarchyLevel1",
+                el."hierarchyLevel2",
+                el."hierarchyLevel3",
+                el."hierarchyLevel4",
+                el."hierarchyLevel5",
+                el."hierarchyPath"
+        ) policy_user_summary`,
+        orgCol: 'org_code',
+        fields: [
+            { key: 'user', label: 'User', col: '"user"' },
+            { key: 'hierarchy', label: 'Hierarchy', col: '"hierarchy"' },
+            { key: 'userOrgCode', label: 'User Org Code', col: '"userOrgCode"' },
+            { key: 'hierarchyLevel1', label: 'Hierarchy Level 1', col: '"hierarchyLevel1"' },
+            { key: 'hierarchyLevel2', label: 'Hierarchy Level 2', col: '"hierarchyLevel2"' },
+            { key: 'hierarchyLevel3', label: 'Hierarchy Level 3', col: '"hierarchyLevel3"' },
+            { key: 'hierarchyLevel4', label: 'Hierarchy Level 4', col: '"hierarchyLevel4"' },
+            { key: 'hierarchyLevel5', label: 'Hierarchy Level 5', col: '"hierarchyLevel5"' },
+            { key: 'hierarchyPath', label: 'Hierarchy Path', col: '"hierarchyPath"' },
+            { key: 'expiringPolicyCount', label: 'Expiring Policy Count', col: '"expiringPolicyCount"', type: 'number' },
+            { key: 'renewablePolicyCount', label: 'Renewable Policy Count', col: '"renewablePolicyCount"', type: 'number' },
+            { key: 'newBusinessPolicyCount', label: 'New Business Policy Count', col: '"newBusinessPolicyCount"', type: 'number' },
+            { key: 'renewedPolicyCount', label: 'Renewed Policy Count', col: '"renewedPolicyCount"', type: 'number' },
+            { key: 'lapsedPolicyCount', label: 'Lapsed Policy Count', col: '"lapsedPolicyCount"', type: 'number' },
+            { key: 'cancelledPolicyCount', label: 'Cancelled Policy Count', col: '"cancelledPolicyCount"', type: 'number' },
+            { key: 'netNewPolicyCount', label: 'Net New Policy Count', col: '"netNewPolicyCount"', type: 'number' },
+            { key: 'policyCount', label: 'Policy Count', col: '"policyCount"', type: 'number' },
+            { key: 'retentionRatio', label: 'Retention Ratio', col: '"retentionRatio"', type: 'number' },
+            { key: 'expiringGrossWrittenPremium', label: 'Expiring Gross Written Premium', col: '"expiringGrossWrittenPremium"', type: 'number' },
+            { key: 'renewableGrossWrittenPremium', label: 'Renewable Gross Written Premium', col: '"renewableGrossWrittenPremium"', type: 'number' },
+            { key: 'newBusinessGrossWrittenPremium', label: 'New Business Gross Written Premium', col: '"newBusinessGrossWrittenPremium"', type: 'number' },
+            { key: 'renewedGrossWrittenPremium', label: 'Renewed Gross Written Premium', col: '"renewedGrossWrittenPremium"', type: 'number' },
+            { key: 'lapsedGrossWrittenPremium', label: 'Lapsed Gross Written Premium', col: '"lapsedGrossWrittenPremium"', type: 'number' },
+            { key: 'cancelledGrossWrittenPremium', label: 'Cancelled Gross Written Premium', col: '"cancelledGrossWrittenPremium"', type: 'number' },
+            { key: 'policyGrossWrittenPremium', label: 'Policy Gross Written Premium', col: '"policyGrossWrittenPremium"', type: 'number' },
+            { key: 'netNewGrossWrittenPremium', label: 'Net New Gross Written Premium', col: '"netNewGrossWrittenPremium"', type: 'number' },
+            { key: 'retentionRatioGrossWrittenPremium', label: 'Retention Ratio (Gross Written Premium)', col: '"retentionRatioGrossWrittenPremium"', type: 'number' },
+            { key: 'totalGrossWrittenPremium', label: 'Total Gross Written Premium', col: '"totalGrossWrittenPremium"', type: 'number' },
+        ],
+    },
     quotes: {
         table: 'quotes',
         orgCol: 'created_by_org_code',
@@ -133,6 +275,17 @@ export const DATA_SOURCES: Record<string, SourceConfig> = {
             { key: 'status', label: 'Status', col: 'status' },
             { key: 'inceptionDate', label: 'Inception Date', col: 'inception_date', type: 'date' },
             { key: 'expiryDate', label: 'Expiry Date', col: 'expiry_date', type: 'date' },
+        ],
+    },
+    policy_earning_periods: {
+        table: 'policy_earning_periods',
+        orgCol: 'org_code',
+        fields: [
+            { key: 'earned_amount', label: 'Earned Amount', col: 'earned_amount' },
+            { key: 'unearned_amount', label: 'Unearned Amount', col: 'unearned_amount' },
+            { key: 'total_premium', label: 'Total Premium', col: 'total_premium' },
+            { key: 'period_year', label: 'Period Year', col: 'period_year' },
+            { key: 'period_month', label: 'Period Month', col: 'period_month' },
         ],
     },
     parties: {

@@ -183,16 +183,16 @@ describe('T-SETTINGS-USERS-R02: unified table shows all accounts', () => {
         await waitFor(() => {
             // Role badges appear as non-interactive spans — check at least one per role
             const internalItems = screen.queryAllByText('Internal Admin')
-            const companyItems  = screen.queryAllByText('Company Admin')
+            const companyItems = screen.queryAllByText('Company Admin')
             expect(internalItems.length).toBeGreaterThanOrEqual(1)
             expect(companyItems.length).toBeGreaterThanOrEqual(1)
         })
         // Filter selects are the only comboboxes — no per-row dropdowns
         const combos = screen.queryAllByRole('combobox')
-        // All comboboxes should be filter controls (role + status = 2), not per-row editors
+        // All comboboxes should be filter or pagination controls, not per-row editors
         expect(combos.every(el => {
             const label = el.getAttribute('aria-label') ?? ''
-            return label.startsWith('Filter by')
+            return label.startsWith('Filter by') || label === 'Rows per page'
         })).toBe(true)
     })
 
@@ -334,6 +334,64 @@ describe('T-SETTINGS-USERS-R03: search filters reduce displayed rows', () => {
         await waitFor(() => {
             expect(screen.queryByLabelText('Clear filters')).not.toBeInTheDocument()
             expect(nameInput).toHaveValue('')
+        })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// R10 — Pagination (REQ-SETTINGS-USERS-F-R10)
+// ---------------------------------------------------------------------------
+
+describe('T-SETTINGS-USERS-R10: pagination controls', () => {
+    it('renders rows-per-page selector', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText(/rows per page/i)).toBeInTheDocument()
+        })
+    })
+
+    it('renders First, Back, Next, Last page buttons', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByTitle('First page')).toBeInTheDocument()
+            expect(screen.getByTitle('Previous page')).toBeInTheDocument()
+            expect(screen.getByTitle('Next page')).toBeInTheDocument()
+            expect(screen.getByTitle('Last page')).toBeInTheDocument()
+        })
+    })
+
+    it('shows result summary line', async () => {
+        renderPage()
+        await waitFor(() => {
+            // e.g. "1–3 of 3" or "Showing 1–3 of 3 accounts"
+            const summaryEls = screen.getAllByText(/of 3/i)
+            expect(summaryEls.length).toBeGreaterThan(0)
+        })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// R11 — New Account button in table column header (REQ-SETTINGS-USERS-F-R11)
+// ---------------------------------------------------------------------------
+
+describe('T-SETTINGS-USERS-R11: New Account button in table header', () => {
+    it('renders a New Account button in the table column header', async () => {
+        renderPage()
+        await waitFor(() => {
+            const btn = screen.getByTitle('New Account')
+            expect(btn).toBeInTheDocument()
+        })
+    })
+
+    it('New Account button navigates to /settings/account/new on click', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByTitle('New Account')).toBeInTheDocument()
+        })
+        await userEvent.click(screen.getByTitle('New Account'))
+        // Navigation tested via mockNavigate
+        await waitFor(() => {
+            expect(mockNavigate).toHaveBeenCalledWith('/settings/account/new')
         })
     })
 })

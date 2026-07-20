@@ -115,12 +115,17 @@ export class Quote {
   @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deletedAt: Date | null
 
+  // Product FK for quote product selection
+  @Column({ name: 'product_id', type: 'int', nullable: true })
+  productId: number | null
+
   /** Serialize with snake_case keys so the JSON matches DB column names. */
   toJSON() {
     return {
       id: this.id,
       reference: this.reference,
       submission_id: this.submissionId,
+      product_id: this.productId,
       insured: this.insured,
       insured_id: this.insuredId,
       status: this.status,

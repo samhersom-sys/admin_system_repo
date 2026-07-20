@@ -1,5 +1,5 @@
 import {
-    Controller, Get, Post, Put, Param, Body, Req,
+    Controller, Get, Post, Put, Delete, Param, Body, Req,
     UseGuards, ParseIntPipe, HttpCode, HttpStatus,
 } from '@nestjs/common'
 import { PoliciesService } from './policies.service'
@@ -102,6 +102,16 @@ export class PoliciesController {
         @Req() req: any,
     ) {
         return this.policiesService.getSectionDetail(id, sectionId, req.user.orgCode)
+    }
+
+    @Put(':id/sections/:sectionId')
+    updateSectionDetail(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Req() req: any,
+        @Body() body: any,
+    ) {
+        return this.policiesService.updateSectionDetail(id, sectionId, req.user.orgCode, body)
     }
 
     // REQ-POL-BE-F-007 — GET /api/policies/:id/invoices
@@ -217,5 +227,64 @@ export class PoliciesController {
     @Get(':id/locations')
     getLocations(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
         return this.policiesService.getLocations(id, req.user.orgCode)
+    }
+
+    // REQ-POL-BE-F-016 — GET /api/policies/:id/sections/:sectionId/coverages/:coverageId/details
+    @Get(':id/sections/:sectionId/coverages/:coverageId/details')
+    getCoverageDetails(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Param('coverageId', ParseIntPipe) coverageId: number,
+        @Req() req: any,
+    ) {
+        return this.policiesService.getCoverageDetails(id, sectionId, coverageId, req.user.orgCode)
+    }
+
+    // REQ-POL-BE-F-017 — POST /api/policies/:id/sections/:sectionId/coverages/:coverageId/details
+    @Post(':id/sections/:sectionId/coverages/:coverageId/details')
+    @HttpCode(HttpStatus.CREATED)
+    createCoverageDetail(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Param('coverageId', ParseIntPipe) coverageId: number,
+        @Body() body: Record<string, unknown>,
+        @Req() req: any,
+    ) {
+        return this.policiesService.createCoverageDetail(
+            id, sectionId, coverageId, req.user.orgCode, body,
+            req.user.name ?? req.user.username ?? null,
+        )
+    }
+
+    // REQ-POL-BE-F-018 — PUT /api/policies/:id/sections/:sectionId/coverages/:coverageId/details/:detailId
+    @Put(':id/sections/:sectionId/coverages/:coverageId/details/:detailId')
+    updateCoverageDetail(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Param('coverageId', ParseIntPipe) coverageId: number,
+        @Param('detailId', ParseIntPipe) detailId: number,
+        @Body() body: Record<string, unknown>,
+        @Req() req: any,
+    ) {
+        return this.policiesService.updateCoverageDetail(
+            id, sectionId, coverageId, detailId, req.user.orgCode, body,
+            req.user.name ?? req.user.username ?? null,
+        )
+    }
+
+    // REQ-POL-BE-F-019 — DELETE /api/policies/:id/sections/:sectionId/coverages/:coverageId/details/:detailId
+    @Delete(':id/sections/:sectionId/coverages/:coverageId/details/:detailId')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    deleteCoverageDetail(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Param('coverageId', ParseIntPipe) coverageId: number,
+        @Param('detailId', ParseIntPipe) detailId: number,
+        @Req() req: any,
+    ) {
+        return this.policiesService.deleteCoverageDetail(
+            id, sectionId, coverageId, detailId, req.user.orgCode,
+            req.user.name ?? req.user.username ?? null,
+        )
     }
 }

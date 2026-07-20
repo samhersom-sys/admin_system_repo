@@ -13,7 +13,7 @@
  *
  * Referential integrity:
  *   - Every submission_id value below must exist in 003-submissions.js seed data.
- *   - Status coverage: Draft, Quoted, Bound, Declined.
+ *   - Status coverage: Created, Quoted, Bound, Issued, Declined.
  */
 
 'use strict'
@@ -32,10 +32,11 @@ const pool = new Pool({ connectionString: DB_URL })
 // Test quote data
 //
 // Status coverage (required — do not remove any status):
-//   Draft     — QUO-2024-001, QUO-2025-001, QUO-2025-D01
-//   Quoted    — QUO-2024-002, QUO-2025-D02
-//   Bound     — QUO-2024-003
-//   Declined  — QUO-2024-004
+//   Created  — QUO-2024-001, QUO-2025-001, QUO-2025-D01
+//   Quoted   — QUO-2024-002, QUO-2025-D02
+//   Bound    — QUO-2024-003
+//   Issued   — QUO-2024-007
+//   Declined — QUO-2024-004
 // ---------------------------------------------------------------------------
 
 const QUOTES = [
@@ -44,7 +45,7 @@ const QUOTES = [
         submissionRef: 'SUB-2024-001',      // inherits insured from submission
         insured: 'Acme Corp',
         insuredId: 'PTY-INS-001',
-        status: 'Draft',
+        status: 'Created',
         businessType: 'Insurance',
         inceptionDate: '2024-01-15',
         expiryDate: '2025-01-14',
@@ -100,7 +101,7 @@ const QUOTES = [
         submissionRef: 'SUB-2024-005',
         insured: 'Skyline Hospitality Group',
         insuredId: 'PTY-INS-005',
-        status: 'Draft',
+        status: 'Created',
         businessType: 'Property',
         inceptionDate: '2025-05-01',
         expiryDate: '2026-04-30',
@@ -114,7 +115,7 @@ const QUOTES = [
         submissionRef: 'SUB-2025-D01',
         insured: 'Demo Manufacturing Co',
         insuredId: 'PTY-INS-D01',
-        status: 'Draft',
+        status: 'Created',
         businessType: 'Property',
         inceptionDate: '2025-06-01',
         expiryDate: '2026-05-31',
@@ -136,6 +137,79 @@ const QUOTES = [
         contractType: 'Open Market',
         createdBy: 'admin',
         createdByOrgCode: 'DEMO',
+    },
+    // Bind auto-decline demo (D1) — four sibling quotes on SUB-2025-D03
+    // Bind QUO-2025-D05 to trigger auto-decline of D03 and D04. D06 must stay Declined.
+    {
+        reference: 'QUO-2025-D03',
+        submissionRef: 'SUB-2025-D03',
+        insured: 'Demo Maritime Ltd',
+        insuredId: null,
+        status: 'Created',
+        businessType: 'Marine',
+        inceptionDate: '2025-08-01',
+        expiryDate: '2026-07-31',
+        quoteCurrency: 'GBP',
+        contractType: 'Open Market',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
+    },
+    {
+        reference: 'QUO-2025-D04',
+        submissionRef: 'SUB-2025-D03',
+        insured: 'Demo Maritime Ltd',
+        insuredId: null,
+        status: 'Quoted',
+        businessType: 'Marine',
+        inceptionDate: '2025-08-01',
+        expiryDate: '2026-07-31',
+        quoteCurrency: 'GBP',
+        contractType: 'Open Market',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
+    },
+    {
+        reference: 'QUO-2025-D05',
+        submissionRef: 'SUB-2025-D03',
+        insured: 'Demo Maritime Ltd',
+        insuredId: null,
+        status: 'Quoted',
+        businessType: 'Marine',
+        inceptionDate: '2025-08-01',
+        expiryDate: '2026-07-31',
+        quoteCurrency: 'GBP',
+        contractType: 'Open Market',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
+    },
+    {
+        reference: 'QUO-2025-D06',
+        submissionRef: 'SUB-2025-D03',
+        insured: 'Demo Maritime Ltd',
+        insuredId: null,
+        status: 'Declined',
+        businessType: 'Marine',
+        inceptionDate: '2025-08-01',
+        expiryDate: '2026-07-31',
+        quoteCurrency: 'GBP',
+        contractType: 'Open Market',
+        createdBy: 'admin',
+        createdByOrgCode: 'DEMO',
+    },
+    // Issued — quote that has been bound and had its policy issued
+    {
+        reference: 'QUO-2024-007',
+        submissionRef: 'SUB-2024-007',
+        insured: 'Coastal Shipping PLC',
+        insuredId: 'PTY-INS-003',
+        status: 'Issued',
+        businessType: 'Marine',
+        inceptionDate: '2024-07-01',
+        expiryDate: '2025-06-30',
+        quoteCurrency: 'GBP',
+        contractType: 'Open Market',
+        createdBy: 'broker.david',
+        createdByOrgCode: 'AON',
     },
 ]
 

@@ -51,8 +51,9 @@ export class QuotesController {
 
     @Post(':id/bind')
     @HttpCode(HttpStatus.OK)
-    bind(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
-        return this.quotesService.bind(id, req.user.orgCode, req.user.name ?? req.user.username ?? null)
+    bind(@Param('id', ParseIntPipe) id: number, @Req() req: any, @Body() body: any) {
+        const declineSiblings = body?.declineSiblings !== false
+        return this.quotesService.bind(id, req.user.orgCode, req.user.name ?? req.user.username ?? null, declineSiblings)
     }
 
     @Post(':id/decline')
@@ -226,6 +227,65 @@ export class QuotesController {
     ) {
         return this.quotesService.deleteCoverage(
             id, sectionId, coverageId, req.user.orgCode,
+            req.user.name ?? req.user.username ?? null,
+        )
+    }
+
+    // REQ-QUO-BE-F-045 — GET /api/quotes/:id/sections/:sectionId/coverages/:coverageId/details
+    @Get(':id/sections/:sectionId/coverages/:coverageId/details')
+    getCoverageDetails(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Param('coverageId', ParseIntPipe) coverageId: number,
+        @Req() req: any,
+    ) {
+        return this.quotesService.getCoverageDetails(id, sectionId, coverageId, req.user.orgCode)
+    }
+
+    // REQ-QUO-BE-F-046 — POST /api/quotes/:id/sections/:sectionId/coverages/:coverageId/details
+    @Post(':id/sections/:sectionId/coverages/:coverageId/details')
+    @HttpCode(HttpStatus.CREATED)
+    createCoverageDetail(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Param('coverageId', ParseIntPipe) coverageId: number,
+        @Body() body: Record<string, unknown>,
+        @Req() req: any,
+    ) {
+        return this.quotesService.createCoverageDetail(
+            id, sectionId, coverageId, req.user.orgCode, body,
+            req.user.name ?? req.user.username ?? null,
+        )
+    }
+
+    // REQ-QUO-BE-F-047 — PUT /api/quotes/:id/sections/:sectionId/coverages/:coverageId/details/:detailId
+    @Put(':id/sections/:sectionId/coverages/:coverageId/details/:detailId')
+    updateCoverageDetail(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Param('coverageId', ParseIntPipe) coverageId: number,
+        @Param('detailId', ParseIntPipe) detailId: number,
+        @Body() body: Record<string, unknown>,
+        @Req() req: any,
+    ) {
+        return this.quotesService.updateCoverageDetail(
+            id, sectionId, coverageId, detailId, req.user.orgCode, body,
+            req.user.name ?? req.user.username ?? null,
+        )
+    }
+
+    // REQ-QUO-BE-F-048 — DELETE /api/quotes/:id/sections/:sectionId/coverages/:coverageId/details/:detailId
+    @Delete(':id/sections/:sectionId/coverages/:coverageId/details/:detailId')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    deleteCoverageDetail(
+        @Param('id', ParseIntPipe) id: number,
+        @Param('sectionId', ParseIntPipe) sectionId: number,
+        @Param('coverageId', ParseIntPipe) coverageId: number,
+        @Param('detailId', ParseIntPipe) detailId: number,
+        @Req() req: any,
+    ) {
+        return this.quotesService.deleteCoverageDetail(
+            id, sectionId, coverageId, detailId, req.user.orgCode,
             req.user.name ?? req.user.username ?? null,
         )
     }

@@ -44,8 +44,14 @@ export class DashboardController {
     @Get('notifications')
     getNotifications() { return this.dashboardService.getNotifications() }
 
-    // REQ-DASH-STUB-F-008
+    // REQ-DASH-STUB-F-008 (legacy path — kept for backwards compatibility)
     @Get('recent-records-data')
+    getRecentRecordsLegacy(@Req() req: any) {
+        return this.dashboardService.getRecentRecords(req.user.orgCode, req.user.id, req.user.username ?? req.user.email ?? null)
+    }
+
+    // REQ-HOME-CFG-FE-F-008 — canonical alias used by new data-source selector
+    @Get('recent-records')
     getRecentRecords(@Req() req: any) {
         return this.dashboardService.getRecentRecords(req.user.orgCode, req.user.id, req.user.username ?? req.user.email ?? null)
     }

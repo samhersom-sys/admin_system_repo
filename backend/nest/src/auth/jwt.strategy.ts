@@ -8,7 +8,7 @@ import { User } from '../entities/user.entity'
 /**
  * JwtStrategy — Passport strategy that validates Bearer tokens.
  *
- * Token payload shape: { id, username, email, orgCode, role, tokenVersion }
+ * Token payload shape: { id, username, email, orgCode, orgType, role, tokenVersion }
  * Validated payload is attached to request.user by Passport.
  *
  * Token versioning: each payload carries tokenVersion. The strategy compares
@@ -33,6 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     username: string
     email: string
     orgCode: string
+    orgType?: string
     role: string
     tokenVersion?: number
   }) {
@@ -56,6 +57,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       username: payload.username,
       email: payload.email,
       orgCode: payload.orgCode,
+      orgType: payload.orgType,
       role: payload.role,
     }
   }

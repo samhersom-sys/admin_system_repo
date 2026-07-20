@@ -1,0 +1,23 @@
+# REQUIREMENTS — Policy/Quote Section Alignment
+
+1. REQ-POL-FE-F-056: A Policy Operations User shall see the PolicyViewPage Sections grid columns aligned to the QuoteViewPage Sections grid by displaying exactly these business columns in this order: Reference, Class of Business, Inception Date, Effective Date, Expiry Date, Days on Cover, Limit Currency, Limit Amount, Limit Loss Qualifier, Excess Currency, Excess Amount, Excess Loss Qualifier, Sum Insured Currency, Sum Insured, Premium Currency, Gross Gross Premium, Gross Premium, Deductions, Net Premium, Tax Receivable, Annual Rated GP, Annual Rated NP; constraint: the grid may include an Action navigation column but shall not include Written Order %, Signed Order %, Time Basis, Written Order Basis, Signed Order Basis, Written Line Total, Signed Line Total, DA Ref, or DA Section Ref. Acceptance criterion: automated UI test asserts the header set contains all required columns and excludes all forbidden columns.
+2. REQ-POL-FE-F-057: A Policy Operations User shall see the PolicySectionViewPage tab set aligned to QuoteSectionViewPage by displaying tabs in this order: Coverages, Deductions, Risk Codes, Participations, Section Financial Summary, Signings; constraint: Finance Summary shall not be shown on PolicySectionViewPage. Acceptance criterion: automated UI test asserts six visible tabs in the required order and confirms Finance Summary is absent.
+3. REQ-POL-FE-F-058: A Policy Operations User shall continue to access policy transaction history on PolicyViewPage; constraint: the parent policy page shall retain a Transactions tab in its existing tab strip while section-page tab alignment is applied. Acceptance criterion: automated UI test confirms Transactions remains visible on PolicyViewPage and opens the transactions grid panel.
+4. REQ-POL-FE-F-059: A Policy Operations User shall see a unified Coverages grid schema on both QuoteSectionViewPage and PolicySectionViewPage using the union of unique fields from both current surfaces; constraint: both pages shall use this exact column order: Reference, Coverage, Effective Date, Expiry Date, Limit Currency, Limit Amount, Sum Insured Currency, Sum Insured, Annual Gross Premium, Annual Net Premium, Gross Premium, Net Premium. Acceptance criterion: automated UI tests on both pages assert identical headers and order.
+5. REQ-POL-FE-F-060: A Policy Operations User shall receive stable rendering of unified coverage columns when one source record omits non-applicable values; constraint: unavailable values shall render as an explicit placeholder and shall not break sorting or row rendering. Acceptance criterion: automated UI test with mixed quote/policy fixture data renders all rows without runtime errors and displays placeholders for missing values.
+
+## Impact Analysis
+
+1. UI changes: frontend/src/policies/PolicyViewPage/PolicyViewPage.tsx (Sections grid columns), frontend/src/policies/PolicySectionViewPage/PolicySectionViewPage.tsx (section tabs and coverages columns), frontend/src/quotes/QuoteSectionViewPage/QuoteSectionViewPage.tsx (coverages columns for union alignment), frontend/src/policies/policies.test.tsx and frontend/src/quotes/quotes.test.tsx (parity assertions).
+2. API changes: No API endpoint additions required; existing policy and quote section/coverage endpoints are reused; optional payload compatibility remains unchanged.
+3. DB changes: No database schema changes required; no migration, table, or column updates required.
+
+## Sponsor Review Steps (Draft)
+
+1. Open a policy record and go to the Sections tab; confirm the grid does not show Written Order %, Signed Order %, Time Basis, Written/Signed Order Basis, Written/Signed Line Total, DA Ref, or DA Section Ref.
+2. On the same policy record, confirm the Transactions tab is still present and opens transaction rows.
+3. Open a policy section and confirm tabs are exactly: Coverages, Deductions, Risk Codes, Participations, Section Financial Summary, Signings.
+4. On the same policy section, confirm Finance Summary is not visible as a tab.
+5. Open a quote section and a policy section side by side and compare the Coverages grid headers.
+6. Confirm both Coverages grids show the same 12-column order: Reference, Coverage, Effective Date, Expiry Date, Limit Currency, Limit Amount, Sum Insured Currency, Sum Insured, Annual Gross Premium, Annual Net Premium, Gross Premium, Net Premium.
+7. Confirm rows still render when some columns are blank and blank values display as placeholders instead of crashing the page.

@@ -187,12 +187,45 @@ When this feature is built it shall:
 | REQ-SETTINGS-ADMIN-F-003 | `settings.test.tsx` | T-SETTINGS-ADMIN-R03 |
 | REQ-SETTINGS-ADMIN-F-004 | `settings.test.tsx` | T-SETTINGS-ADMIN-R04 |
 | REQ-SETTINGS-ADMIN-F-005 | `settings.test.tsx` | T-SETTINGS-ADMIN-R05 |
+| REQ-SETTINGS-RATING-F-001 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R01 |
+| REQ-SETTINGS-RATING-F-002 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R02 |
+| REQ-SETTINGS-RATING-F-003 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R03 |
+| REQ-SETTINGS-RATING-F-004 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R04 |
+| REQ-SETTINGS-RATING-F-005 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R05 |
+| REQ-SETTINGS-RATING-F-006 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R06 |
+| REQ-SETTINGS-RATING-F-009 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R09a through R09f |
+| REQ-SETTINGS-RATING-F-010 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R09b (updated) |
+| REQ-SETTINGS-RATING-F-011 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R10 |
+| REQ-SETTINGS-RATING-F-012 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R11a, R11b |
+| REQ-SETTINGS-RATING-F-013 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R02 (updated), R12 |
+| REQ-SETTINGS-RATING-F-014 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R07 |
+| REQ-SETTINGS-RATING-F-015 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R05 (updated) |
+| REQ-SETTINGS-RATING-F-016 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R08 |
+| REQ-SETTINGS-RATING-F-017 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R03 (updated), R12 (updated) |
+| REQ-SETTINGS-RATING-F-018 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R11a (updated), R11b (updated) |
+| REQ-SETTINGS-RATING-F-019 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R17 |
+| REQ-SETTINGS-RATING-F-020 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R18 |
+| REQ-SETTINGS-RATING-F-021 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R19 |
+| REQ-SETTINGS-RATING-F-022 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R20 |
+| REQ-SETTINGS-RATING-F-023 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R21 |
+| REQ-SETTINGS-RATING-F-024 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R22 |
+| REQ-SETTINGS-RATING-F-025 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R23 |
+| REQ-SETTINGS-RATING-F-026 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R24 |
+| REQ-SETTINGS-RATING-F-027 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R25 |
+| REQ-SETTINGS-RATING-F-028 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R26 |
+| REQ-SETTINGS-RATING-F-029 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R27 |
+| REQ-SETTINGS-RATING-F-030 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R28 |
+| REQ-SETTINGS-RATING-F-031 | `settings/__tests__/RatingRulesPage.test.tsx` | T-settings-rating-R29, R30 |
 
 ---
 
 ---
 
 ## 3b. Batch C — Rating Rules Pages
+
+> **Business context**
+> A rating schedule is a named set of pricing rules that tells the system how to calculate a premium for an insured location. For example, a rule might say "if the country is UK and the postcode starts with SW, apply a 1.5% rate to the sum insured". Administrators configure these schedules in Settings so that when an underwriter rates a location on a quote, the system can apply the correct price automatically — rather than requiring manual calculation for every location.
+> Each schedule has an effective date range, so the right schedule is selected automatically based on when the policy incepts. Multiple schedules can exist, each targeting different binding authorities or classes of business.
 
 > **Backup Coverage Map sources read:**
 > - `src/layouts/AppLayout/AppLayoutPages/Settings/RatingRulesPage.jsx`
@@ -205,11 +238,13 @@ When this feature is built it shall:
 | 2 | Conflicting Schedules tab | — | DEFERRED — Batch D |
 | 3 | Schedule row → drill into detail | REQ-SETTINGS-RATING-F-003 | COVERED |
 | 4 | Detail: schedule header (Name, dates, Active) editable | REQ-SETTINGS-RATING-F-004 | COVERED |
-| 5 | Detail: rules table (Field, Operator, Value, Rate %, delete) | REQ-SETTINGS-RATING-F-005 | COVERED |
-| 6 | Detail: Add Rule row | REQ-SETTINGS-RATING-F-005 | COVERED |
-| 7 | Detail: grouped conditions (AND/OR logic operators) | — | DEFERRED — Batch D (complex rule-group logic) |
-| 8 | Detail: Versions tab | — | DEFERRED — Batch D |
-| 9 | Save button on detail | REQ-SETTINGS-RATING-F-006 | COVERED |
+| 5 | Detail: rules table (Field, Operator, Value, Rate %) | REQ-SETTINGS-RATING-F-005 | COVERED |
+| 6 | Detail: Add Rule row | REQ-SETTINGS-RATING-F-007 | COVERED |
+| 7 | Detail: Delete rule | REQ-SETTINGS-RATING-F-008 | COVERED |
+| 8 | Detail: grouped conditions (AND/OR logic operators) | — | DEFERRED — Batch D (complex rule-group logic) |
+| 9 | Detail: Versions tab | — | DEFERRED — Batch D |
+| 10 | Save button on detail | REQ-SETTINGS-RATING-F-006 | COVERED |
+| 11 | Create New Schedule (gap — not in backup UI) | REQ-SETTINGS-RATING-F-009 | COVERED |
 
 ### Page Layout — RatingRulesPage
 
@@ -218,8 +253,8 @@ When this feature is built it shall:
 │  outer: p-6 flex flex-col gap-6                │
 ├────────────────────────────────────────────────┤
 │  Card title="Rating Schedules"                  │  ← unconditional
-│    ResizableGrid: Name | Eff. From | Eff. To | Active | Actions │
-│    [+ New Schedule button]                     │
+│    Table: Name | Eff. From | Eff. To | Active  │
+│    (click row → detail page)                   │
 └────────────────────────────────────────────────┘
 ```
 
@@ -229,27 +264,271 @@ When this feature is built it shall:
 ┌────────────────────────────────────────────────┐
 │  outer: p-6 flex flex-col gap-6                │
 ├────────────────────────────────────────────────┤
-│  Card title="Schedule Details"                  │  ← unconditional; header fields
-│    Name [editable], Eff. From [date], Eff. To [date], Active [toggle] │
+│  Card title="Schedule Details"                  │  ← header fields, all editable
+│    Name [text] | Eff. From [date] | Eff. To [date] | Active [toggle] │
 │    [Save button]                               │
 ├────────────────────────────────────────────────┤
-│  Card title="Rating Rules"                      │  ← unconditional
-│    Table: Field | Operator | Value | Rate % | Actions (delete) │
-│    [+ Add Rule row]                            │
+│  Card title="Rating Rules"                      │  ← one row per rule
+│    Table: Field | Operator | Value | Rate % | [delete icon] │
+│    [+ Add Rule button]                         │
 └────────────────────────────────────────────────┘
 ```
 
-**REQ-SETTINGS-RATING-F-001:** A `RatingRulesPage` component shall exist at route `/settings/rating-rules`, accessible only to users with role `client_admin` or `internal_admin`. Unauthenticated users shall be redirected to `/login`.
+---
 
-**REQ-SETTINGS-RATING-F-002:** `RatingRulesPage` shall display all rating schedules in a table with columns: Name, Effective From, Effective To, Active. Data is loaded from `GET /api/rating-schedules` on mount.
+**REQ-SETTINGS-RATING-F-001** — _Access control_
 
-**REQ-SETTINGS-RATING-F-003:** Clicking a schedule row in `RatingRulesPage` shall navigate to `/settings/rating-rules/:id` where `:id` is the schedule's `id`.
+> Rating schedule configuration directly affects how premiums are calculated. Only organisation and platform administrators should be able to view or modify these settings.
 
-**REQ-SETTINGS-RATING-F-004:** A `RatingRulesDetailPage` component shall exist at route `/settings/rating-rules/:id`. It shall fetch `GET /api/rating-schedules/:id` on mount and display the schedule's Name (editable text), Effective From (editable date), Effective To (editable date), and Active (checkbox toggle) in a details card.
+The Rating Rules page shall be accessible only to users with the `client_admin` or `internal_admin` role. A user who is not logged in shall be redirected to the login page when they attempt to reach the Rating Rules page.
 
-**REQ-SETTINGS-RATING-F-005:** `RatingRulesDetailPage` shall display a rules card showing a table of rating rules loaded from `GET /api/rating-schedules/:id/rules`, with columns: Field, Operator, Value, Rate %, Actions. An "+ Add Rule" button shall append a new editable row with a Field dropdown and Operator dropdown pre-populated with the valid options from the BackUp (`postcode`, `country`, `subdivision`, `sum_insured`, `construction_type`, `occupancy`, `year_built` for fields; `=`, `!=`, `>`, `<`, `>=`, `<=`, `IN`, `STARTS_WITH`, `ENDS_WITH`, `CONTAINS` for operators). Submitting a new row calls `POST /api/rating-rules`. Clicking the delete icon calls `DELETE /api/rating-rules/:id`.
+---
 
-**REQ-SETTINGS-RATING-F-006:** `RatingRulesDetailPage` shall include a "Save" button in the details card that calls `PUT /api/rating-schedules/:id` with the edited header fields and on HTTP 200 displays a toast "Schedule saved".
+**REQ-SETTINGS-RATING-F-002** — _Viewing the list of rating schedules_
+
+> An administrator needs to see all the rating schedules configured for their organisation at a glance — to understand which are active, find a schedule to edit, or identify whether a schedule is missing or has expired.
+
+When an administrator opens the Rating Rules page, they shall see a list of all rating schedules for their organisation. Each row shall show the schedule's name, the date it becomes effective, the date it expires, and whether it is currently active.
+
+---
+
+**REQ-SETTINGS-RATING-F-003** — _Opening a schedule to view or edit_
+
+> After identifying the right schedule in the list, the administrator needs to be able to open it to review or change its rules.
+
+When an administrator clicks on a schedule row in the list, they shall be taken to the detail page for that schedule.
+
+---
+
+**REQ-SETTINGS-RATING-F-004** — _Viewing and editing a schedule's header details_
+
+> An administrator may need to rename a schedule, extend its validity dates, or mark it as inactive — for example, when renewing a schedule for a new underwriting year or retiring a superseded one.
+
+When an administrator opens a schedule's detail page, they shall see the schedule's name, effective-from date, effective-to date, and active status, and shall be able to edit all four values directly on the page.
+
+---
+
+**REQ-SETTINGS-RATING-F-005** — _Viewing the rules that belong to a schedule_
+
+> Each schedule contains one or more rules that define under which conditions a rate applies. An administrator needs to see these rules to understand the current pricing logic and verify it is correct.
+
+When an administrator views a schedule's detail page, they shall see a table of all pricing rules belonging to that schedule. Each row shall show: the location attribute being evaluated (for example: country, postcode, sum insured), the type of comparison being applied (for example: equals, greater than, starts with), the value being matched against, and the premium rate as a percentage.
+
+---
+
+**REQ-SETTINGS-RATING-F-006** — _Saving changes to a schedule's header_
+
+> Edits to a schedule's name, dates, or active status are not applied automatically — the administrator must explicitly confirm them to prevent accidental changes taking effect.
+
+When an administrator edits a schedule's name, dates, or active status and clicks "Save", the changes shall be persisted and a "Schedule saved" confirmation message shall be displayed. If the save fails, an error message shall be shown and the edited values shall be preserved on screen.
+
+---
+
+**REQ-SETTINGS-RATING-F-007** — _Adding a new pricing rule to a schedule_
+
+> An administrator may need to add a new pricing rule — for example, a rule that applies a 2% rate to all UK locations where the sum insured exceeds £1,000,000. Each rule is built by specifying what location attribute to look at, how to compare it, what value to match, and what rate to apply when the condition is met.
+
+When an administrator clicks "+ Add Rule" on a schedule's detail page, they shall be presented with an editable row containing the following inputs:
+- **Field** — a dropdown of the location attributes that can be evaluated: postcode, country, subdivision, sum insured, construction type, occupancy, year built
+- **Operator** — a dropdown of the comparison types that can be applied: equals (`=`), not equals (`≠`), greater than (`>`), less than (`<`), greater than or equal (`≥`), less than or equal (`≤`), in list (`IN`), starts with, ends with, contains
+- **Value** — a free text field for the value to match against
+- **Rate %** — a number field for the premium rate to apply when the rule matches
+
+When the administrator confirms the new row, the rule shall be saved and added to the rules table.
+
+---
+
+**REQ-SETTINGS-RATING-F-008** — _Removing a rule from a schedule_
+
+> An administrator may need to remove a rule that is no longer correct — for example, if a territory's pricing has changed and the old rule is being replaced.
+
+When an administrator clicks the delete icon on a rule row, that rule shall be permanently removed from the schedule and shall no longer appear in the rules table.
+
+---
+
+**REQ-SETTINGS-RATING-F-009** — _Creating a new rating schedule_
+
+> An administrator needs to be able to create a new schedule from scratch — for example, when setting up pricing for a new binding authority, a new class of business, or a new underwriting year. Without this, the only way to have a schedule is to import data directly into the database.
+
+The schedules grid shall display a '+' button (FiPlus icon) in the top-left header cell. When an administrator clicks this button, an inline entry row shall appear at the top of the grid with a name field (required). The administrator shall type the new schedule's name and confirm (FiCheck button, or Enter key) to create the schedule. On success, the administrator shall be taken directly to the new schedule's detail page where they can begin adding rules. The '+' button is disabled while the inline row is open; an 'x' (FiX) button in the inline row cancels creation and dismisses the row.
+
+---
+
+**REQ-SETTINGS-RATING-F-010** — _Inline create row includes date fields_
+
+> When creating a new schedule, the administrator should be able to set the effective date range immediately rather than being forced to navigate to the detail page to set them.
+
+The inline create row (opened by clicking the `+` icon) shall include an "Effective From" date input and an "Effective To" date input in addition to the Name field. Both date fields are optional. The `createRatingSchedule` call shall include the dates in the payload when provided. When the user enters Effective From and Effective To has not been manually edited, Effective To shall auto-default to Effective From plus one calendar year. If the user manually edits Effective To, later Effective From edits shall not overwrite the manually entered Effective To value.
+
+---
+
+**REQ-SETTINGS-RATING-F-011** — _Sidebar section: Rating Schedule_
+
+> The sidebar must reflect the current page context and provide quick access to save actions so that users can save without scrolling or searching for a button.
+
+The Rating Rules list page shall register a sidebar section titled "Rating Schedule" with a "Save" action item. The Save item shall be disabled when there is no in-progress inline row with a name entered; it shall be enabled and fire `rating-schedule:save` once the user has typed a name in the inline row. The page shall listen for the `rating-schedule:save` DOM event and trigger schedule creation.
+
+---
+
+**REQ-SETTINGS-RATING-F-012** — _Unsaved changes banner_
+
+> If the administrator opens an inline create row, types a name, and then accidentally navigates away, their work will be silently discarded. A visible warning and a browser guard reduce this risk.
+
+When the inline row is open and a schedule name has been typed, the list page shall display an amber unsaved-changes notification banner above the table. The browser's `beforeunload` event shall also be guarded to show a native confirmation dialog. The banner and guard are cleared when the inline row is cancelled or the new schedule is saved.
+
+---
+
+**REQ-SETTINGS-RATING-F-013** — _Column rename and edit icon_
+
+> The column label "Active" is misleading as the table also contains inactive schedules. A pencil icon is the standard affordance for "open and edit" in this application; a chevron offers no clear call to action.
+
+The schedules list table shall rename the "Active" column header to "Status". The first data column (previously showing `FiChevronRight`) shall be left blank. A new final column shall contain a green `FiEdit2` pencil icon button for each row; clicking it navigates to the schedule detail page (`/settings/rating-rules/:id`). The row itself remains clickable as a convenience.
+
+---
+
+**REQ-SETTINGS-RATING-F-014** — _Detail page: effective dates are editable date fields_
+
+> Administrators may need to adjust the validity period of a rating schedule after creation, for example to extend or shorten its active window.
+
+On the Rating Rules detail page, the "Effective From" and "Expiry Date" fields shall be rendered as editable `<input type="date">` controls, allowing the administrator to change the schedule's date range. Changes are staged locally and applied only when the sidebar Save action is triggered.
+
+---
+
+**REQ-SETTINGS-RATING-F-015** — _Detail page: rules table uses app-table style with FiPlus in header_
+
+> Consistency: all grids in this application use the `app-table` / `table-wrapper` style. The standalone "Add Rule" button above the grid should be replaced with the standard `FiPlus` icon in the first column header, matching the Quote Sections pattern.
+
+On the Rating Rules detail page, the rules table shall use `<table className="app-table">` inside `<div className="table-wrapper">`. The separate "Add Rule" button panel above the table shall be removed. A `FiPlus` icon button with `aria-label="Add rule"` shall appear in the first column header `<th>` and trigger the same add-rule action. The empty state message shall read "No rules defined. Click + to create one."
+
+---
+
+**REQ-SETTINGS-RATING-F-016** — _Detail page: sidebar section with Save action_
+
+The Rating Rules detail page shall register a sidebar section titled "Rating Schedule" with a "Save" action that fires `rating-schedule:save`. The page shall listen for that event and trigger `handleSave`.
+
+---
+
+**REQ-SETTINGS-RATING-F-017** — _List page: open records via magnifying glass, not row click_
+
+Records shall be opened by clicking a `FiSearch` icon button (aria-label "Open schedule") in the first column of each data row — matching the standard app navigation pattern. Clicking elsewhere on the row shall not navigate. The `FiEdit2` pencil icon shall be removed.
+
+---
+
+**REQ-SETTINGS-RATING-F-018** — _Unsaved changes: notification panel, not inline banner_
+
+When the inline create row has a name entered (`hasUnsaved === true`), the page shall call `addNotification` with type `'warning'` and a stable id `'rating-unsaved'` to surface the warning in the notification dock. The inline amber banner on the page body shall be removed. When the row is cancelled or saved, `removeNotification('rating-unsaved')` shall be called.
+
+---
+
+**REQ-SETTINGS-RATING-F-019** — _List page: schedule ID column_
+
+The list table shall include an "ID" column displaying the schedule's unique database ID. This allows users to distinguish schedules that share the same name.
+
+---
+
+**REQ-SETTINGS-RATING-F-020** — _Detail page: schedule ID in metadata card_
+
+The schedule metadata card shall display a read-only "Schedule ID" field showing the schedule's unique database ID.
+
+---
+
+**REQ-SETTINGS-RATING-F-021** — _Detail page: title shows schedule name_
+
+The page heading (`<h2>`) shall display the actual schedule name (loaded from the API), not the static text "Rating Schedule".
+
+---
+
+**REQ-SETTINGS-RATING-F-022** — _Detail page: no in-page back arrow_
+
+The in-page back arrow button (`FiArrowLeft`) shall be removed. Navigation back to the list is handled by the global sidebar "Back" button present on all non-home routes.
+
+---
+
+**REQ-SETTINGS-RATING-F-023** — _Detail page: Save is sidebar-only_
+
+The page-level "Save" button at the bottom of the detail page shall be removed. The only Save trigger shall be the sidebar section action (registered via `useSidebarSection`).
+
+---
+
+**REQ-SETTINGS-RATING-F-024** — _Detail page: Group-based rule structure_
+
+Rating rules on the detail page shall be organised into **Groups**. Each group has a name and an overall rate percentage. Within each group, one or more **Conditions** define criteria. The data model on load converts flat API rules (ordered by `group_number`, `sequence_in_group`) into a `RatingGroup[]` hierarchy.
+
+---
+
+**REQ-SETTINGS-RATING-F-025** — _Detail page: Field dropdown with 9 defined options_
+
+The Field column in every condition row shall be a `<select>` populated from `FIELD_OPTIONS`: Postcode, Country, State/Province, Sum Insured, Construction Type, Occupancy, Year Built, Coverage Detail, Coverage Detail Sub-Type.
+
+---
+
+**REQ-SETTINGS-RATING-F-026** — _Detail page: Operator dropdown with 10 defined options_
+
+The Operator column in every condition row shall be a `<select>` populated from `OPERATOR_OPTIONS`: Equals, Not Equals, Greater Than, Less Than, Greater or Equal, Less or Equal, In List, Starts With, Ends With, Contains.
+
+---
+
+**REQ-SETTINGS-RATING-F-027** — _Detail page: Logic column — IF for first condition, AND/OR for subsequent_
+
+The first condition in a group shall display a static **IF** badge. Subsequent conditions shall render an AND/OR `<select>`.
+
+---
+
+**REQ-SETTINGS-RATING-F-028** — _Detail page: Add Group button in table header_
+
+A `FiPlus` icon button with `aria-label="Add group"` in the first column `<th>` shall append a new group (with one default condition) to the list.
+
+---
+
+**REQ-SETTINGS-RATING-F-029** — _Detail page: Add Condition to a group_
+
+Each group header row shall include a `FiPlus` icon button with `aria-label="Add condition"` that appends a new condition to that group.
+
+---
+
+**REQ-SETTINGS-RATING-F-030** — _Detail page: Delete group and delete condition_
+
+Each group header row shall have a `FiTrash2` button (`aria-label="Delete group"`) that removes the entire group. Each condition row shall have a `FiTrash2` button (`aria-label="Delete condition"`) that removes that condition only.
+
+---
+
+**REQ-SETTINGS-RATING-F-031** — _Detail page: Group and condition ordering_
+
+Each group header row shall have `FiChevronUp` (`aria-label="Move group up"`) and `FiChevronDown` (`aria-label="Move group down"`) buttons to reorder groups. Each condition row shall have equivalent buttons (`aria-label="Move condition up"` / `"Move condition down"`) to reorder conditions within their group. First-position buttons shall be disabled.
+
+---
+
+### 3b.1 Page Validation — Iteration 1 (Settings -> Rating Rules)
+
+> This subsection defines Page 1 validation for the first iteration and is intentionally scoped to Settings surfaces only. No quote/policy implementation behavior is changed by this subsection.
+
+**REQ-SETTINGS-RATING-F-032** — _Section-level eligibility for schedule selection_
+
+When an underwriter configures rating schedules, the schedule record shall expose enough metadata to determine whether it is eligible for quote-section selection (active status, effective date range, placement compatibility). Only eligible schedules shall be returned to section-selection consumers.
+
+**REQ-SETTINGS-RATING-F-033** — _Multiple eligible schedules supported_
+
+The Rating Rules model shall permit multiple concurrently active schedules for the same organisation and context. The UI shall clearly distinguish schedules by name and id so users can intentionally choose one when multiple are eligible.
+
+**REQ-SETTINGS-RATING-F-034** — _Version visibility for audit_
+
+The detail view shall expose schedule version context used for downstream rating calculations, including current version number and effective window metadata.
+
+**REQ-SETTINGS-RATING-F-035** — _Rule explainability readiness_
+
+Rules configured in Settings shall provide display-ready fields needed by downstream explain views: field, operator, value, rate percentage, rule order/grouping, and active status.
+
+**REQ-SETTINGS-RATING-F-036** — _Validation data-readiness contract_
+
+The Settings surfaces shall support deterministic first-iteration validation by ensuring at least one schedule can be configured with multiple postcode-driven rules that return different rates for different inputs under the same coverage context.
+
+### Acceptance Criteria — Iteration 1 Page 1
+
+1. At least two schedules may be active concurrently and visible in list/detail views without data collision.
+2. Each schedule row shows an id and name sufficient to avoid ambiguity.
+3. Detail view exposes version/effective metadata required for transaction audit trails.
+4. Rule rows include field/operator/value/rate and maintain deterministic ordering.
+5. A configured schedule can represent multiple postcode outcomes with distinct rates for downstream tests.
 
 ---
 
@@ -261,10 +540,10 @@ When this feature is built it shall:
 
 | # | BackUp Feature | Requirement ID | Status |
 |---|----------------|----------------|--------|
-| 1 | Product cards grid (Name, Code, Type, LoB, UW Year) | REQ-SETTINGS-PRODUCTS-F-001 | COVERED |
-| 2 | New Product modal form | REQ-SETTINGS-PRODUCTS-F-002 | COVERED |
+| 1 | Product table grid (ID, Name, Code, Type, LoB, UW Year, Status) | REQ-SETTINGS-PRODUCTS-F-001 | COVERED |
+| 2 | Inline add-product row in table header | REQ-SETTINGS-PRODUCTS-F-002 | COVERED |
 | 3 | Delete product from list | — | DEFERRED — Batch D |
-| 4 | Navigate to product detail (click card) | REQ-SETTINGS-PRODUCTS-F-003 | COVERED |
+| 4 | Navigate to product detail (open action) | REQ-SETTINGS-PRODUCTS-F-003 | COVERED |
 | 5 | General tab: Name, Code (read-only), Type, LoB, UW Year, Active, Description | REQ-SETTINGS-PRODUCTS-F-004 | COVERED |
 | 6 | Workflow Steps tab: table of steps with Name, Code, Description, Active, Default | REQ-SETTINGS-PRODUCTS-F-005 | COVERED |
 | 7 | Inline add-step form | REQ-SETTINGS-PRODUCTS-F-005 | COVERED |
@@ -277,15 +556,17 @@ When this feature is built it shall:
 ┌────────────────────────────────────────────────┐
 │  outer: p-6 flex flex-col gap-6                │
 ├────────────────────────────────────────────────┤
-│  [+ New Product button]   (top-right)          │  ← unconditional
+│  Header: Product Configuration                  │  ← unconditional
 ├────────────────────────────────────────────────┤
-│  Grid of product cards (1 col→2 col→3 col)     │  ← conditional on data loaded
-│    Card: Name, Code badge, Type badge, LoB,    │
-│           UW Year, Description (2 lines)       │
+│  Products table                                │  ← conditional on data loaded
+│    Header + add button in first column         │
+│    Columns: ID, Name, Code, Type, LoB, UW Year,│
+│             Status                              │
+│    Row action: Open product                     │
 └────────────────────────────────────────────────┘
-│  Modal (conditional on "+ New Product" click)  │
-│    Name, Code (auto), Type, LoB, UW Year, Desc │
-│    [Cancel] [Create Product]                   │
+│  Inline row (conditional on + click)           │
+│    Name, Code, Type, LoB, UW Year              │
+│    [Create] [Cancel]                            │
 └────────────────────────────────────────────────┘
 ```
 
@@ -307,15 +588,27 @@ When this feature is built it shall:
 └────────────────────────────────────────────────┘
 ```
 
-**REQ-SETTINGS-PRODUCTS-F-001:** A `ProductListPage` component shall exist at route `/settings/products`, loading products from `GET /api/settings/products` on mount and rendering each product as a card showing: Name, Code, Product Type (badge), Line of Business, and Underwriting Year.
+**REQ-SETTINGS-PRODUCTS-F-001:** A `ProductListPage` component shall exist at route `/settings/products`, loading products and product categories from the settings API on mount and rendering products in a table with columns: ID, Name, Code, Product Catagory, Line of Business, Underwriting Year, Status.
 
-**REQ-SETTINGS-PRODUCTS-F-002:** `ProductListPage` shall include a "+ New Product" button that opens a modal with fields: Name (required text), Code (auto-generated from Name, required), Product Type (dropdown: `open_market` / `delegated`), Line of Business (text), Underwriting Year (number), Description (textarea). Submitting the form calls `POST /api/settings/products` and on HTTP 201 closes the modal, refreshes the list, and shows a toast "Product created".
+**REQ-SETTINGS-PRODUCTS-F-002:** `ProductListPage` shall include an add-product action in the table header that reveals an inline create row with fields: Name (required text), Code (auto-generated from Name, required), Product Catagory (dropdown populated from org categories), Line of Business (text), Underwriting Year (number). Confirming the row calls `POST /api/settings/products`; on HTTP 201 the row is hidden, list is refreshed/updated, and a toast "Product created" is shown.
 
-**REQ-SETTINGS-PRODUCTS-F-003:** Clicking a product card in `ProductListPage` shall navigate to `/settings/products/:id`.
+**REQ-SETTINGS-PRODUCTS-F-003:** Each product row in `ProductListPage` shall include an "Open product" action that navigates to `/settings/products/:id`.
 
-**REQ-SETTINGS-PRODUCTS-F-004:** A `ProductConfigPage` component shall exist at route `/settings/products/:id`. It shall display a "General" tab with fields: Name (editable), Code (read-only), Product Type (dropdown), Line of Business (text), Underwriting Year (number), Active (toggle), Description (textarea). A "Save" button calls `PUT /api/settings/products/:id`; on HTTP 200 a toast "Product saved" appears.
+**REQ-SETTINGS-PRODUCTS-F-004:** A `ProductConfigPage` component shall exist at route `/settings/products/:id`. It shall display a top-level `Product Details` tab with fields: Name (editable), Code (editable), Product Catagory (dropdown populated from org categories), Class of Business (dropdown), Year of Account (number), Active (toggle), Description (textarea). The page Save action shall be provided from the sidebar and shall call `PUT /api/settings/products/:id`; on HTTP 200 a toast "Product saved" appears.
 
-**REQ-SETTINGS-PRODUCTS-F-005:** `ProductConfigPage` shall display a "Workflow Steps" tab showing steps loaded from `GET /api/settings/products/:id/workflow-steps` in a table with columns: #, Step Name, Code, Description, Active, Default. An inline "+ Add Step" row at the bottom of the table accepts: Step Name (required), Code (auto-generated), Description, Active (checkbox), Default (checkbox). Submitting the inline row calls `POST /api/settings/products/:id/workflow-steps`.
+**REQ-SETTINGS-PRODUCTS-F-005:** `ProductConfigPage` shall display a drilldown grid under `Product Details` that follows a `Section -> Coverage -> Coverage Element` flow. The initial grid shall list sections. Clicking a section shall open a coverage grid for that section. Clicking a coverage shall open a coverage-element grid. The grids shall use the same app-table / table-wrapper presentation style as quote section pages.
+
+**REQ-SETTINGS-PRODUCTS-F-006:** The coverage-element grid in `ProductConfigPage` shall render editable rows for coverage element defaults and include an add-row action. The page shall preserve the selected drilldown path until the user navigates back.
+
+**REQ-SETTINGS-PRODUCTS-F-007:** `ProductConfigPage` shall display an `Audit` tab that loads product audit history from `GET /api/audit/Product/:id` on first activation and renders it in the shared `AuditTable` component.
+
+**REQ-SETTINGS-PRODUCTS-F-008:** A `ProductCategoriesPage` component shall exist at route `/settings/product-catagories`. It shall load org-scoped product categories from `GET /api/settings/product-categories`, render a table with category name and the count of products assigned to each category, and allow inline creation of a new category.
+
+**REQ-SETTINGS-PRODUCTS-F-009:** `ProductCategoriesPage` shall call `POST /api/settings/product-categories` to create a category. Newly created categories shall be available to the Product Catagory filters and product editor dropdowns after refresh.
+
+**REQ-SETTINGS-PRODUCTS-F-010:** `ProductCategoriesPage` shall call `DELETE /api/settings/product-categories/:id` to remove a category. The delete action shall be disabled or rejected when the category still has one or more products assigned.
+
+**REQ-SETTINGS-PRODUCTS-F-011:** `ProductListPage` and `ProductConfigPage` shall register a sidebar action labelled `Create Product Catagory` that navigates to `/settings/product-catagories`.
 
 ---
 

@@ -13,8 +13,9 @@ async function run() {
             { code: 'CREATED',   name: 'Created',   description: 'Quote has been created',           order_index: 1 },
             { code: 'QUOTED',    name: 'Quoted',    description: 'Quote has been issued',             order_index: 2 },
             { code: 'BOUND',     name: 'Bound',     description: 'Quote has been bound to a policy', order_index: 3 },
-            { code: 'DECLINED',  name: 'Declined',  description: 'Quote has been declined',          order_index: 4 },
-            { code: 'DISBANDED', name: 'Disbanded', description: 'Quote has been disbanded',         order_index: 5 },
+            { code: 'ISSUED',    name: 'Issued',    description: 'Quote has been issued as a policy', order_index: 4 },
+            { code: 'DECLINED',  name: 'Declined',  description: 'Quote has been declined',           order_index: 5 },
+            { code: 'DISBANDED', name: 'Disbanded', description: 'Quote has been disbanded',          order_index: 6 },
         ]
         for (const r of rows) {
             await client.query(

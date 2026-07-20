@@ -32,6 +32,7 @@ import { useSidebarSection } from '@/shell/SidebarContext'
 import type { SidebarSection } from '@/shell/SidebarContext'
 import { useNotifications } from '@/shell/NotificationDock'
 import { getSession } from '@/shared/lib/auth-session/auth-session'
+import { post, get } from '@/shared/lib/api-client/api-client'
 import AuditTable from '@/shared/components/AuditTable/AuditTable'
 import BrokerSearch from '@/parties/BrokerSearch/BrokerSearch'
 import Card from '@/shared/Card/Card'
@@ -118,6 +119,10 @@ export default function PolicyEndorsementPage() {
     // Audit tab
     const [audit, setAudit] = useState<AuditEvent[]>([])
     const auditPostedRef = useRef(false)
+    // REQ-POL-FE-F-045/046 — endorsement-specific audit open/close tracking
+    const endorsementAuditPostedRef = useRef(false)
+    const endorsementCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const endorsementIdRef = useRef(endorsementId)
 
     // Endorsement fields
     const [effectiveDate, setEffectiveDate] = useState('')
@@ -171,12 +176,50 @@ export default function PolicyEndorsementPage() {
 
     function handleTabChange(key: string) {
         setActiveTab(key)
-        if (key === 'audit' && id) {
-            getPolicyAudit(Number(id))
+        // REQ-POL-FE-F-047 — endorsement audit tab fetches endorsement-specific events
+        if (key === 'audit' && endorsementId) {
+            get<AuditEvent[]>(`/api/audit/PolicyEndorsement/${endorsementId}`)
                 .then(setAudit)
                 .catch(() => undefined)
         }
     }
+
+    // REQ-POL-FE-F-045 — POST Endorsement Opened on mount
+    useEffect(() => {
+        if (endorsementCloseTimerRef.current !== null) {
+            clearTimeout(endorsementCloseTimerRef.current)
+            endorsementCloseTimerRef.current = null
+        }
+        if (!endorsementId || endorsementAuditPostedRef.current) return
+        endorsementAuditPostedRef.current = true
+        post('/api/audit/event', {
+            entityType: 'PolicyEndorsement',
+            entityId: Number(endorsementId),
+            action: 'Endorsement Opened',
+            details: {},
+        }).catch(() => undefined)
+    }, [endorsementId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // REQ-POL-FE-F-046 — POST Endorsement Closed on unmount
+    useEffect(() => {
+        endorsementIdRef.current = endorsementId
+    }, [endorsementId])
+
+    useEffect(() => {
+        return () => {
+            if (!endorsementIdRef.current || !endorsementAuditPostedRef.current) return
+            const capturedEndId = endorsementIdRef.current
+            endorsementCloseTimerRef.current = setTimeout(() => {
+                endorsementCloseTimerRef.current = null
+                post('/api/audit/event', {
+                    entityType: 'PolicyEndorsement',
+                    entityId: Number(capturedEndId),
+                    action: 'Endorsement Closed',
+                    details: {},
+                }).catch(() => undefined)
+            }, 0)
+        }
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     // REQ-POL-FE-F-026/014 parity — POST Policy Opened on initial page load
     // closeTimerRef lets this effect cancel a pending Closed post that was
@@ -250,11 +293,28 @@ export default function PolicyEndorsementPage() {
         return () => window.removeEventListener('popstate', onPopState)
     }, [isDirty])
 
-    // REQ-POL-FE-F-027 — Issue Endorsement action
+    // REQ-POL-FE-F-048/049 — Issue Endorsement action
     const handleIssue = useCallback(async () => {
         if (!id || !endorsementId) return
         try {
             await issueEndorsement(id, endorsementId)
+            // REQ-POL-FE-F-048 — best-effort endorsement issued event
+            const session = getSession()
+            post('/api/audit/event', {
+                entityType: 'PolicyEndorsement',
+                entityId: Number(endorsementId),
+                action: 'Endorsement Issued',
+                details: {},
+            }).catch(() => undefined)
+            // REQ-POL-FE-F-049 — cross-post Policy Cancelled for cancellation endorsements
+            if (endorsement?.transaction_type === 'Cancellation') {
+                postPolicyAudit(Number(id), {
+                    action: 'Policy Cancelled',
+                    entityType: 'Policy',
+                    entityId: Number(id),
+                    performedBy: session?.user?.name,
+                }).catch(() => undefined)
+            }
             addNotification({ message: 'Endorsement issued successfully.', type: 'success' })
             setIsDirty(false)
             navigate(`/policies/${id}`)
@@ -262,7 +322,7 @@ export default function PolicyEndorsementPage() {
             const msg = err instanceof Error ? err.message : 'Failed to issue endorsement.'
             addNotification({ message: `Issue endorsement failed: ${msg}`, type: 'error' })
         }
-    }, [id, endorsementId, addNotification, navigate])
+    }, [id, endorsementId, endorsement, addNotification, navigate])
 
     const sidebarSection = useMemo((): SidebarSection => ({
         title: 'Endorsement',
@@ -440,8 +500,13 @@ export default function PolicyEndorsementPage() {
             : col
     )
 
+    const policyProduct = (() => {
+        const payload = (policy?.payload ?? {}) as Record<string, unknown>
+        return (payload.product as Record<string, unknown> | undefined) ?? null
+    })()
+
     return (
-        <div className="p-6 flex flex-col gap-6">
+        <div className="p-6 flex flex-col gap-4">
             {/* Header — F-026 */}
             <Card>
                 <div className="flex items-center justify-between mb-4">
@@ -457,7 +522,7 @@ export default function PolicyEndorsementPage() {
                         {policy.status}
                     </span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                     <div className="flex flex-col gap-3">
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contract &amp; Reference</h3>
                         <div>
@@ -485,7 +550,20 @@ export default function PolicyEndorsementPage() {
                             <p className="text-gray-900">{readPolicy('placing_broker', 'placingBroker')}</p>
                         </div>
                     </div>
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3">
+                        <FieldGroup title="Product">
+                            <div className="flex flex-col gap-2 text-sm">
+                                <div>
+                                    <p className="text-xs text-gray-500">Product Category</p>
+                                    <p className="text-gray-900">{typeof policyProduct?.category === 'string' && policyProduct.category ? policyProduct.category : '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500">Product</p>
+                                    <p className="text-gray-900">{typeof policyProduct?.name === 'string' && policyProduct.name ? policyProduct.name : '—'}</p>
+                                </div>
+                            </div>
+                        </FieldGroup>
+
                         <div className="flex flex-col gap-3">
                             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Dates</h3>
                             <div>

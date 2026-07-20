@@ -131,6 +131,10 @@
 
 **REQ-AUTH-F-024:** The system shall embed the authenticated user's `orgCode` in the JWT payload upon successful authentication.
 
+**REQ-AUTH-F-033:** The `POST /api/auth/login` endpoint shall include an `orgType` field in the `user` object of the response body, resolved from the `organisations` table by the authenticated user's `orgCode`. When no matching organisation record exists, `orgType` shall default to `'insurer'`.
+
+**REQ-AUTH-F-034:** The `POST /api/auth/login` endpoint shall embed `orgType` in the JWT payload, resolved from the `organisations` table by the authenticated user's `orgCode`. When no matching organisation record exists, `orgType` shall default to `'insurer'`.
+
 **REQ-AUTH-C-002:** The LoginPage and LoginForm components shall use the `auth-session` shared service to store the session token and shall not write to `localStorage` or `sessionStorage` directly.
 
 **REQ-AUTH-C-003:** The LoginPage and LoginForm components shall not call `fetch()` directly; all API calls shall be made via the `api-client` shared service.
@@ -241,6 +245,8 @@
 | REQ-AUTH-S-009 | `backend/__tests__/auth.test.js` | T-BE-AUTH-R10f |
 | REQ-AUTH-F-023 | pending | pending |
 | REQ-AUTH-F-024 | pending | pending |
+| REQ-AUTH-F-033 | `backend/nest/src/auth/auth.spec.ts` | T-AUTH-BE-NE-R01f, T-AUTH-BE-NE-R01i |
+| REQ-AUTH-F-034 | `backend/nest/src/auth/auth.spec.ts` | T-AUTH-BE-NE-R01f, T-AUTH-BE-NE-R01i |
 | REQ-AUTH-F-027 | pending | pending |
 | REQ-AUTH-F-028 | pending | pending |
 | REQ-AUTH-F-029 | pending | pending |
@@ -332,7 +338,7 @@ POST /api/auth/login → 200
 {
   "message": "Login successful",
   "token": "<jwt>",
-  "user": { "id", "username", "email", "fullName", "orgCode", "role" }
+  "user": { "id", "username", "email", "fullName", "orgCode", "orgType", "role" }
 }
 ```
 

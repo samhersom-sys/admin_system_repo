@@ -57,7 +57,7 @@ Sources read from `policy-forge-chat (BackUp)/`:
 | 21 | Audit tab — audit trail | F-069, F-070 | COVERED |
 | 22 | Section detail — coverage, participations, risk codes | F-073–F-085 | COVERED |
 | 23 | Section GPI monitoring | F-086 | COVERED |
-| 24 | Section Rating Configuration | F-087 | DEFERRED — Block 3 |
+| 24 | Section Rating Configuration | F-087, F-087a | COVERED — Block 3 |
 | 25 | BA Opened / BA Closed audit events | F-071 | COVERED |
 | 26 | Dirty state + back barrier | C-003 | COVERED |
 | 27 | Documents page (generate, list, download) | — | DEFERRED — Block 3 |
@@ -348,6 +348,26 @@ All editable fields shall be inputs when the parent BA status is `"Draft"` and r
 
 **REQ-BA-FE-F-086:** The Section GPI Monitoring tab shall display the section's GPI Limit (`written_premium_limit`) with currency, Actual Gross Premium (populated from bordereau data when available), and a colour-coded usage percentage progress bar. The colour rules from REQ-BA-FE-F-057 apply (green below 80%, amber 80–100%, red above 100%). When no GPI limit is set for this section (`written_premium_limit` is null), the tab shall render `"No GPI limit configured for this section. Set a Written Premium Limit on the Coverage tab to enable GPI monitoring."`. **[Block 3 — actual premium aggregation from bordereau data is deferred; placeholder 0 is shown until that integration is built.]**
 
+#### 4.11.5 Section Rating Configuration Tab
+
+> **Business context**
+> Each binding authority section can be priced using one or more rating schedules configured in Settings. This tab gives underwriters a read-only view of which schedules apply to this section's binding authority — so they can quickly confirm the right pricing rules are in place without leaving the section page. Clicking "View Schedule" takes them directly to the schedule's detail page to inspect or edit the rules.
+
+**REQ-BA-FE-F-087:** The `BASectionViewPage` shall include a fifth tab labelled **"Rating Configuration"**. When the tab is active, the page shall call `GET /api/rating-schedules?binding_authority_id=<ba_id>` and display the returned schedules in an `app-table` grid. The grid shall have the following columns:
+
+| Column | Source field | Notes |
+|--------|-------------|-------|
+| Schedule Name | `name` | |
+| Effective From | `effective_date` | formatted `dd Mmm yyyy` |
+| Effective To | `expiry_date` | formatted `dd Mmm yyyy`; `—` when null |
+| Status | `is_active` | green badge "Active" / grey badge "Inactive" |
+| Rules | `rules_count` | e.g. "3 rules"; "0 rules" when absent |
+| Actions | — | "View Schedule" link → `/settings/rating-rules/:id` |
+
+While loading, the tab shall display the text `"Loading rating schedules…"`. When the API returns an empty array, the tab shall display `"No rating schedules configured for this binding authority."`. On API failure, `addNotification('Could not load rating schedules.', 'error')` shall be called and the loading state shall be cleared. The tab content shall be loaded lazily (only when the tab is first selected). The component shall be extracted into `BASectionViewPage/BASectionRatingConfiguration.tsx` and imported into `BASectionViewPage`.
+
+**REQ-BA-FE-F-087a:** The "View Schedule" link in the Rating Configuration tab shall navigate to `/settings/rating-rules/:id` using a React Router `<Link>` component, opening the schedule's detail page in the same window.
+
 ### 4.12 BASearchModal — Reusable BA Search and Link Modal
 
 **REQ-BA-FE-F-091:** The application shall include a `BASearchModal` component at `frontend/src/binding-authorities/BASearchModal/BASearchModal.tsx` that is a reusable modal for searching and selecting an existing BA record. It shall accept props: `isOpen: boolean`, `onClose: () => void`, `onSelect: (ba: BindingAuthority) => void`, and an optional `excludeIds?: number[]`.
@@ -503,6 +523,8 @@ All editable fields shall be inputs when the parent BA status is `"Draft"` and r
 | REQ-BA-FE-F-143 | `frontend/src/binding-authorities/__tests__/binding-authorities.test.tsx` | pending |
 | REQ-BA-FE-F-144 | `frontend/src/binding-authorities/__tests__/binding-authorities.test.tsx` | pending |
 | REQ-BA-FE-F-145 | `frontend/src/binding-authorities/__tests__/binding-authorities.test.tsx` | pending |
+| REQ-BA-FE-F-148 | `frontend/src/binding-authorities/__tests__/binding-authorities.test.tsx` | T-BA-FE-F-R148 |
+| REQ-BA-FE-F-149 | `frontend/src/binding-authorities/__tests__/binding-authorities.test.tsx` | T-BA-FE-F-R149 |
 
 ---
 
@@ -1043,7 +1065,27 @@ Acceptance criteria:
 
 ---
 
-## 8. Design Notes
+### REQ-BA-FE-F-148 — BA Updated audit event on save
+
+**REQ-BA-FE-F-148 (Frontend):** `BAViewPage` shall post a best-effort audit event with `action: 'BA Updated'` to `POST /api/binding-authorities/:id/audit` after a successful `handleSaveBA`. The `details.description` field shall contain a human-readable field diff (using `buildAuditDiff`) listing changed fields in the format `"Label: old → new"`. If no fields changed, `details` shall be `{}`.
+
+Acceptance criteria:
+- `POST /api/binding-authorities/:id/audit` called with `{ action: 'BA Updated', details: { description: ... } }` after successful save.
+- Failure of the audit post does not surface an error to the user.
+
+Test: T-BA-FE-F-R148
+
+---
+
+### REQ-BA-FE-F-149 — BA Status Changed audit event
+
+**REQ-BA-FE-F-149 (Frontend):** `BAViewPage` shall post a best-effort audit event with `action: 'BA Status Changed'` to `POST /api/binding-authorities/:id/audit` after a successful `handleStatusChange`. The `details.description` field shall contain `"Status: <old> → <new>"`.
+
+Acceptance criteria:
+- `POST /api/binding-authorities/:id/audit` called with `{ action: 'BA Status Changed', details: { description: 'Status: Draft → Active' } }` on issue.
+- Failure of the audit post does not surface an error to the user.
+
+Test: T-BA-FE-F-R149
 
 ### Dependencies
 - `frontend/src/binding-authorities/binding-authorities.service.ts` — `listBAs`, `getBA`, `createBA`, `updateBA`

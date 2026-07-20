@@ -69,32 +69,39 @@ export class SearchService {
     // ---------------------------------------------------------------------------
     // GET /api/search
     // ---------------------------------------------------------------------------
-    async search(q: Record<string, string>, orgCode: string): Promise<any> {
+    async search(q: Record<string, string>, userId: number | null, userName: string | null, orgCode: string): Promise<any> {
         // REQ-SEARCH-BE-F-007 â€” validate type(s)
         const requestedTypes: string[] = q['types']
             ? q['types'].split(',').filter(t => VALID_TYPES.has(t))
             : (q['type'] && VALID_TYPES.has(q['type']) ? [q['type']] : [])
 
         if (q['types'] && requestedTypes.length === 0) {
-            await logError(this.dataSource, orgCode, null, 'GET /api/search', 'ERR_SEARCH_INVALID_TYPES', `Invalid types: ${q['types']}`, { query: q })
+            await logError(this.dataSource, orgCode, userName, 'GET /api/search', 'ERR_SEARCH_INVALID_TYPES', `Invalid types: ${q['types']}`, { query: q })
             throw new BadRequestException(`Invalid types. Each must be one of: ${[...VALID_TYPES].join(', ')}`)
         }
         if (q['type'] && !q['types'] && !VALID_TYPES.has(q['type'])) {
-            await logError(this.dataSource, orgCode, null, 'GET /api/search', 'ERR_SEARCH_INVALID_TYPE', `Invalid type: ${q['type']}`, { query: q })
+            await logError(this.dataSource, orgCode, userName, 'GET /api/search', 'ERR_SEARCH_INVALID_TYPE', `Invalid type: ${q['type']}`, { query: q })
             throw new BadRequestException(`Invalid type. Must be one of: ${[...VALID_TYPES].join(', ')}`)
         }
 
         // REQ-SEARCH-BE-F-009 â€” validate date params
         for (const dp of DATE_PARAMS) {
             if (q[dp] && !isValidDate(q[dp])) {
-                await logError(this.dataSource, orgCode, null, 'GET /api/search', 'ERR_SEARCH_INVALID_DATE', `Invalid date value for ${dp}`, { query: q, parameter: dp, value: q[dp] })
+                await logError(this.dataSource, orgCode, userName, 'GET /api/search', 'ERR_SEARCH_INVALID_DATE', `Invalid date value for ${dp}`, { query: q, parameter: dp, value: q[dp] })
                 throw new BadRequestException(`Invalid date value for ${dp}: "${q[dp]}"`)
             }
         }
 
-        // Single query path - filterMode always used.
-        // Results capped at LIMIT 2000 per type as a database safety guard.
-        // Frontend pagination handles display volume.
+        const hasFilters = Boolean(
+            requestedTypes.length > 0 || q['reference'] || q['status'] || q['insured'] || q['broker'] ||
+            q['coverholder'] ||
+            q['yearOfAccount'] || q['inceptionFrom'] || q['inceptionTo'] || q['expiryFrom'] || q['expiryTo'] ||
+            q['lastOpenedFrom'] || q['lastOpenedTo'] || q['createdFrom'] || q['createdTo'] || q['createdBy'],
+        )
+
+        // Always use filterMode so unfiltered results use the same LIMIT 200
+        // query as type-filtered results. defaultMode (15-cap, audit-based) was
+        // causing fewer results to appear when NO type filter was selected.
         return this.filterMode(q, orgCode, requestedTypes)
     }
 
@@ -112,6 +119,178 @@ export class SearchService {
         return rows
             .map((r: any) => String(r.name ?? '').trim())
             .filter((name: string) => name.length > 0)
+    }
+
+    // ---------------------------------------------------------------------------
+    // Default mode â€” most recently opened by this user, or most recently created
+    // ---------------------------------------------------------------------------
+    private async defaultMode(orgCode: string, userId: number | null, userName: string | null): Promise<any> {
+        let auditRows: any[] = []
+        if (userId || userName) {
+            const auditSql = userId
+                ? `SELECT ae.entity_type, ae.entity_id, MAX(ae.created_at) AS last_opened
+                   FROM public.audit_event ae
+                   WHERE (ae.action ILIKE '%Opened%' OR ae.action ILIKE '%Updated%')
+                     AND (ae.user_id = $1 OR (ae.user_id IS NULL AND ae.user_name = $2))
+                   GROUP BY ae.entity_type, ae.entity_id
+                   ORDER BY last_opened DESC
+                   LIMIT 90`
+                : `SELECT ae.entity_type, ae.entity_id, MAX(ae.created_at) AS last_opened
+                   FROM public.audit_event ae
+                   WHERE (ae.action ILIKE '%Opened%' OR ae.action ILIKE '%Updated%')
+                     AND ae.user_name = $1
+                   GROUP BY ae.entity_type, ae.entity_id
+                   ORDER BY last_opened DESC
+                   LIMIT 90`
+            const auditParams = userId ? [userId, userName] : [userName]
+            auditRows = await this.dataSource.query(auditSql, auditParams)
+        }
+
+        // Group audit rows by type
+        const auditByType: Record<string, Array<{ id: any; lastOpenedDate: any }>> = {}
+        for (const row of auditRows) {
+            if (!auditByType[row.entity_type]) auditByType[row.entity_type] = []
+            auditByType[row.entity_type].push({ id: row.entity_id, lastOpenedDate: row.last_opened })
+        }
+
+        const result: any = { submissions: [], quotes: [], policies: [], bindingAuthorities: [], parties: [], claims: [] }
+
+        // Submissions
+        const subAudit = (auditByType['Submission'] || []).slice(0, 15)
+        if (subAudit.length > 0) {
+            const ids = subAudit.map(a => a.id)
+            const rows = await this.dataSource.query(
+                `SELECT id, reference, insured, status, "inceptionDate", "expiryDate", "createdDate", "createdBy"
+                 FROM submission WHERE id = ANY($1) AND "createdByOrgCode" = $2`,
+                [ids, orgCode],
+            )
+            const lastOpenedMap = Object.fromEntries(subAudit.map(a => [a.id, a.lastOpenedDate]))
+            result.submissions = rows.map((r: any) => ({ ...r, lastOpenedDate: lastOpenedMap[r.id] ?? null }))
+        } else {
+            const rows = await this.dataSource.query(
+                `SELECT id, reference, insured, status, "inceptionDate", "expiryDate", "createdDate", "createdBy"
+                 FROM submission WHERE "createdByOrgCode" = $1 ORDER BY "createdDate" DESC LIMIT 15`,
+                [orgCode],
+            )
+            result.submissions = rows.map((r: any) => ({ ...r, lastOpenedDate: null }))
+        }
+
+        // Parties
+        const partyAudit = (auditByType['Party'] || []).slice(0, 15)
+        if (partyAudit.length > 0) {
+            const ids = partyAudit.map(a => a.id)
+            const rows = await this.dataSource.query(
+                `SELECT id, name, role FROM party WHERE id = ANY($1) AND "orgCode" = $2`,
+                [ids, orgCode],
+            )
+            const lastOpenedMap = Object.fromEntries(partyAudit.map(a => [a.id, a.lastOpenedDate]))
+            result.parties = rows.map((r: any) => ({ ...r, lastOpenedDate: lastOpenedMap[r.id] ?? null }))
+        } else {
+            const rows = await this.dataSource.query(
+                `SELECT id, name, role FROM party WHERE "orgCode" = $1 ORDER BY "createdDate" DESC LIMIT 15`,
+                [orgCode],
+            )
+            result.parties = rows.map((r: any) => ({ ...r, lastOpenedDate: null }))
+        }
+
+        result.quotes = await this.fetchWithAuditOrFallback(
+            auditByType['Quote'],
+            (ids) => this.dataSource.query(
+                `${QUOTE_SEARCH_SELECT}
+                 FROM quotes
+                 WHERE id = ANY($1) AND created_by_org_code = $2 AND deleted_at IS NULL`,
+                [ids, orgCode],
+            ),
+            () => this.dataSource.query(
+                `${QUOTE_SEARCH_SELECT}
+                 FROM quotes
+                 WHERE created_by_org_code = $1 AND deleted_at IS NULL
+                 ORDER BY created_date DESC
+                 LIMIT 15`,
+                [orgCode],
+            ),
+        )
+
+        result.policies = await this.fetchWithAuditOrFallback(
+            auditByType['Policy'],
+            (ids) => this.dataSource.query(
+                `${POLICY_SEARCH_SELECT}
+                 FROM policies
+                 WHERE id = ANY($1) AND created_by_org_code = $2`,
+                [ids, orgCode],
+            ),
+            () => this.dataSource.query(
+                `${POLICY_SEARCH_SELECT}
+                 FROM policies
+                 WHERE created_by_org_code = $1
+                 ORDER BY created_date DESC
+                 LIMIT 15`,
+                [orgCode],
+            ),
+        )
+
+        result.bindingAuthorities = await this.fetchWithAuditOrFallback(
+            auditByType['Binding Authority'],
+            (ids) => this.dataSource.query(
+                `${BINDING_AUTHORITY_SEARCH_SELECT}
+                 FROM binding_authorities ba
+                 LEFT JOIN submission s ON s.id = ba.submission_id
+                 WHERE ba.id = ANY($1) AND ba.created_by_org_code = $2`,
+                [ids, orgCode],
+            ),
+            () => this.dataSource.query(
+                `${BINDING_AUTHORITY_SEARCH_SELECT}
+                 FROM binding_authorities ba
+                 LEFT JOIN submission s ON s.id = ba.submission_id
+                 WHERE ba.created_by_org_code = $1
+                 ORDER BY ba.created_at DESC
+                 LIMIT 15`,
+                [orgCode],
+            ),
+        )
+
+        result.claims = await this.fetchWithAuditOrFallback(
+            auditByType['Claim'],
+            (ids) => this.dataSource.query(
+                `${CLAIM_SEARCH_SELECT}
+                 FROM claims c
+                 INNER JOIN policies p ON p.id = c.policy_id
+                 WHERE c.id = ANY($1) AND p.created_by_org_code = $2`,
+                [ids, orgCode],
+            ),
+            () => this.dataSource.query(
+                `${CLAIM_SEARCH_SELECT}
+                 FROM claims c
+                 INNER JOIN policies p ON p.id = c.policy_id
+                 WHERE p.created_by_org_code = $1
+                 ORDER BY c.created_at DESC
+                 LIMIT 15`,
+                [orgCode],
+            ),
+        )
+
+        return result
+    }
+
+    private async fetchWithAuditOrFallback(
+        auditEntries: Array<{ id: any; lastOpenedDate: any }> | undefined,
+        fetchByIds: (ids: any[]) => Promise<any[]>,
+        fetchFallback: () => Promise<any[]>,
+    ): Promise<any[]> {
+        const entries = (auditEntries || []).slice(0, 15)
+        try {
+            if (entries.length > 0) {
+                const ids = entries.map(a => a.id)
+                const lastOpenedMap = Object.fromEntries(entries.map(a => [a.id, a.lastOpenedDate]))
+                const rows = await fetchByIds(ids)
+                return rows.map((r: any) => ({ ...r, lastOpenedDate: lastOpenedMap[r.id] ?? null }))
+            } else {
+                const rows = await fetchFallback()
+                return rows.map((r: any) => ({ ...r, lastOpenedDate: null }))
+            }
+        } catch {
+            return []
+        }
     }
 
     // ---------------------------------------------------------------------------
@@ -186,7 +365,7 @@ export class SearchService {
             const { where, params } = buildClause([orgCode], allFields)
             const rows = await this.dataSource.query(
                 `SELECT id, reference, insured, status, "inceptionDate", "expiryDate", "createdDate", "createdBy"
-                 FROM submission WHERE "createdByOrgCode" = $1${where} ORDER BY "createdDate" DESC LIMIT 2000`,
+                 FROM submission WHERE "createdByOrgCode" = $1${where} ORDER BY "createdDate" DESC LIMIT 200`,
                 params,
             )
             return filterByLastOpened(await this.attachLastOpened(rows, 'Submission'))
@@ -214,7 +393,7 @@ export class SearchService {
 
             const where = clauses.length ? ` AND ${clauses.join(' AND ')}` : ''
             const rows = await this.dataSource.query(
-                `SELECT id, name, role, "createdDate", "createdBy" FROM party WHERE "orgCode" = $1${where} ORDER BY "createdDate" DESC LIMIT 2000`,
+                `SELECT id, name, role, "createdDate", "createdBy" FROM party WHERE "orgCode" = $1${where} ORDER BY "createdDate" DESC LIMIT 200`,
                 params,
             )
             return filterByLastOpened(await this.attachLastOpened(rows, 'Party'))
@@ -235,7 +414,7 @@ export class SearchService {
                  FROM quotes
                  WHERE created_by_org_code = $1 AND deleted_at IS NULL${where}
                  ORDER BY created_date DESC
-                 LIMIT 2000`,
+                 LIMIT 200`,
                 params,
             ).catch(() => [])
             return filterByLastOpened(await this.attachLastOpened(rows, 'Quote'))
@@ -257,7 +436,7 @@ export class SearchService {
                  FROM policies
                  WHERE created_by_org_code = $1${where}
                  ORDER BY created_date DESC
-                 LIMIT 2000`,
+                 LIMIT 200`,
                 params,
             ).catch(() => [])
             return filterByLastOpened(await this.attachLastOpened(rows, 'Policy'))
@@ -280,7 +459,7 @@ export class SearchService {
                  LEFT JOIN submission s ON s.id = ba.submission_id
                  WHERE ba.created_by_org_code = $1${where}
                  ORDER BY ba.created_at DESC
-                 LIMIT 2000`,
+                 LIMIT 200`,
                 params,
             ).catch(() => [])
             return filterByLastOpened(await this.attachLastOpened(rows, 'Binding Authority'))
@@ -298,7 +477,7 @@ export class SearchService {
                  INNER JOIN policies p ON p.id = c.policy_id
                  WHERE p.created_by_org_code = $1${where}
                  ORDER BY c.created_at DESC
-                 LIMIT 2000`,
+                 LIMIT 200`,
                 params,
             ).catch(() => [])
             return filterByLastOpened(await this.attachLastOpened(rows, 'Claim'))

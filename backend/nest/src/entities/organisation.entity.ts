@@ -3,8 +3,41 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  UpdateDateColumn,
   Index,
 } from 'typeorm'
+
+/**
+ * Organisation entity — maps to the `organisations` table.
+ * Source: backend/nest/src/migrations/1747000000000-CreateOrganisationsTable.ts
+ *
+ * Stores platform-level org classification (broker / insurer / platform).
+ * Used by BrokerSubmissionsService to enforce org-type access rules.
+ */
+@Entity('organisations')
+@Index('idx_organisations_org_code', ['orgCode'], { unique: true })
+export class Organisation {
+  @PrimaryGeneratedColumn()
+  id: number
+
+  @Column({ name: 'org_code', type: 'varchar', length: 50, unique: true })
+  orgCode: string
+
+  @Column({ name: 'org_type', type: 'varchar', length: 30, default: 'insurer' })
+  orgType: string
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  name: string | null
+
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive: boolean
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt: Date
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date
+}
 
 /**
  * OrganisationHierarchy entity — maps to `organisation_hierarchy`.

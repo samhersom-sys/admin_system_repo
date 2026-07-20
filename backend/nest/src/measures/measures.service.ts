@@ -19,6 +19,7 @@ export type MeasureDto = {
     ratioNumerator: string | null
     ratioDenominator: string | null
     isActive: boolean
+    hasEarningVariants: boolean
     createdAt: string
     updatedAt: string
 }
@@ -51,6 +52,7 @@ function toDto(m: MeasureDefinition): MeasureDto {
         ratioNumerator: m.ratioNumerator,
         ratioDenominator: m.ratioDenominator,
         isActive: m.isActive,
+        hasEarningVariants: m.hasEarningVariants,
         createdAt: m.createdAt?.toISOString(),
         updatedAt: m.updatedAt?.toISOString(),
     }

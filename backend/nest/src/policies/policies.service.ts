@@ -7,6 +7,7 @@ import {
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm'
 import { Repository, DataSource } from 'typeorm'
 import { Policy } from '../entities/policy.entity'
+import { PolicySectionCoverageDetail } from '../entities/coverage-detail.entity'
 import { AuditService } from '../audit/audit.service'
 
 /**
@@ -299,6 +300,68 @@ export class PoliciesService {
             [sectionId, id],
         )
         if (!rows.length) throw new NotFoundException(`Policy section ${sectionId} not found.`)
+        return rows[0]
+    }
+
+    async updateSectionDetail(
+        id: number,
+        sectionId: number,
+        orgCode: string,
+        body: Record<string, unknown>,
+    ): Promise<unknown> {
+        await this.findOne(id, orgCode)
+        const existingRows = await this.dataSource.query(
+            `SELECT * FROM policy_sections WHERE id = $1 AND policy_id = $2`,
+            [sectionId, id],
+        )
+        if (!existingRows.length) throw new NotFoundException(`Policy section ${sectionId} not found.`)
+        const current = existingRows[0]
+
+        const inceptionDate = body.inception_date !== undefined ? body.inception_date : current.inception_date
+        const expiryDate = body.expiry_date !== undefined ? body.expiry_date : current.expiry_date
+        const daysOnCover = inceptionDate && expiryDate
+            ? Math.max(0, Math.floor((new Date(String(expiryDate)).getTime() - new Date(String(inceptionDate)).getTime()) / 86_400_000))
+            : null
+
+        const rows = await this.dataSource.query(
+            `UPDATE policy_sections
+                SET class_of_business = COALESCE($1, class_of_business),
+                    inception_date = COALESCE($2, inception_date),
+                    effective_date = COALESCE($3, effective_date),
+                    expiry_date = COALESCE($4, expiry_date),
+                    inception_time = COALESCE($5, inception_time),
+                    effective_time = COALESCE($6, effective_time),
+                    expiry_time = COALESCE($7, expiry_time),
+                    days_on_cover = $8,
+                    limit_currency = COALESCE($9, limit_currency),
+                    limit_amount = COALESCE($10, limit_amount),
+                    limit_loss_qualifier = COALESCE($11, limit_loss_qualifier),
+                    excess_currency = COALESCE($12, excess_currency),
+                    excess_loss_qualifier = COALESCE($13, excess_loss_qualifier),
+                    sum_insured_currency = COALESCE($14, sum_insured_currency),
+                    premium_currency = COALESCE($15, premium_currency)
+              WHERE id = $16 AND policy_id = $17
+          RETURNING *`,
+            [
+                body.class_of_business ?? null,
+                body.inception_date ?? null,
+                body.effective_date ?? null,
+                body.expiry_date ?? null,
+                body.inception_time ?? null,
+                body.effective_time ?? null,
+                body.expiry_time ?? null,
+                daysOnCover,
+                body.limit_currency ?? null,
+                body.limit_amount ?? null,
+                body.limit_loss_qualifier ?? null,
+                body.excess_currency ?? null,
+                body.excess_loss_qualifier ?? null,
+                body.sum_insured_currency ?? null,
+                body.premium_currency ?? null,
+                sectionId,
+                id,
+            ],
+        )
         return rows[0]
     }
 
@@ -703,5 +766,147 @@ export class PoliciesService {
             `SELECT * FROM policy_location_rows WHERE policy_id = $1 ORDER BY id`,
             [id],
         )
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-016 — GET /api/policies/:id/sections/:sectionId/coverages/:coverageId/details
+    // -----------------------------------------------------------------------
+    async getCoverageDetails(
+        id: number,
+        sectionId: number,
+        coverageId: number,
+        orgCode: string,
+    ): Promise<unknown[]> {
+        await this.findOne(id, orgCode)
+        return this.dataSource.query(
+            `SELECT * FROM policy_section_coverage_details
+             WHERE policy_id = $1 AND section_id = $2 AND coverage_id = $3 AND deleted_at IS NULL
+             ORDER BY id`,
+            [id, sectionId, coverageId],
+        )
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-017 — POST /api/policies/:id/sections/:sectionId/coverages/:coverageId/details
+    // -----------------------------------------------------------------------
+    async createCoverageDetail(
+        id: number,
+        sectionId: number,
+        coverageId: number,
+        orgCode: string,
+        body: Record<string, unknown>,
+        createdBy: string | null,
+    ): Promise<unknown> {
+        const policy = await this.findOne(id, orgCode)
+        const coverageRows = await this.dataSource.query(
+            `SELECT reference FROM policy_section_coverages
+             WHERE id = $1 AND section_id = $2 AND policy_id = $3 AND deleted_at IS NULL`,
+            [coverageId, sectionId, id],
+        )
+        if (!coverageRows.length) throw new NotFoundException('Coverage not found.')
+
+        const countRows = await this.dataSource.query(
+            `SELECT COUNT(*)::int AS count FROM policy_section_coverage_details
+             WHERE policy_id = $1 AND section_id = $2 AND coverage_id = $3 AND deleted_at IS NULL`,
+            [id, sectionId, coverageId],
+        )
+        const nextSeq = Number(countRows[0]?.count ?? 0) + 1
+        const reference = `${coverageRows[0].reference}-DET-${String(nextSeq).padStart(3, '0')}`
+
+        const rows = await this.dataSource.query(
+            `INSERT INTO policy_section_coverage_details (
+                policy_id, section_id, coverage_id, reference,
+                coverage_detail_type_id, coverage_detail_sub_type_id,
+                effective_date, effective_time, expiry_date, expiry_time,
+                sum_insured_currency, sum_insured, payload, created_at
+             ) VALUES (
+                $1, $2, $3, $4,
+                $5, $6,
+                $7, $8, $9, $10,
+                $11, $12, $13::jsonb, NOW()
+             ) RETURNING *`,
+            [
+                id, sectionId, coverageId, reference,
+                body.coverage_detail_type_id ?? null,
+                body.coverage_detail_sub_type_id ?? null,
+                body.effective_date ?? null,
+                body.effective_time ?? null,
+                body.expiry_date ?? null,
+                body.expiry_time ?? null,
+                body.sum_insured_currency ?? null,
+                body.sum_insured ?? null,
+                body.payload ?? {},
+            ],
+        )
+        return rows[0]
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-018 — PUT /api/policies/:id/sections/:sectionId/coverages/:coverageId/details/:detailId
+    // -----------------------------------------------------------------------
+    async updateCoverageDetail(
+        id: number,
+        sectionId: number,
+        coverageId: number,
+        detailId: number,
+        orgCode: string,
+        body: Record<string, unknown>,
+        updatedBy: string | null,
+    ): Promise<unknown> {
+        await this.findOne(id, orgCode)
+        const existing = await this.dataSource.query(
+            `SELECT * FROM policy_section_coverage_details
+             WHERE id = $1 AND section_id = $2 AND coverage_id = $3 AND policy_id = $4 AND deleted_at IS NULL`,
+            [detailId, sectionId, coverageId, id],
+        )
+        if (!existing.length) throw new NotFoundException('Coverage detail not found.')
+
+        const mutableFields = [
+            'coverage_detail_type_id', 'coverage_detail_sub_type_id',
+            'effective_date', 'effective_time', 'expiry_date', 'expiry_time',
+            'sum_insured_currency', 'sum_insured', 'payload',
+        ]
+        const setClauses: string[] = []
+        const values: unknown[] = []
+        let idx = 1
+
+        for (const field of mutableFields) {
+            if (field in body) {
+                setClauses.push(`${field} = $${idx}`)
+                values.push((body as Record<string, unknown>)[field])
+                idx++
+            }
+        }
+
+        if (!setClauses.length) return existing[0]
+
+        values.push(detailId)
+        const [updatedRows] = await this.dataSource.query(
+            `UPDATE policy_section_coverage_details SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+            values,
+        )
+        return updatedRows[0]
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-POL-BE-F-019 — DELETE /api/policies/:id/sections/:sectionId/coverages/:coverageId/details/:detailId
+    // -----------------------------------------------------------------------
+    async deleteCoverageDetail(
+        id: number,
+        sectionId: number,
+        coverageId: number,
+        detailId: number,
+        orgCode: string,
+        deletedBy: string | null,
+    ): Promise<void> {
+        await this.findOne(id, orgCode)
+        const rows = await this.dataSource.query(
+            `UPDATE policy_section_coverage_details
+             SET deleted_at = NOW()
+             WHERE id = $1 AND section_id = $2 AND coverage_id = $3 AND policy_id = $4 AND deleted_at IS NULL
+             RETURNING id`,
+            [detailId, sectionId, coverageId, id],
+        )
+        if (!rows.length) throw new NotFoundException('Coverage detail not found.')
     }
 }

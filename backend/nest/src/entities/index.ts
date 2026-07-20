@@ -8,6 +8,7 @@ export { Policy } from './policy.entity'
 export { PolicySection } from './policy-section.entity'
 export { PolicyTransaction } from './policy-transaction.entity'
 export { PolicySectionCoverage, QuoteSectionCoverage } from './policy-section-coverage.entity'
+export { PolicySectionCoverageDetail, QuoteSectionCoverageDetail } from './coverage-detail.entity'
 export { Claim } from './claim.entity'
 
 // Reporting and finance
@@ -21,7 +22,11 @@ export { PolicySectionTransaction, BASectionTransaction } from './financial-sect
 // Workflow and org
 export { ClearanceSubmission } from './clearance-submission.entity'
 export { DataQualityIssue } from './data-quality-issue.entity'
-export { ClearanceQueue, OrganisationHierarchy, OrganisationEntity, OrganisationHierarchyConfig, OrganisationHierarchyLink } from './organisation.entity'
+export { Organisation, ClearanceQueue, OrganisationHierarchy, OrganisationEntity, OrganisationHierarchyConfig, OrganisationHierarchyLink } from './organisation.entity'
+
+// Broker submissions (PSS-A)
+export { BrokerSubmission } from './broker-submission.entity'
+export { LookupBrokerSubmissionSource } from './lookup-broker-submission-source.entity'
 
 // Binding authorities
 export { BindingAuthority } from './binding-authority.entity'
@@ -46,7 +51,7 @@ export { ChatMessage, NotificationMessage, NotificationTemplate, UserNotificatio
 
 // Lookups
 export {
-  LookupSubmissionStatus, LookupQuoteStatus, LookupPolicyStatus, LookupBindingAuthorityStatus,
+  LookupSubmissionStatus, LookupQuoteStatus, LookupPolicyStatus, LookupPolicyVersionStatus, LookupBindingAuthorityStatus,
   LookupContractType, LookupMethodOfPlacement, LookupRenewalStatus, LookupTransactionType,
   LookupLossQualifier, LookupClaimStatus, LookupClassOfBusiness, LookupBasisForOrder,
   LookupAnalysisBasis, LookupDateBasis, LookupWorkflowStatus, LookupPartyRole,
@@ -54,6 +59,10 @@ export {
   LookupCurrency, LookupCountry, LookupRegion, LookupSubdivision,
   LookupSicCode, LookupRiskCode, LookupClassRiskCode, LookupTaxRule,
 } from './lookup.entity'
+
+// Earnings configuration
+export { EarningPattern, EarningPatternPoint, EarningPatternRule } from './earning-pattern.entity'
+export { PolicyEarningPeriod } from '../earnings-config/policy-earning-period.entity'
 
 // Auth and security
 export { PasswordResetToken, PasswordAuditLog, ErrorLog } from './auth-security.entity'

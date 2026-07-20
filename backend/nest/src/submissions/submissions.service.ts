@@ -218,6 +218,7 @@ export class SubmissionsService {
       expiryDate: resolvedExpiry,
       renewalDate: renewalDate ?? null,
       status: 'Created',
+      isActive: true,
       createdDate: createdDate ?? new Date().toISOString(),
       createdBy: createdBy ?? null,
       createdByOrgCode: orgCode,
@@ -515,5 +516,29 @@ export class SubmissionsService {
         ORDER BY ba.reference ASC`,
       [id],
     )
+  }
+
+  // ---------------------------------------------------------------------------
+  // R13 — REQ-SUB-BE-NE-F-C03: Propagate quote lifecycle to parent submission
+  // Called by QuotesService after bind() and issuePolicy().
+  // ---------------------------------------------------------------------------
+  async updateStatusFromQuote(
+    submissionId: number | null,
+    status: string,
+    isActive: boolean,
+    orgCode: string,
+  ): Promise<void> {
+    if (submissionId == null) return
+
+    const submission = await this.submissionRepo.findOne({
+      where: { id: submissionId, createdByOrgCode: orgCode },
+    })
+    if (!submission) {
+      throw new NotFoundException('Submission not found')
+    }
+
+    submission.status = status
+    submission.isActive = isActive
+    await this.submissionRepo.save(submission)
   }
 }

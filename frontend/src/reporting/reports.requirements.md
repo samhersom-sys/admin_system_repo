@@ -83,7 +83,7 @@ Sources read from `policy-forge-chat (BackUp)/`:
 
 ## 3. Scope
 
-**In scope:** ReportsListPage (`/reports`) — list core reports, custom reports, and dashboards; ReportCreatePage (`/reports/create`, `/reports/edit/:id`) — create/edit custom report with field selection, filters, date basis, sort; ReportRunPage (`/reports/run/:reportId`, `/reports/run/custom/:customId`) — execute report and display results in a dynamic table with export to CSV; DashboardCreatePage (`/dashboards/create`, `/dashboards/edit/:id`) — create and edit dashboard layout metadata; DashboardConfigurePage (`/dashboards/configure/:id`) — assign widgets to configured slots and render saved widgets with live data instead of placeholder previews; DashboardViewPage (`/dashboards/view/:reportId`) — display configured dashboard widgets with live data and filter-driven refresh.
+**In scope:** ReportsListPage (`/reports`) — list core reports, core dashboards, custom reports, and dashboards; ReportCreatePage (`/reports/create`, `/reports/edit/:id`) — create/edit custom report with field selection, filters, date basis, sort; ReportRunPage (`/reports/run/:reportId`, `/reports/run/custom/:customId`) — execute report and display results in a dynamic table with export to CSV; DashboardCreatePage (`/dashboards/create`, `/dashboards/edit/:id`) — create and edit dashboard layout metadata; DashboardConfigurePage (`/dashboards/configure/:id`) — assign widgets to configured slots and render saved widgets with live data instead of placeholder previews; DashboardViewPage (`/dashboards/view/:reportId`) — display configured dashboard widgets with live data and filter-driven refresh.
 
 **Deferred to Block 2:** Persisted dashboard-specific widget rows, widget-level saved filter presets, and cross-source join semantics for a single widget.
 
@@ -139,7 +139,7 @@ Sources read from `policy-forge-chat (BackUp)/`:
 
 **REQ-RPT-FE-F-004:** The page shall display reports in two sections: **Core Reports** (system-provided, non-deletable) and **Custom Reports** (user-created).
 
-**REQ-RPT-FE-F-005:** Each report card shall display: Name, Description, Type (Core/Custom), Created By, Date Created, and a `"Run"` action button rendered with the brand colour (`text-brand-500`). For core reports, clicking Run shall navigate to `/reports/run/{data_source}` (e.g. `/reports/run/submissions`). For custom reports, clicking Run shall navigate to `/reports/run/{id}` where `{id}` is the numeric template ID.
+**REQ-RPT-FE-F-005:** Each report card shall display: Name, Description, Type (Core/Custom), Created By, Date Created, and a `"Run"` action button rendered with the brand colour (`text-brand-500`). The **Core Application Reports** table shall not display a `Data Source` column. For core reports, clicking Run shall navigate to `/reports/run/{data_source}` (e.g. `/reports/run/submissions`). For custom reports, clicking Run shall navigate to `/reports/run/{id}` where `{id}` is the numeric template ID.
 
 **REQ-RPT-FE-F-005a:** When the ReportRunPage is opened for a core report (non-numeric `reportId` matching a known data source key such as `submissions`, `quotes`, `parties`, `policies`, or `login-activity`), clicking "Run Report" shall call `GET /api/{dataSource}` directly (e.g. `GET /api/submissions`) rather than `POST /api/report-templates/:id/run`. This avoids a 404 because core report templates are not persisted in the database.
 
@@ -148,6 +148,12 @@ Sources read from `policy-forge-chat (BackUp)/`:
 **REQ-RPT-FE-F-007:** When no reports exist (empty API response), the page shall render `"No reports found."`.
 
 **REQ-RPT-FE-F-008:** The page shall display five core report templates that are always present: **Submissions Report** (data source: submissions), **New Business Report** (data source: quotes), **Parties Report** (data source: parties), **Policies Report** (data source: policies), and **User Login Activity Report** (data source: login-activity). Core reports cannot be edited or deleted.
+
+**REQ-RPT-FE-F-009:** The page shall display a **Core Application Dashboards** section with one always-present system dashboard template: **User Policy Performance Dashboard** (slug: `core-user-policy-performance`). Clicking View Dashboard shall navigate to `/dashboards/view/core-user-policy-performance`.
+
+**REQ-RPT-FE-F-010a:** Each core report row shall display a **Copy** action button (copy icon). Clicking it shall navigate to `/reports/create` with the report's `name` (prefixed `"Copy of "`) and `description` pre-populated in the form, so the user can immediately customise and save it as a new custom report. No API call is made at the time of clicking Copy; the form is simply pre-seeded.
+
+**REQ-RPT-FE-F-010b:** Each core dashboard row shall display a **Copy** action button (copy icon). Clicking it shall call `POST /api/report-templates` to create a new custom dashboard pre-populated with the core dashboard's full `dashboardConfig`, with the name prefixed `"Copy of "`, and then navigate directly to `/dashboards/configure/:id` so the user can adjust widgets immediately. A loading state shall prevent double-submission. On error an error notification shall be shown.
 
 ### 4.2 ReportCreatePage — /reports/create and /reports/edit/:id
 
@@ -269,6 +275,12 @@ Filter rows shall be stored as an array of objects: `Array<{ connector?: 'AND' |
 
 **REQ-RPT-FE-F-042:** DashboardViewPage shall render a collapsible `Dashboard Filters` panel whenever the current dashboard contains filterable live widgets. The panel shall expose: `Analysis Basis`, `Date Basis`, `Reporting Date`, and repeatable custom field filters derived from the filterable fields used by the current page's widgets. Clicking `Apply Filters` shall rerun the live widget queries for the current page with the selected filter state; clicking `Reset Filters` shall restore defaults and rerun the widgets. The page shall not silently ignore filter changes.
 
+**REQ-RPT-FE-F-045:** DashboardViewPage shall support core dashboard slugs (non-numeric `reportId`) for built-in dashboards. For `core-user-policy-performance`, the page shall render two table widgets using the existing dashboard widget runtime: (1) a KPI table with `Hierarchy`, `Expiring Policy Count`, `Renewable Policy Count`, `New Business Policy Count`, `Renewed Policy Count`, `Lapsed Policy Count`, `Cancelled Policy Count`, `Policy Count`, `Retention Ratio`, and `Net New Policy Count`; and (2) a premium table with `Hierarchy`, `Expiring Gross Written Premium`, `Renewable Gross Written Premium`, `New Business Gross Written Premium`, `Renewed Gross Written Premium`, `Lapsed Gross Written Premium`, `Cancelled Gross Written Premium`, `Policy Gross Written Premium`, `Retention Ratio (Gross Written Premium)`, and `Net New Gross Written Premium`. These two tables shall render one above the other (vertical stack), not side-by-side.
+
+**REQ-RPT-FE-F-047:** The `Hierarchy` column in core user policy performance tables shall be aggregatable and interactive. The table shall render a tree-style hierarchy with expand/collapse controls per node (Organisation → Region → Team → User) rather than showing a single concatenated path string (for example, not `A > B > C`). Parent rows shall display aggregated numeric values for visible measure columns and shall be visually emphasized in bold to indicate totals.
+
+**REQ-RPT-FE-F-046:** For the `core-user-policy-performance` dashboard, the `Dashboard Filters` panel shall expose hierarchy filters sourced from the `policyUserSummary` datasource (`Hierarchy Level 1`..`Hierarchy Level 5`, `Hierarchy Path`, and `User Org Code`) so users can drill down through organisation hierarchy to the user level. The hierarchy values shall reflect Organisation Configuration seed/setup data, with `User` as the lowest reporting dimension.
+
 ### 4.5 Cross-cutting
 
 **REQ-RPT-FE-C-001:** All API calls must go through `@/shared/lib/api-client/api-client`; no direct `fetch()` or `axios`.
@@ -318,8 +330,9 @@ Filter rows shall be stored as an array of objects: `Array<{ connector?: 'AND' |
 | REQ-RPT-FE-S-002 | `frontend/src/reporting/__tests__/reports.test.tsx` | pending |
 | REQ-RPT-FE-F-043 | `frontend/src/reporting/__tests__/reports.test.tsx` | pending |
 | REQ-RPT-FE-F-044 | `frontend/src/reporting/__tests__/reports.test.tsx` | pending |
-| REQ-RPT-FE-F-050 | `frontend/src/reporting/__tests__/reports.test.tsx` | T-RPT-FE-F-R050 |
-
+| REQ-RPT-FE-F-047 | `frontend/src/reporting/__tests__/reports.test.tsx` | T-RPT-FE-F-R047 |
+| REQ-RPT-FE-F-050 | `frontend/src/reporting/__tests__/reports.test.tsx` | T-RPT-FE-F-R050 || REQ-RPT-FE-F-010a | `frontend/src/reporting/__tests__/reports.test.tsx` | T-RPT-FE-F-R010a |
+| REQ-RPT-FE-F-010b | `frontend/src/reporting/__tests__/reports.test.tsx` | T-RPT-FE-F-R010b |
 ---
 
 ## 6. Open Questions
@@ -333,7 +346,7 @@ Filter rows shall be stored as an array of objects: `Array<{ connector?: 'AND' |
 | OQ-RPT-005 | Share dashboard/report with other org users — not yet implemented. Requires a `shared_dashboards` or `shared_reports` junction table, share-recipient selector UI, and permission checks. Requires new requirements block before implementation. | New requirement — not started |
 | OQ-RPT-006 | LLM-driven natural-language report builder — user types a question, LLM maps it to widget config or filtered query. Considerations: (1) schema context via field-mappings allow-list (no raw schema exposure), (2) LLM call server-side only (API keys secret), (3) orgCode always injected by server (tenant isolation, not LLM-sourced), (4) output validated against DashboardWidget schema before saving, (5) rate-limited per org, (6) no PII passed to LLM — only field names and aggregated values. Requires a new endpoint `POST /api/reporting/ai-suggest` and a frontend prompt panel. Requires new requirements block before implementation. | New requirement — not started |
 | OQ-RPT-007 | `Count of Lapsed Policies`, `Count of Renewed Policies`, `Count of Non-Renewable Policies` — what policy field and values determine these states? | **Resolved** — Lapsed = `policies.status = 'Expired'`. Renewed = `policies.status = 'Renewed'` (new lookup value via migration 115). Renewable = `policies.renewable = 'Renewable'` (new column via migration 114). See REQ-RPT-DB-F-053, REQ-RPT-DB-F-054, REQ-RPT-BE-F-052. |
-| OQ-RPT-008 | **Net New Policy Count** — user wants `Policy Count(current period) − Policy Count(prior period)`. The current SQL generator builds a single WHERE clause and does not support period-over-period comparison within one query. Should this use two separate widget metric values (user subtracts mentally), a client-side computed widget type, or a new dedicated API endpoint `GET /api/reporting/period-delta`? Deferred pending architectural decision. | Open — deferred |
+| OQ-RPT-008 | **Net New Policy Count** — definition confirmed: `New Business + Renewed − Expiring` (i.e. policies with `new_or_renewal = 'New'` or `business_type = 'New Business'`, plus `status = 'Renewed'`, minus policies where `CAST(expiry_date AS date) >= CURRENT_DATE`). Same formula applies to the GWP equivalent. Implemented in `policyUserSummary` CTE in `field-mappings.ts`. | **Resolved — 2026-05-29** |
 | OQ-RPT-009 | **Retention Ratio display format** — the SQL expression returns a floating-point ratio (e.g. 0.857). What format should the metric widget display: raw decimal, percentage (×100), or `x:1`? | Open |
 | OQ-RPT-010 | **Measure Definitions DB Table** — measures moved from `field-mappings.ts` to a `measure_definitions` DB table with append-only history (`measure_definition_history`). Internal admin measures use raw `filter_expr`; tenant admin measures use structured `filter_condition` JSONB (compiled to SQL by platform — no raw SQL input). `field-mappings.ts` retains dimension/field definitions only. `MeasuresModule` provides full CRUD API. `reporting.service.ts` and `home.service.ts` load measures from DB at query time. | **Resolved — in progress (2026-04-28)** |
 

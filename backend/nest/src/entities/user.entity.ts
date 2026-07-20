@@ -57,4 +57,7 @@ export class User {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date
+
+  @Column({ name: 'master_homepage_template_id', type: 'int', nullable: true })
+  masterHomepageTemplateId: number | null
 }

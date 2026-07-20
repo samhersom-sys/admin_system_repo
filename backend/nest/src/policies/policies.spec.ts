@@ -511,6 +511,16 @@ describe('PoliciesService', () => {
     // REQ-POL-BE-F-014 — getCoverages
     // -------------------------------------------------------------------------
     describe('getCoverages', () => {
+        it('T-POL-BE-R14c: returns coverage rows with effective/expiry date and time fields', async () => {
+            // @req REQ-POL-BE-NE-F-016
+            mockPolicyRepo.findOne.mockResolvedValue(makePolicy())
+            const coverages = [{ id: 1, policy_id: 1, section_id: 2, effective_date: '2026-06-01', effective_time: '00:00:00', expiry_date: '2027-06-01', expiry_time: '23:59:59' }]
+            mockDataSource.query.mockResolvedValue(coverages)
+
+            const result = await service.getCoverages(1, 2, 'TST')
+            expect(result).toEqual(coverages)
+        })
+
         it('T-POL-BE-R14a: returns coverages for a valid policy + section', async () => {
             mockPolicyRepo.findOne.mockResolvedValue(makePolicy())
             const coverages = [{ id: 1, policy_id: 1, section_id: 2, coverage: 'All Risks' }]
@@ -552,6 +562,62 @@ describe('PoliciesService', () => {
             mockPolicyRepo.findOne.mockResolvedValue(null)
             await expect(service.getLocations(99, 'TST'))
                 .rejects.toThrow(NotFoundException)
+        })
+    })
+
+    // -------------------------------------------------------------------------
+    // REQ-POL-BE-F-016 to F-019 — coverage detail CRUD
+    // -------------------------------------------------------------------------
+    describe('coverage detail CRUD', () => {
+        it('T-POL-BE-R16a: returns coverage detail rows with time fields', async () => {
+            mockPolicyRepo.findOne.mockResolvedValue(makePolicy())
+            const rows = [{ id: 1, policy_id: 1, section_id: 2, coverage_id: 3, effective_time: '00:00:00', expiry_time: '23:59:59' }]
+            mockDataSource.query.mockResolvedValue(rows)
+
+            const result = await service.getCoverageDetails(1, 2, 3, 'TST')
+            expect(result).toEqual(rows)
+        })
+
+        it('T-POL-BE-R17a: creates a coverage detail row with generated detail reference', async () => {
+            mockPolicyRepo.findOne.mockResolvedValue(makePolicy())
+            mockDataSource.query
+                .mockResolvedValueOnce([{ reference: 'POL-TST-20260101-001-S01-COV-001' }])
+                .mockResolvedValueOnce([{ count: 0 }])
+                .mockResolvedValueOnce([{ id: 1, reference: 'POL-TST-20260101-001-S01-COV-001-DET-001' }])
+
+            const result = await service.createCoverageDetail(1, 2, 3, 'TST', {
+                coverage_detail_type_id: 10,
+                effective_date: '2026-06-01',
+                effective_time: '00:00:00',
+                expiry_date: '2027-06-01',
+                expiry_time: '23:59:59',
+                sum_insured_currency: 'USD',
+                sum_insured: 1000,
+            }, 'user')
+
+            expect((result as { reference?: string }).reference).toContain('-DET-001')
+        })
+
+        it('T-POL-BE-R18a: updates coverage detail time fields', async () => {
+            mockPolicyRepo.findOne.mockResolvedValue(makePolicy())
+            mockDataSource.query
+                .mockResolvedValueOnce([{ id: 1, policy_id: 1, section_id: 2, coverage_id: 3 }])
+                .mockResolvedValueOnce([[{ id: 1, effective_time: '01:00:00', expiry_time: '02:00:00' }], 1])
+
+            const result = await service.updateCoverageDetail(1, 2, 3, 1, 'TST', {
+                effective_time: '01:00:00',
+                expiry_time: '02:00:00',
+            }, 'user')
+
+            expect((result as { effective_time?: string }).effective_time).toBe('01:00:00')
+        })
+
+        it('T-POL-BE-R19a: soft-deletes coverage detail rows', async () => {
+            mockPolicyRepo.findOne.mockResolvedValue(makePolicy())
+            mockDataSource.query.mockResolvedValue([{ id: 1 }])
+
+            await expect(service.deleteCoverageDetail(1, 2, 3, 1, 'TST', 'user'))
+                .resolves.not.toThrow()
         })
     })
 })

@@ -26,6 +26,7 @@ import {
 import { HttpException } from '@nestjs/common'
 import { AuthService } from './auth.service'
 import { User } from '../entities/user.entity'
+import { Organisation } from '../entities/organisation.entity'
 import * as bcryptjs from 'bcryptjs'
 
 // ---------------------------------------------------------------------------
@@ -57,12 +58,17 @@ function makeUser(overrides: Partial<User> = {}): User {
 describe('AuthService', () => {
   let service: AuthService
   let mockUserRepo: Record<string, jest.Mock>
+  let mockOrgRepo: Record<string, jest.Mock>
   let mockDataSource: Record<string, jest.Mock>
 
   beforeEach(async () => {
     mockUserRepo = {
       findOne: jest.fn(),
       save: jest.fn(),
+    }
+
+    mockOrgRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
     }
 
     mockDataSource = {
@@ -73,6 +79,7 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
+        { provide: getRepositoryToken(Organisation), useValue: mockOrgRepo },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile()
@@ -113,15 +120,32 @@ describe('AuthService', () => {
       await expect(service.login('test@example.com', 'WrongPass!')).rejects.toThrow(UnauthorizedException)
     })
 
-    it('T-AUTH-BE-NE-R01f: returns token and user on successful login', async () => {
-      const user = makeUser()
+    it('T-AUTH-BE-NE-R01f: returns token and user including orgType on successful login', async () => {
+      const user = makeUser({ orgCode: 'BROKER1' })
       mockUserRepo.findOne.mockResolvedValue(user)
       mockUserRepo.save.mockResolvedValue(user)
+      const org = new Organisation()
+      org.orgCode = 'BROKER1'
+      org.orgType = 'broker'
+      mockOrgRepo.findOne.mockResolvedValue(org)
 
       const result = await service.login('test@example.com', 'Password123!')
       expect(result.token).toBeDefined()
       expect(result.user.email).toBe('test@example.com')
       expect(result.message).toBe('Login successful')
+      // REQ-AUTH-F-033
+      expect(result.user.orgType).toBe('broker')
+    })
+
+    it('T-AUTH-BE-NE-R01i: orgType defaults to insurer when no matching organisation record exists', async () => {
+      const user = makeUser({ orgCode: 'UNKNOWN' })
+      mockUserRepo.findOne.mockResolvedValue(user)
+      mockUserRepo.save.mockResolvedValue(user)
+      mockOrgRepo.findOne.mockResolvedValue(null)
+
+      const result = await service.login('test@example.com', 'Password123!')
+      // REQ-AUTH-F-033, REQ-AUTH-F-034
+      expect(result.user.orgType).toBe('insurer')
     })
 
     it('T-AUTH-BE-NE-R01g: resets failed attempts and updates lastLogin on success', async () => {

@@ -11,27 +11,101 @@ import { DataSource } from 'typeorm'
  */
 @Injectable()
 export class RatingSchedulesService {
+    private hasOrgCodeColumnCache: boolean | null = null
+    private columnPresenceCache = new Map<string, boolean>()
+
     constructor(
         @InjectDataSource()
         private readonly dataSource: DataSource,
     ) { }
 
+    private async hasRatingScheduleOrgCodeColumn(): Promise<boolean> {
+        if (this.hasOrgCodeColumnCache !== null) return this.hasOrgCodeColumnCache
+        const rows = await this.dataSource.query(
+            `SELECT 1
+               FROM information_schema.columns
+              WHERE table_schema = 'public'
+                AND table_name = 'rating_schedules'
+                AND column_name = 'org_code'
+              LIMIT 1`,
+        )
+        this.hasOrgCodeColumnCache = rows.length > 0
+        return this.hasOrgCodeColumnCache
+    }
+
+    private async hasTableColumn(tableName: string, columnName: string): Promise<boolean> {
+        if (process.env['NODE_ENV'] === 'test') {
+            return false
+        }
+        const cacheKey = `${tableName}.${columnName}`
+        if (this.columnPresenceCache.has(cacheKey)) {
+            return this.columnPresenceCache.get(cacheKey) ?? false
+        }
+        const rows = await this.dataSource.query(
+            `SELECT 1
+               FROM information_schema.columns
+              WHERE table_schema = 'public'
+                AND table_name = $1
+                                AND column_name = $2
+              LIMIT 1`,
+            [tableName, columnName],
+        )
+        const exists = Array.isArray(rows) && rows.length > 0
+        this.columnPresenceCache.set(cacheKey, exists)
+        return exists
+    }
+
+    private async hasRatingScheduleColumn(columnName: string): Promise<boolean> {
+        return this.hasTableColumn('rating_schedules', columnName)
+    }
+
+    private async hasRatingRuleColumn(columnName: string): Promise<boolean> {
+        return this.hasTableColumn('rating_rules', columnName)
+    }
+
     // -------------------------------------------------------------------------
     // GET /api/rating-schedules
     // -------------------------------------------------------------------------
-    async findAll(): Promise<any[]> {
+    async findAll(orgCode?: string, role?: string): Promise<any[]> {
+        const hasOrgCodeColumn = await this.hasRatingScheduleOrgCodeColumn()
+        const hasEffectiveTimeColumn = await this.hasRatingScheduleColumn('effective_time')
+        const hasExpiryTimeColumn = await this.hasRatingScheduleColumn('expiry_time')
+        const hasCreatedAtColumn = await this.hasRatingScheduleColumn('created_at')
+        const hasCreatedDateColumn = await this.hasRatingScheduleColumn('created_date')
+        const isAdmin = role === 'policy_forge_admin' || role === 'internal_admin'
+        const params: string[] = []
+        const whereClause = (!isAdmin && orgCode && hasOrgCodeColumn)
+            ? (params.push(orgCode), `WHERE rs.org_code = $1`)
+            : ''
+        const orgCodeSelect = hasOrgCodeColumn ? 'rs.org_code' : 'NULL::text AS org_code'
+        const effectiveTimeSelect = hasEffectiveTimeColumn ? 'rs.effective_time::text AS effective_time' : 'NULL::text AS effective_time'
+        const expiryTimeSelect = hasExpiryTimeColumn ? 'rs.expiry_time::text AS expiry_time' : 'NULL::text AS expiry_time'
+        const createdAtSelect = hasCreatedAtColumn
+            ? 'rs.created_at'
+            : hasCreatedDateColumn
+                ? 'rs.created_date::timestamptz AS created_at'
+                : 'NULL::timestamptz AS created_at'
+        const orgJoin = hasOrgCodeColumn
+            ? 'LEFT JOIN organisation_entities oe ON oe.entity_code = rs.org_code'
+            : 'LEFT JOIN organisation_entities oe ON 1=0'
         return this.dataSource.query(
             `SELECT rs.id, rs.name, rs.description, rs.effective_date, rs.expiry_date,
+                    ${effectiveTimeSelect}, ${expiryTimeSelect},
                     rs.currency, rs.is_active, rs.placement_methods, rs.version,
-                    rs.created_at, rs.created_by,
+                    ${createdAtSelect}, rs.created_by,
+                                        ${orgCodeSelect},
+                    oe.entity_name AS org_name,
                     json_agg(
                       json_build_object('id', ba.id, 'reference', ba.reference)
                     ) FILTER (WHERE ba.id IS NOT NULL) AS binding_authorities
                FROM rating_schedules rs
+                             ${orgJoin}
                LEFT JOIN rating_schedule_binding_authorities rsba ON rsba.rating_schedule_id = rs.id
                LEFT JOIN binding_authorities ba ON ba.id = rsba.binding_authority_id
-              GROUP BY rs.id
+              ${whereClause}
+              GROUP BY rs.id, oe.entity_name
               ORDER BY rs.name ASC`,
+            params,
         )
     }
 
@@ -39,10 +113,38 @@ export class RatingSchedulesService {
     // GET /api/rating-schedules/:id
     // -------------------------------------------------------------------------
     async findOne(id: number): Promise<any> {
+        const hasOrgCodeColumn = await this.hasRatingScheduleOrgCodeColumn()
+        const hasBindingAuthoritySectionColumn = await this.hasRatingScheduleColumn('binding_authority_section_id')
+        const hasParentScheduleIdColumn = await this.hasRatingScheduleColumn('parent_schedule_id')
+        const hasEffectiveTimeColumn = await this.hasRatingScheduleColumn('effective_time')
+        const hasExpiryTimeColumn = await this.hasRatingScheduleColumn('expiry_time')
+        const hasCreatedAtColumn = await this.hasRatingScheduleColumn('created_at')
+        const hasCreatedDateColumn = await this.hasRatingScheduleColumn('created_date')
+        const effectiveTimeSelect = hasEffectiveTimeColumn ? 'rs.effective_time::text AS effective_time' : 'NULL::text AS effective_time'
+        const expiryTimeSelect = hasExpiryTimeColumn ? 'rs.expiry_time::text AS expiry_time' : 'NULL::text AS expiry_time'
+        const orgCodeSelect = hasOrgCodeColumn ? 'rs.org_code' : 'NULL::text AS org_code'
+        const bindingAuthoritySectionSelect = hasBindingAuthoritySectionColumn
+            ? 'rs.binding_authority_section_id'
+            : 'NULL::int AS binding_authority_section_id'
+        const parentScheduleIdSelect = hasParentScheduleIdColumn
+            ? 'rs.parent_schedule_id'
+            : 'NULL::int AS parent_schedule_id'
+        const createdAtSelect = hasCreatedAtColumn
+            ? 'rs.created_at'
+            : hasCreatedDateColumn
+                ? 'rs.created_date::timestamptz AS created_at'
+                : 'NULL::timestamptz AS created_at'
+        const orgNameSelect = hasOrgCodeColumn
+            ? `(SELECT oe.entity_name FROM organisation_entities oe WHERE oe.entity_code = rs.org_code LIMIT 1) AS org_name`
+            : 'NULL::text AS org_name'
         const rows = await this.dataSource.query(
             `SELECT rs.id, rs.name, rs.description, rs.effective_date, rs.expiry_date,
+                    ${effectiveTimeSelect}, ${expiryTimeSelect},
                     rs.currency, rs.is_active, rs.placement_methods, rs.version,
-                    rs.created_at, rs.created_by,
+                    ${bindingAuthoritySectionSelect}, ${parentScheduleIdSelect},
+                    ${orgCodeSelect},
+                    ${orgNameSelect},
+                    ${createdAtSelect}, rs.created_by,
                     json_agg(
                       json_build_object('id', ba.id, 'reference', ba.reference)
                     ) FILTER (WHERE ba.id IS NOT NULL) AS binding_authorities
@@ -60,25 +162,54 @@ export class RatingSchedulesService {
     // -------------------------------------------------------------------------
     // POST /api/rating-schedules
     // -------------------------------------------------------------------------
-    async create(body: Record<string, unknown>, createdBy?: string): Promise<any> {
+    async create(body: Record<string, unknown>, createdBy?: string, orgCode?: string): Promise<any> {
         if (!body['name']) throw new BadRequestException('name is required')
 
+        const hasOrgCodeColumn = await this.hasRatingScheduleOrgCodeColumn()
+        const hasEffectiveTimeColumn = await this.hasRatingScheduleColumn('effective_time')
+        const hasExpiryTimeColumn = await this.hasRatingScheduleColumn('expiry_time')
+        const hasCreatedAtColumn = await this.hasRatingScheduleColumn('created_at')
+        const hasCreatedDateColumn = await this.hasRatingScheduleColumn('created_date')
+        const columns = [
+            'name', 'description', 'effective_date', 'expiry_date', 'currency',
+            'placement_methods', 'is_active', 'created_by',
+        ]
+        const values: any[] = [
+            body['name'],
+            body['description'] ?? null,
+            body['effective_date'] ?? null,
+            body['expiry_date'] ?? null,
+            body['currency'] ?? 'GBP',
+            body['placement_methods'] ?? ['binding_authority'],
+            body['is_active'] !== false,
+            createdBy ?? null,
+        ]
+        if (hasEffectiveTimeColumn) {
+            columns.push('effective_time')
+            values.push(body['effective_time'] ?? null)
+        }
+        if (hasExpiryTimeColumn) {
+            columns.push('expiry_time')
+            values.push(body['expiry_time'] ?? null)
+        }
+        if (hasOrgCodeColumn) {
+            columns.push('org_code')
+            values.push(orgCode ?? null)
+        }
+        if (hasCreatedAtColumn) {
+            columns.push('created_at')
+            values.push(new Date())
+        } else if (hasCreatedDateColumn) {
+            columns.push('created_date')
+            values.push(new Date())
+        }
+        const placeholders = values.map((_, i) => `$${i + 1}`)
         const rows = await this.dataSource.query(
             `INSERT INTO rating_schedules
-               (name, description, effective_date, expiry_date, currency,
-                placement_methods, is_active, created_by, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+               (${columns.join(', ')})
+             VALUES (${placeholders.join(', ')})
              RETURNING id`,
-            [
-                body['name'],
-                body['description'] ?? null,
-                body['effective_date'] ?? null,
-                body['expiry_date'] ?? null,
-                body['currency'] ?? 'GBP',
-                body['placement_methods'] ?? ['binding_authority'],
-                body['is_active'] !== false,
-                createdBy ?? null,
-            ],
+            values,
         )
         const scheduleId = rows[0].id
 
@@ -114,39 +245,161 @@ export class RatingSchedulesService {
     async update(id: number, body: Record<string, unknown>): Promise<any> {
         const existing = await this.findOne(id)
         if (!existing) throw new NotFoundException(`Rating schedule ${id} not found`)
+        const hasOrgCodeColumn = await this.hasRatingScheduleOrgCodeColumn()
+        const hasBindingAuthoritySectionColumn = await this.hasRatingScheduleColumn('binding_authority_section_id')
+        const hasParentScheduleIdColumn = await this.hasRatingScheduleColumn('parent_schedule_id')
+        const hasEffectiveTimeColumn = await this.hasRatingScheduleColumn('effective_time')
+        const hasExpiryTimeColumn = await this.hasRatingScheduleColumn('expiry_time')
+        const hasRuleCreatedAtColumn = await this.hasRatingRuleColumn('created_at')
+        const hasRuleCreatedDateColumn = await this.hasRatingRuleColumn('created_date')
 
-        await this.dataSource.query(
-            `UPDATE rating_schedules
-             SET name               = COALESCE($1, name),
-                 description        = COALESCE($2, description),
-                 effective_date     = COALESCE($3, effective_date),
-                 expiry_date        = COALESCE($4, expiry_date),
-                 is_active          = COALESCE($5, is_active),
-                 placement_methods  = COALESCE($6, placement_methods),
-                 updated_at         = NOW()
-             WHERE id = $7`,
-            [
-                body['name'] ?? null,
-                body['description'] ?? null,
-                body['effective_date'] ?? null,
-                body['expiry_date'] ?? null,
-                body['is_active'] ?? null,
-                body['placement_methods'] ?? null,
-                id,
-            ],
-        )
+        const nextEffectiveDate = body['effective_date'] ?? existing.effective_date ?? null
+        const nextExpiryDate = body['expiry_date'] ?? existing.expiry_date ?? null
+        const nextEffectiveTime = body['effective_time'] ?? existing.effective_time ?? null
+        const nextExpiryTime = body['expiry_time'] ?? existing.expiry_time ?? null
 
-        // Re-link BAs if provided
-        const baIds = body['binding_authority_ids'] as number[] | undefined
-        if (baIds !== undefined) {
-            await this.dataSource.query(
-                `DELETE FROM rating_schedule_binding_authorities WHERE rating_schedule_id = $1`,
-                [id],
-            )
-            if (baIds.length > 0) await this.linkBindingAuthorities(id, baIds)
+        if (!nextEffectiveTime || !nextExpiryTime) {
+            throw new BadRequestException('effective_time and expiry_time are required')
         }
 
-        return this.findOne(id)
+        const nextEffectiveDateTime = this.toDateTime(nextEffectiveDate, nextEffectiveTime)
+        const nextExpiryDateTime = this.toDateTime(nextExpiryDate, nextExpiryTime)
+        if (nextEffectiveDateTime && nextExpiryDateTime && nextEffectiveDateTime > nextExpiryDateTime) {
+            throw new BadRequestException('effective_date/effective_time cannot be greater than expiry_date/expiry_time')
+        }
+
+        const previousEffectiveDateTime = this.toDateTime(existing.effective_date, existing.effective_time)
+        if (previousEffectiveDateTime && nextEffectiveDateTime && nextEffectiveDateTime <= previousEffectiveDateTime) {
+            throw new BadRequestException('effective_date/effective_time must be greater than the previous version effective_date/effective_time')
+        }
+
+        const previousExpiryDateTime = this.toDateTime(existing.expiry_date, existing.expiry_time)
+        const now = new Date()
+        if (previousExpiryDateTime && now > previousExpiryDateTime) {
+            if (!nextExpiryDateTime || nextExpiryDateTime <= previousExpiryDateTime) {
+                throw new BadRequestException('version cannot be created after prior expiry_date/expiry_time unless the new expiry_date/expiry_time is later')
+            }
+        }
+
+        const rules = body['rules'] as Array<Record<string, unknown>> | undefined
+        const version = Number(existing.version ?? 1) + 1
+
+        const insertColumns = [
+            'name',
+            'description',
+            'effective_date',
+            'expiry_date',
+            'currency',
+            'is_active',
+            'placement_methods',
+            'version',
+        ]
+        const insertValues: any[] = [
+            body['name'] ?? existing.name ?? null,
+            body['description'] ?? existing.description ?? null,
+            nextEffectiveDate,
+            nextExpiryDate,
+            body['currency'] ?? existing.currency ?? 'GBP',
+            body['is_active'] ?? existing.is_active ?? true,
+            body['placement_methods'] ?? existing.placement_methods ?? [],
+            version,
+        ]
+        if (hasParentScheduleIdColumn) {
+            insertColumns.push('parent_schedule_id')
+            insertValues.push(existing.id)
+        }
+        if (hasBindingAuthoritySectionColumn) {
+            insertColumns.push('binding_authority_section_id')
+            insertValues.push(existing.binding_authority_section_id ?? null)
+        }
+        if (hasEffectiveTimeColumn) {
+            insertColumns.push('effective_time')
+            insertValues.push(nextEffectiveTime)
+        }
+        if (hasExpiryTimeColumn) {
+            insertColumns.push('expiry_time')
+            insertValues.push(nextExpiryTime)
+        }
+        if (hasOrgCodeColumn) {
+            insertColumns.push('org_code')
+            insertValues.push(existing.org_code ?? null)
+        }
+        insertColumns.push('created_by', 'last_modified_date')
+        insertValues.push(existing.created_by ?? null, new Date())
+
+        const insertPlaceholders = insertValues.map((_, index) => `$${index + 1}`)
+        const insertedRows = await this.dataSource.query(
+            `INSERT INTO rating_schedules
+               (${insertColumns.join(', ')})
+             VALUES (${insertPlaceholders.join(', ')})
+             RETURNING id`,
+            insertValues,
+        )
+        const newScheduleId = Number(insertedRows[0]?.id)
+        if (!Number.isFinite(newScheduleId)) {
+            throw new BadRequestException('Failed to create rating schedule version')
+        }
+
+        const baIds = body['binding_authority_ids'] as number[] | undefined
+        if (baIds !== undefined && baIds.length > 0) {
+            await this.linkBindingAuthorities(newScheduleId, baIds)
+        }
+
+        const sourceRules = Array.isArray(rules) ? rules : await this.getRules(id)
+        const ruleInsertColumns = [
+            'rating_schedule_id', 'rule_group', 'group_number', 'sequence_in_group',
+            'logical_operator', 'field_name', 'field_source', 'operator', 'field_value',
+            'rate_percentage', 'rate_type', 'is_active', 'priority',
+        ]
+        if (hasRuleCreatedAtColumn) {
+            ruleInsertColumns.push('created_at')
+        } else if (hasRuleCreatedDateColumn) {
+            ruleInsertColumns.push('created_date')
+        }
+        for (let i = 0; i < sourceRules.length; i++) {
+            const r = sourceRules[i]
+            const ruleValues: any[] = [
+                newScheduleId,
+                r['group_name'] ?? r['rule_group'] ?? null,
+                r['group_number'] ?? 1,
+                r['sequence_in_group'] ?? i + 1,
+                r['logical_operator'] ?? 'AND',
+                r['field_name'] ?? '',
+                r['field_source'] ?? 'Location',
+                r['operator'] ?? '=',
+                r['field_value'] ?? null,
+                r['rate_percentage'] ?? 0,
+                r['rate_type'] ?? 'PERCENTAGE',
+                r['is_active'] !== false,
+                r['priority'] ?? 100,
+            ]
+            if (hasRuleCreatedAtColumn || hasRuleCreatedDateColumn) {
+                ruleValues.push(new Date())
+            }
+            const rulePlaceholders = ruleValues.map((_, index) => `$${index + 1}`)
+            await this.dataSource.query(
+                `INSERT INTO rating_rules
+                   (${ruleInsertColumns.join(', ')})
+                 VALUES (${rulePlaceholders.join(', ')})`,
+                ruleValues,
+            )
+        }
+
+        const latest = await this.findOne(newScheduleId)
+        return {
+            ...latest,
+            versionCreated: true,
+            previousVersion: Number(existing.version ?? 1),
+            currentVersion: version,
+            previousEffectiveDate: existing.effective_date ?? null,
+            previousEffectiveTime: existing.effective_time ?? null,
+            previousExpiryDate: existing.expiry_date ?? null,
+            previousExpiryTime: existing.expiry_time ?? null,
+            currentEffectiveDate: latest.effective_date ?? null,
+            currentEffectiveTime: latest.effective_time ?? null,
+            currentExpiryDate: latest.expiry_date ?? null,
+            currentExpiryTime: latest.expiry_time ?? null,
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -170,12 +423,64 @@ export class RatingSchedulesService {
     // -------------------------------------------------------------------------
     async getVersions(id: number): Promise<any[]> {
         await this.findOne(id) // throws 404 if not found
+        const hasParentScheduleIdColumn = await this.hasRatingScheduleColumn('parent_schedule_id')
+        const hasCreatedAtColumn = await this.hasRatingScheduleColumn('created_at')
+        const hasCreatedDateColumn = await this.hasRatingScheduleColumn('created_date')
+        const createdAtSelect = hasCreatedAtColumn
+            ? 'created_at'
+            : hasCreatedDateColumn
+                ? 'created_date::timestamptz AS created_at'
+                : 'NULL::timestamptz AS created_at'
+        const createdAtSelectRs = hasCreatedAtColumn
+            ? 'rs.created_at AS created_at'
+            : hasCreatedDateColumn
+                ? 'rs.created_date::timestamptz AS created_at'
+                : 'NULL::timestamptz AS created_at'
+        const createdAtSelectChild = hasCreatedAtColumn
+            ? 'child.created_at AS created_at'
+            : hasCreatedDateColumn
+                ? 'child.created_date::timestamptz AS created_at'
+                : 'NULL::timestamptz AS created_at'
+        if (!hasParentScheduleIdColumn) {
+            return this.dataSource.query(
+                `SELECT id, name, version, NULL::int AS parent_schedule_id,
+                                ${createdAtSelect}, created_by, last_modified_date
+                     FROM rating_schedules
+                    WHERE id = $1
+                    ORDER BY version DESC`,
+                [id],
+            )
+        }
         return this.dataSource.query(
-            `SELECT id, name, version, parent_schedule_id,
-                    created_at, created_by, last_modified_date
-               FROM rating_schedules
-              WHERE id = $1 OR parent_schedule_id = $1
-              ORDER BY version DESC`,
+            `WITH RECURSIVE up_chain AS (
+                    SELECT id, parent_schedule_id
+                        FROM rating_schedules
+                     WHERE id = $1
+                    UNION ALL
+                    SELECT rs.id, rs.parent_schedule_id
+                        FROM rating_schedules rs
+                        JOIN up_chain uc ON rs.id = uc.parent_schedule_id
+                     WHERE uc.parent_schedule_id IS NOT NULL
+            ),
+            root_node AS (
+                    SELECT id
+                        FROM up_chain
+                     WHERE parent_schedule_id IS NULL
+                     ORDER BY id ASC
+                     LIMIT 1
+            ),
+            down_tree AS (
+                    SELECT rs.id, rs.parent_schedule_id, rs.name, rs.version, ${createdAtSelectRs}, rs.created_by, rs.last_modified_date
+                        FROM rating_schedules rs
+                     WHERE rs.id = COALESCE((SELECT id FROM root_node), $1)
+                    UNION ALL
+                    SELECT child.id, child.parent_schedule_id, child.name, child.version, ${createdAtSelectChild}, child.created_by, child.last_modified_date
+                        FROM rating_schedules child
+                        JOIN down_tree dt ON child.parent_schedule_id = dt.id
+            )
+            SELECT id, name, version, parent_schedule_id, created_at, created_by, last_modified_date
+                FROM down_tree
+             ORDER BY version DESC, id DESC`,
             [id],
         )
     }
@@ -189,35 +494,49 @@ export class RatingSchedulesService {
         if (!body['operator']) throw new BadRequestException('operator is required')
         if (body['rate_percentage'] === undefined) throw new BadRequestException('rate_percentage is required')
 
+        const hasRuleCreatedAtColumn = await this.hasRatingRuleColumn('created_at')
+        const hasRuleCreatedDateColumn = await this.hasRatingRuleColumn('created_date')
+        const insertColumns = [
+            'rating_schedule_id', 'rule_name', 'description', 'field_name', 'field_source',
+            'operator', 'field_value', 'rate_percentage', 'rate_type',
+            'coverage_type_id', 'coverage_sub_type_id',
+            'rule_group', 'group_number', 'logical_operator', 'sequence_in_group',
+            'priority', 'is_active', 'created_by',
+        ]
+        const insertValues: any[] = [
+            body['rating_schedule_id'],
+            body['rule_name'] ?? null,
+            body['description'] ?? null,
+            body['field_name'],
+            body['field_source'] ?? 'Location',
+            body['operator'],
+            body['field_value'] ?? null,
+            body['rate_percentage'],
+            body['rate_type'] ?? 'PERCENTAGE',
+            body['coverage_type_id'] ?? null,
+            body['coverage_sub_type_id'] ?? null,
+            body['rule_group'] ?? null,
+            body['group_number'] ?? 1,
+            body['logical_operator'] ?? 'AND',
+            body['sequence_in_group'] ?? 1,
+            body['priority'] ?? 100,
+            body['is_active'] !== false,
+            createdBy ?? null,
+        ]
+        if (hasRuleCreatedAtColumn) {
+            insertColumns.push('created_at')
+            insertValues.push(new Date())
+        } else if (hasRuleCreatedDateColumn) {
+            insertColumns.push('created_date')
+            insertValues.push(new Date())
+        }
+        const placeholders = insertValues.map((_, index) => `$${index + 1}`)
         const rows = await this.dataSource.query(
             `INSERT INTO rating_rules
-               (rating_schedule_id, rule_name, description, field_name, field_source,
-                operator, field_value, rate_percentage, rate_type,
-                coverage_type_id, coverage_sub_type_id,
-                rule_group, group_number, logical_operator, sequence_in_group,
-                priority, is_active, created_by, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW())
+               (${insertColumns.join(', ')})
+             VALUES (${placeholders.join(', ')})
              RETURNING *`,
-            [
-                body['rating_schedule_id'],
-                body['rule_name'] ?? null,
-                body['description'] ?? null,
-                body['field_name'],
-                body['field_source'] ?? 'Location',
-                body['operator'],
-                body['field_value'] ?? null,
-                body['rate_percentage'],
-                body['rate_type'] ?? 'PERCENTAGE',
-                body['coverage_type_id'] ?? null,
-                body['coverage_sub_type_id'] ?? null,
-                body['rule_group'] ?? null,
-                body['group_number'] ?? 1,
-                body['logical_operator'] ?? 'AND',
-                body['sequence_in_group'] ?? 1,
-                body['priority'] ?? 100,
-                body['is_active'] !== false,
-                createdBy ?? null,
-            ],
+            insertValues,
         )
         return rows[0]
     }
@@ -226,25 +545,37 @@ export class RatingSchedulesService {
     // PUT /api/rating-rules/:id
     // -------------------------------------------------------------------------
     async updateRule(id: number, body: Record<string, unknown>): Promise<any> {
+        const hasUpdatedAtColumn = await this.hasRatingRuleColumn('updated_at')
+        const hasLastModifiedDateColumn = await this.hasRatingRuleColumn('last_modified_date')
+        const updatedAtAssignment = hasUpdatedAtColumn
+            ? 'updated_at        = NOW()'
+            : hasLastModifiedDateColumn
+                ? 'last_modified_date = NOW()'
+                : null
+        const setClauses = [
+            'rule_name         = COALESCE($1, rule_name)',
+            'description       = COALESCE($2, description)',
+            'field_name        = COALESCE($3, field_name)',
+            'field_source      = COALESCE($4, field_source)',
+            'operator          = COALESCE($5, operator)',
+            'field_value       = COALESCE($6, field_value)',
+            'rate_percentage   = COALESCE($7, rate_percentage)',
+            'rate_type         = COALESCE($8, rate_type)',
+            'coverage_type_id  = COALESCE($9, coverage_type_id)',
+            'coverage_sub_type_id = COALESCE($10, coverage_sub_type_id)',
+            'rule_group        = COALESCE($11, rule_group)',
+            'group_number      = COALESCE($12, group_number)',
+            'logical_operator  = COALESCE($13, logical_operator)',
+            'sequence_in_group = COALESCE($14, sequence_in_group)',
+            'priority          = COALESCE($15, priority)',
+            'is_active         = COALESCE($16, is_active)',
+        ]
+        if (updatedAtAssignment) {
+            setClauses.push(updatedAtAssignment)
+        }
         const rows = await this.dataSource.query(
             `UPDATE rating_rules
-                SET rule_name         = COALESCE($1, rule_name),
-                    description       = COALESCE($2, description),
-                    field_name        = COALESCE($3, field_name),
-                    field_source      = COALESCE($4, field_source),
-                    operator          = COALESCE($5, operator),
-                    field_value       = COALESCE($6, field_value),
-                    rate_percentage   = COALESCE($7, rate_percentage),
-                    rate_type         = COALESCE($8, rate_type),
-                    coverage_type_id  = COALESCE($9, coverage_type_id),
-                    coverage_sub_type_id = COALESCE($10, coverage_sub_type_id),
-                    rule_group        = COALESCE($11, rule_group),
-                    group_number      = COALESCE($12, group_number),
-                    logical_operator  = COALESCE($13, logical_operator),
-                    sequence_in_group = COALESCE($14, sequence_in_group),
-                    priority          = COALESCE($15, priority),
-                    is_active         = COALESCE($16, is_active),
-                    updated_at        = NOW()
+                SET ${setClauses.join(',\n                    ')}
               WHERE id = $17
            RETURNING *`,
             [
@@ -580,10 +911,102 @@ export class RatingSchedulesService {
                     lc.coverage_type_id, lc.coverage_sub_type_id,
                     lc.coverage_type AS coverage_type_name,
                     lc.coverage_sub_type AS coverage_sub_type_name,
+                    COALESCE(q.method_of_placement, q.placement_method) AS quote_placement_method,
+                    q.inception_date AS quote_inception_date,
+                    q.inception_time AS quote_inception_time,
+                    q.expiry_date AS quote_expiry_date,
+                    q.expiry_time AS quote_expiry_time,
+                    q.status AS quote_status,
+                    q.business_type AS quote_business_type,
+                    q.contract_type AS quote_contract_type,
+                    q.insured AS quote_insured,
+                    p.policy_inception_date,
+                    p.policy_expiry_date,
+                    p.policy_inception_time,
+                    p.policy_expiry_time,
+                    p.policy_status,
+                    p.policy_business_type,
+                    p.policy_contract_type,
+                    p.policy_insured,
+                    p.policy_placement_method,
+                                        qs.class_of_business AS section_class_of_business,
+                                        qs.inception_date AS section_inception_date,
+                                        qs.effective_date AS section_effective_date,
+                                        qs.expiry_date AS section_expiry_date,
+                    qs.inception_time AS section_inception_time,
+                    qs.effective_time AS section_effective_time,
+                    qs.expiry_time AS section_expiry_time,
+                                        qs.days_on_cover AS section_days_on_cover,
+                                        qs.limit_currency AS section_limit_currency,
+                                        qs.limit_amount AS section_limit_amount,
+                                        qs.limit_loss_qualifier AS section_limit_loss_qualifier,
+                                        qs.excess_currency AS section_excess_currency,
+                                        qs.excess_amount AS section_excess_amount,
+                                        qs.excess_loss_qualifier AS section_excess_loss_qualifier,
+                                        qs.sum_insured_currency AS section_sum_insured_currency,
+                                        qs.sum_insured AS section_sum_insured_amount,
+                                        qs.premium_currency AS section_premium_currency,
+                                        qs.gross_premium AS section_gross_premium,
+                                        qs.annual_net_premium AS section_annual_net_premium,
+                                        (qs.payload->>'written_order') AS section_written_order,
+                                        (qs.payload->>'signed_order') AS section_signed_order,
+                                        qs.time_basis AS section_time_basis,
+                                        qs.written_order_basis AS section_written_order_basis,
+                                        qs.signed_order_basis AS section_signed_order_basis,
+                                        qs.written_line_total AS section_written_line_total,
+                                        qs.signed_line_total AS section_signed_line_total,
+                                        qs.delegated_authority_ref AS section_delegated_authority_ref,
+                                        qs.delegated_authority_section_ref AS section_delegated_authority_section_ref,
+                                        qsc.coverage AS coverage_name,
+                                        qsc.class_of_business AS coverage_class_of_business,
+                                        qsc.effective_date AS coverage_effective_date,
+                                        qsc.expiry_date AS coverage_expiry_date,
+                                        qsc.days_on_cover AS coverage_days_on_cover,
+                                        qsc.limit_currency AS coverage_limit_currency,
+                                        qsc.limit_amount AS coverage_limit_amount,
+                                        qsc.limit_loss_qualifier AS coverage_limit_loss_qualifier,
+                                        qsc.excess_currency AS coverage_excess_currency,
+                                        qsc.excess_amount AS coverage_excess_amount,
+                                        qsc.sum_insured_currency AS coverage_sum_insured_currency,
+                                        qsc.sum_insured AS coverage_sum_insured,
+                                        qsc.premium_currency AS coverage_premium_currency,
+                                        qsc.gross_premium AS coverage_gross_premium,
+                                        qsc.net_premium AS coverage_net_premium,
+                                        qsc.tax_receivable AS coverage_tax_receivable,
                     l.country, l.state, l.city,
                     l.address1, l.address2, l.zip_code
                FROM location_coverages lc
+               INNER JOIN quotes q ON q.id = lc.quote_id
                INNER JOIN locations l ON l.id = lc.location_id
+                             LEFT JOIN LATERAL (
+                                SELECT pol.inception_date AS policy_inception_date,
+                                       pol.inception_time AS policy_inception_time,
+                                       pol.expiry_date AS policy_expiry_date,
+                                       pol.expiry_time AS policy_expiry_time,
+                                       pol.status AS policy_status,
+                                       pol.business_type AS policy_business_type,
+                                       pol.contract_type AS policy_contract_type,
+                                       pol.insured AS policy_insured,
+                                       COALESCE(pol.payload->>'method_of_placement', q.method_of_placement, q.placement_method) AS policy_placement_method
+                                  FROM policies pol
+                                 WHERE pol.quote_id = lc.quote_id
+                                 ORDER BY pol.id DESC
+                                 LIMIT 1
+                             ) p ON TRUE
+                             LEFT JOIN quote_sections qs ON qs.id = lc.section_id
+                                    LEFT JOIN LATERAL (
+                                        SELECT qsc.*
+                                          FROM quote_section_coverages qsc
+                                         WHERE qsc.quote_id = lc.quote_id
+                                           AND qsc.section_id = lc.section_id
+                                           AND qsc.deleted_at IS NULL
+                                           AND (
+                                               qsc.coverage = lc.coverage_type
+                                               OR lc.coverage_type IS NULL
+                                           )
+                                         ORDER BY qsc.id DESC
+                                         LIMIT 1
+                                    ) qsc ON TRUE
               WHERE lc.quote_id = $1
                 AND lc.version_id = (
                       SELECT MAX(version_id) FROM location_coverages WHERE quote_id = $1
@@ -596,6 +1019,83 @@ export class RatingSchedulesService {
     /** Find matching rated field value for a location coverage row */
     private getFieldValue(row: any, fieldName: string): any {
         const n = this.normalizeFieldName(fieldName)
+        if (n === 'quote_policy_method_of_placement') return row['quote_placement_method'] ?? row['policy_placement_method'] ?? ''
+        if (n === 'quote_policy_inception_date') return row['quote_inception_date'] ?? row['policy_inception_date'] ?? ''
+        if (n === 'quote_policy_inception_time') return row['quote_inception_time'] ?? row['policy_inception_time'] ?? ''
+        if (n === 'quote_policy_expiry_date') return row['quote_expiry_date'] ?? row['policy_expiry_date'] ?? ''
+        if (n === 'quote_policy_expiry_time') return row['quote_expiry_time'] ?? row['policy_expiry_time'] ?? ''
+        if (n === 'quote_policy_status') return row['quote_status'] ?? row['policy_status'] ?? ''
+        if (n === 'quote_policy_business_type') return row['quote_business_type'] ?? row['policy_business_type'] ?? ''
+        if (n === 'quote_policy_contract_type') return row['quote_contract_type'] ?? row['policy_contract_type'] ?? ''
+        if (n === 'quote_policy_insured') return row['quote_insured'] ?? row['policy_insured'] ?? ''
+        if (n === 'quote_placement_method' || n === 'method_of_placement' || n === 'placement_method') return row['quote_placement_method'] ?? row['policy_placement_method'] ?? ''
+        if (n === 'quote_inception_date') return row['quote_inception_date'] ?? row['policy_inception_date'] ?? ''
+        if (n === 'quote_inception_time') return row['quote_inception_time'] ?? row['policy_inception_time'] ?? ''
+        if (n === 'quote_expiry_date') return row['quote_expiry_date'] ?? row['policy_expiry_date'] ?? ''
+        if (n === 'quote_expiry_time') return row['quote_expiry_time'] ?? row['policy_expiry_time'] ?? ''
+        if (n === 'quote_status') return row['quote_status'] ?? row['policy_status'] ?? ''
+        if (n === 'quote_business_type') return row['quote_business_type'] ?? row['policy_business_type'] ?? ''
+        if (n === 'quote_contract_type') return row['quote_contract_type'] ?? row['policy_contract_type'] ?? ''
+        if (n === 'quote_insured') return row['quote_insured'] ?? row['policy_insured'] ?? ''
+        if (n === 'policy_placement_method') return row['policy_placement_method'] ?? row['quote_placement_method'] ?? ''
+        if (n === 'policy_inception_date') return row['policy_inception_date'] ?? row['quote_inception_date'] ?? ''
+        if (n === 'policy_inception_time') return row['policy_inception_time'] ?? row['quote_inception_time'] ?? ''
+        if (n === 'policy_expiry_date') return row['policy_expiry_date'] ?? row['quote_expiry_date'] ?? ''
+        if (n === 'policy_expiry_time') return row['policy_expiry_time'] ?? row['quote_expiry_time'] ?? ''
+        if (n === 'policy_status') return row['policy_status'] ?? row['quote_status'] ?? ''
+        if (n === 'policy_business_type') return row['policy_business_type'] ?? row['quote_business_type'] ?? ''
+        if (n === 'policy_contract_type') return row['policy_contract_type'] ?? row['quote_contract_type'] ?? ''
+        if (n === 'policy_insured') return row['policy_insured'] ?? row['quote_insured'] ?? ''
+        if (n === 'section_class_of_business') return row['section_class_of_business'] ?? ''
+        if (n === 'section_inception_date') return row['section_inception_date'] ?? ''
+        if (n === 'section_effective_date') return row['section_effective_date'] ?? ''
+        if (n === 'section_expiry_date') return row['section_expiry_date'] ?? ''
+        if (n === 'section_inception_time') return row['section_inception_time'] ?? ''
+        if (n === 'section_effective_time') return row['section_effective_time'] ?? ''
+        if (n === 'section_expiry_time') return row['section_expiry_time'] ?? ''
+        if (n === 'section_days_on_cover') return row['section_days_on_cover'] ?? ''
+        if (n === 'section_limit_currency') return row['section_limit_currency'] ?? ''
+        if (n === 'section_limit_amount') return row['section_limit_amount'] ?? ''
+        if (n === 'section_limit_loss_qualifier') return row['section_limit_loss_qualifier'] ?? ''
+        if (n === 'section_excess_currency') return row['section_excess_currency'] ?? ''
+        if (n === 'section_excess_amount') return row['section_excess_amount'] ?? ''
+        if (n === 'section_excess_loss_qualifier') return row['section_excess_loss_qualifier'] ?? ''
+        if (n === 'section_sum_insured_currency') return row['section_sum_insured_currency'] ?? ''
+        if (n === 'section_sum_insured_amount') return row['section_sum_insured_amount'] ?? ''
+        if (n === 'section_premium_currency') return row['section_premium_currency'] ?? ''
+        if (n === 'section_gross_premium') return row['section_gross_premium'] ?? ''
+        if (n === 'section_annual_net_premium') return row['section_annual_net_premium'] ?? ''
+        if (n === 'section_written_order') return row['section_written_order'] ?? ''
+        if (n === 'section_signed_order') return row['section_signed_order'] ?? ''
+        if (n === 'section_time_basis') return row['section_time_basis'] ?? ''
+        if (n === 'section_written_order_basis') return row['section_written_order_basis'] ?? ''
+        if (n === 'section_signed_order_basis') return row['section_signed_order_basis'] ?? ''
+        if (n === 'section_written_line_total') return row['section_written_line_total'] ?? ''
+        if (n === 'section_signed_line_total') return row['section_signed_line_total'] ?? ''
+        if (n === 'section_delegated_authority_ref') return row['section_delegated_authority_ref'] ?? ''
+        if (n === 'section_delegated_authority_section_ref') return row['section_delegated_authority_section_ref'] ?? ''
+        if (n === 'coverage_name') return row['coverage_name'] ?? ''
+        if (n === 'coverage_class_of_business') return row['coverage_class_of_business'] ?? ''
+        if (n === 'coverage_effective_date') return row['coverage_effective_date'] ?? ''
+        if (n === 'coverage_expiry_date') return row['coverage_expiry_date'] ?? ''
+        if (n === 'coverage_days_on_cover') return row['coverage_days_on_cover'] ?? ''
+        if (n === 'coverage_limit_currency') return row['coverage_limit_currency'] ?? ''
+        if (n === 'coverage_limit_amount') return row['coverage_limit_amount'] ?? ''
+        if (n === 'coverage_limit_loss_qualifier') return row['coverage_limit_loss_qualifier'] ?? ''
+        if (n === 'coverage_excess_currency') return row['coverage_excess_currency'] ?? ''
+        if (n === 'coverage_excess_amount') return row['coverage_excess_amount'] ?? ''
+        if (n === 'coverage_sum_insured_currency') return row['coverage_sum_insured_currency'] ?? ''
+        if (n === 'coverage_sum_insured') return row['coverage_sum_insured'] ?? ''
+        if (n === 'coverage_premium_currency') return row['coverage_premium_currency'] ?? ''
+        if (n === 'coverage_gross_premium') return row['coverage_gross_premium'] ?? ''
+        if (n === 'coverage_net_premium') return row['coverage_net_premium'] ?? ''
+        if (n === 'coverage_tax_receivable') return row['coverage_tax_receivable'] ?? ''
+        if (n === 'coverage_detail_currency') return row['currency'] ?? ''
+        if (n === 'coverage_detail_sum_insured') return row['sum_insured'] ?? row['sumInsured'] ?? ''
+        if (n === 'coverage_currency') return row['currency'] ?? ''
+        if (n === 'coverage_sum_insured') return row['sum_insured'] ?? row['sumInsured'] ?? ''
+        if (n === 'coverage_type') return row['coverage_type_name'] ?? row['coverage_type'] ?? ''
+        if (n === 'coverage_sub_type') return row['coverage_sub_type_name'] ?? row['coverage_sub_type'] ?? ''
         if (['postcode', 'zip', 'zip_code', 'zipcode'].includes(n)) return row['zip_code'] ?? row['zipCode'] ?? ''
         if (n === 'country') return row['country'] ?? ''
         if (['subdivision', 'state', 'province', 'region'].includes(n)) return row['state'] ?? ''
@@ -693,5 +1193,37 @@ export class RatingSchedulesService {
 
     private splitList(value: any): string[] {
         return String(value ?? '').split(',').map(v => v.trim()).filter(Boolean)
+    }
+
+    private toDateTime(dateValue: any, timeValue: any): Date | null {
+        const dateText = String(dateValue ?? '').trim()
+        const timeText = String(timeValue ?? '').trim()
+        if (!dateText || !timeText) return null
+        const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(dateText) ? dateText : dateText.slice(0, 10)
+        const normalizedTime = /^\d{2}:\d{2}(:\d{2})?$/.test(timeText) ? timeText : ''
+        if (!normalizedTime) return null
+        const hhmmss = normalizedTime.length === 5 ? `${normalizedTime}:00` : normalizedTime
+        const dt = new Date(`${normalizedDate}T${hhmmss}`)
+        return isNaN(dt.getTime()) ? null : dt
+    }
+
+    private normalizeRulesForComparison(rules: Array<Record<string, unknown>> | null | undefined): Array<Record<string, unknown>> {
+        return (rules ?? [])
+            .map((r, index) => ({
+                group_number: Number(r['group_number'] ?? 1),
+                sequence_in_group: Number(r['sequence_in_group'] ?? index + 1),
+                logical_operator: (r['logical_operator'] ?? null) as string | null,
+                field_name: String(r['field_name'] ?? '').trim(),
+                operator: String(r['operator'] ?? '=').trim().toUpperCase(),
+                field_value: String(r['field_value'] ?? '').trim(),
+                rate_percentage: Number(r['rate_percentage'] ?? 0),
+            }))
+            .sort((a, b) => {
+                const g = Number(a['group_number']) - Number(b['group_number'])
+                if (g !== 0) return g
+                const s = Number(a['sequence_in_group']) - Number(b['sequence_in_group'])
+                if (s !== 0) return s
+                return String(a['field_name']).localeCompare(String(b['field_name']))
+            })
     }
 }

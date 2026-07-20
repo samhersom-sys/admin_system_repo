@@ -240,6 +240,38 @@ describe('BindingAuthoritiesService', () => {
 
       expect(result).toEqual(['EUR', 'GBP'])
     })
+
+    it('lists loss qualifiers in name order', async () => {
+      baRepo.manager = { query: jest.fn().mockResolvedValue([{ name: 'Any One Loss' }, { name: 'Each and Every Loss' }]) }
+
+      const result = await service.listLossQualifiers()
+
+      expect(result).toEqual(['Any One Loss', 'Each and Every Loss'])
+    })
+
+    it('lists contract types in name order', async () => {
+      baRepo.manager = { query: jest.fn().mockResolvedValue([{ name: 'Facultative' }, { name: 'Treaty' }]) }
+
+      const result = await service.listContractTypes()
+
+      expect(result).toEqual(['Facultative', 'Treaty'])
+    })
+
+    it('lists methods of placement in name order', async () => {
+      baRepo.manager = { query: jest.fn().mockResolvedValue([{ name: 'Binding Authority' }, { name: 'Open Market' }]) }
+
+      const result = await service.listMethodsOfPlacement()
+
+      expect(result).toEqual(['Binding Authority', 'Open Market'])
+    })
+
+    it('lists renewal statuses in name order', async () => {
+      baRepo.manager = { query: jest.fn().mockResolvedValue([{ name: 'Expiring' }, { name: 'Renewed' }]) }
+
+      const result = await service.listRenewalStatuses()
+
+      expect(result).toEqual(['Expiring', 'Renewed'])
+    })
   })
 
   // ---------------------------------------------------------------------------

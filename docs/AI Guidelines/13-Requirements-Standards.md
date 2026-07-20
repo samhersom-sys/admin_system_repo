@@ -101,6 +101,14 @@ Every requirement must have a unique ID in the format:
 | FieldGroup shared component | `SHARED-FG` |
 | TabsNav shared component | `SHARED-TABS` |
 | AuditTable component + useAudit hook | `SHARED-AUDIT` |
+| Broker Submissions domain module | `PSS-BRK-DOM` |
+| Broker Submissions backend NestJS module | `PSS-BRK-BE` |
+| Broker Submissions list page | `PSS-BRK-LIST` |
+| New Broker Submission page | `PSS-BRK-NEW` |
+| Broker Submission detail/view page | `PSS-BRK-VIEW` |
+| Platform Shared Submissions — insurer extensions | `PSS-INS` |
+| Placement domain module | `PLC-DOM` |
+| Earnings Configuration settings page + NestJS module | `EARN-CFG` |
 
 New domains must be assigned a code in this table before requirements for that domain are written.
 

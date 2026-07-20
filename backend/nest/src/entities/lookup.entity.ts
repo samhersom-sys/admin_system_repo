@@ -43,6 +43,17 @@ export class LookupPolicyStatus {
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt: Date
 }
 
+@Entity('lookup_policy_version_statuses')
+export class LookupPolicyVersionStatus {
+  @PrimaryGeneratedColumn() id: number
+  @Column({ type: 'varchar', length: 50, unique: true }) code: string
+  @Column({ type: 'varchar', length: 100 }) name: string
+  @Column({ type: 'text', nullable: true }) description: string | null
+  @Column({ name: 'order_index', type: 'int', default: 0 }) orderIndex: number
+  @Column({ name: 'is_active', type: 'boolean', default: true }) isActive: boolean
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt: Date
+}
+
 @Entity('lookup_binding_authority_statuses')
 export class LookupBindingAuthorityStatus {
   @PrimaryGeneratedColumn() id: number

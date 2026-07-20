@@ -59,6 +59,17 @@ interface NavItem {
   subItems?: NavSubItem[]
 }
 
+interface DomainNavItem {
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  to: string
+  matchPrefix: string
+  noLink?: boolean
+  subItems: { label: string; icon: React.ComponentType<{ className?: string }>; event?: string; to?: string }[]
+  /** If set, only show this item for users whose orgType matches */
+  requiredOrgType?: string
+}
+
 // ─── Main nav items (always visible) ───────────────────────────────────────
 const NAV_ITEMS: NavItem[] = [
   { label: 'Home', icon: FiHome, to: '/app-home' },
@@ -103,7 +114,7 @@ const NAV_ITEMS: NavItem[] = [
 // ─── Domain contextual nav items ────────────────────────────────────────────
 // Only shown when the user is navigating within that domain (T-SIDEBAR-CTXNAV-*).
 // subItems: shown on hover when no page section is registered (REQ-SIDEBAR-F-016).
-const DOMAIN_NAV = [
+const DOMAIN_NAV: DomainNavItem[] = [
   {
     label: 'Submissions', icon: FiFileText, to: '/submissions', matchPrefix: '/submissions',
     subItems: [
@@ -129,6 +140,25 @@ const DOMAIN_NAV = [
   {
     label: 'Binding Authorities', icon: FiBriefcase, to: '/binding-authorities', matchPrefix: '/binding-authorities',
     subItems: [],
+  },
+  {
+    label: 'Broker Submissions', icon: FiInbox, to: '/broker-submissions', matchPrefix: '/broker-submissions',
+    requiredOrgType: 'broker',
+    subItems: [],
+  },
+  {
+    label: 'Account Admin', icon: FiSettings, to: '/settings/account', matchPrefix: '/settings/account',
+    subItems: [],
+  },
+  {
+    label: 'Product Configuration', icon: FiPackage, to: '/settings/products', matchPrefix: '/settings/product',
+    subItems: [],
+  },
+  {
+    label: 'Rating Profiles', icon: FiSliders, to: '/settings/rating-rules', matchPrefix: '/settings/rating-rules',
+    subItems: [
+      { label: 'Save', icon: FiSave, event: 'rating-schedule:save' },
+    ],
   },
 ]
 
@@ -162,13 +192,26 @@ export default function Sidebar() {
   const [ctxSubOpen, setCtxSubOpen] = useState<string | null>(null)
 
   // Domain contextual nav — items visible only when within a domain route (T-SIDEBAR-CTXNAV-*)
-  const contextualDomainItems = DOMAIN_NAV.filter(({ matchPrefix }) =>
+  // Items with requiredOrgType are hidden unless the user's org type matches OR they are a platform admin.
+  const userOrgType = (session?.user as Record<string, unknown>)?.['orgType'] as string | undefined
+  const userRole = session?.user?.role
+  const visibleDomainNav = DOMAIN_NAV.filter(d =>
+    !d.requiredOrgType || d.requiredOrgType === userOrgType || userRole === 'internal_admin'
+  )
+  const contextualDomainItems = visibleDomainNav.filter(({ matchPrefix }) =>
     location.pathname.startsWith(matchPrefix)
   )
 
+  // Create menu — append "Broker Submission" for broker orgs and platform admins (REQ-PSS-BRK-LIST-F-013).
+  // The Create entry links directly to the form, not the list.
+  const computedCreateItems = (userOrgType === 'broker' || userRole === 'internal_admin')
+    ? [...CREATE_ITEMS, { label: 'Broker Submission', icon: FiInbox, to: '/broker-submissions/new' }]
+    : CREATE_ITEMS
+
   // Which domain item is currently active — used to bind section items to the right header
-  const activeDomainItem = DOMAIN_NAV.find(d => location.pathname.startsWith(d.matchPrefix)) ?? null
+  const activeDomainItem = visibleDomainNav.find(d => location.pathname.startsWith(d.matchPrefix)) ?? null
   const isReportingRoute = location.pathname.startsWith('/reports') || location.pathname.startsWith('/dashboards')
+  const isSettingsRoute = location.pathname.startsWith('/settings')
 
   // Domain sub-item hover state (REQ-SIDEBAR-F-016)
   const [hoveredDomain, setHoveredDomain] = useState<string | null>(null)
@@ -179,102 +222,116 @@ export default function Sidebar() {
   const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Pre-render page-registered section sub-items for the active domain header.
-  // This is a JSX expression (not a hook) — valid to compute before return().
-  const sectionSubEl = (section && Array.isArray(section.items)) ? (
-    <ul className="sidebar-domain-sub" role="list">
-      {section.items.map((item) => {
-        const ItemIcon = item.icon
-        if (item.children?.length) {
-          const subOpen = ctxSubOpen === item.label
+  // This is a function (not a hook) — valid to call inside return().
+  // showTitle=true prepends the section.title as a visible heading item.
+  function renderSectionItems(showTitle = false) {
+    if (!section || !Array.isArray(section.items)) return null
+    return (
+      <ul className="sidebar-domain-sub" role="list">
+        {showTitle && (
+          <li key="__section-title">
+            <div className="sidebar-item sidebar-context-section-title" title={section.title}>
+              <span className="sidebar-item-label">{section.title}</span>
+            </div>
+          </li>
+        )}
+        {section.items.map((item) => {
+          const ItemIcon = item.icon
+          if (item.children?.length) {
+            const subOpen = ctxSubOpen === item.label
+            return (
+              <li
+                key={item.label}
+                className={`sidebar-submenu-wrap${subOpen ? ' sidebar-submenu-wrap--open' : ''}`}
+                onMouseEnter={() => setCtxSubOpen(item.label)}
+                onMouseLeave={() => setCtxSubOpen(null)}
+              >
+                <button
+                  type="button"
+                  className="sidebar-item sidebar-domain-sub-item sidebar-context-btn"
+                  aria-expanded={subOpen}
+                  aria-haspopup="true"
+                  title={item.label}
+                  onClick={() => setCtxSubOpen(v => v === item.label ? null : item.label)}
+                >
+                  <ItemIcon className="sidebar-item-icon" aria-hidden="true" />
+                  <span className="sidebar-item-label">{item.label}</span>
+                </button>
+                <ul className="sidebar-submenu" role="list" aria-label={`${item.label} options`}>
+                  {item.children.map((child) => {
+                    const ChildIcon = child.icon
+                    return (
+                      <li key={child.to ?? child.event ?? child.label}>
+                        {child.to ? (
+                          <NavLink
+                            to={child.to}
+                            className="sidebar-item sidebar-submenu-item"
+                            title={child.label}
+                            onClick={() => setCtxSubOpen(null)}
+                          >
+                            <ChildIcon className="sidebar-item-icon" aria-hidden="true" />
+                            <span className="sidebar-item-label">{child.label}</span>
+                          </NavLink>
+                        ) : (
+                          <button
+                            type="button"
+                            className="sidebar-item sidebar-submenu-item"
+                            title={child.label}
+                            onClick={() => {
+                              if (child.event) window.dispatchEvent(new CustomEvent(child.event))
+                              setCtxSubOpen(null)
+                            }}
+                          >
+                            <ChildIcon className="sidebar-item-icon" aria-hidden="true" />
+                            <span className="sidebar-item-label">{child.label}</span>
+                          </button>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </li>
+            )
+          }
+          if (item.to) {
+            return (
+              <li key={item.to}>
+                <NavLink
+                  to={item.to}
+                  className="sidebar-item sidebar-domain-sub-item sidebar-context-btn"
+                  title={item.label}
+                >
+                  <ItemIcon className="sidebar-item-icon" aria-hidden="true" />
+                  <span className="sidebar-item-label">{item.label}</span>
+                </NavLink>
+              </li>
+            )
+          }
           return (
-            <li
-              key={item.label}
-              className={`sidebar-submenu-wrap${subOpen ? ' sidebar-submenu-wrap--open' : ''}`}
-              onMouseEnter={() => setCtxSubOpen(item.label)}
-              onMouseLeave={() => setCtxSubOpen(null)}
-            >
+            <li key={item.event ?? item.label}>
               <button
                 type="button"
                 className="sidebar-item sidebar-domain-sub-item sidebar-context-btn"
-                aria-expanded={subOpen}
-                aria-haspopup="true"
                 title={item.label}
-                onClick={() => setCtxSubOpen(v => v === item.label ? null : item.label)}
+                disabled={item.disabled ?? false}
+                onClick={() => {
+                  if (!item.disabled && item.event) {
+                    window.dispatchEvent(new CustomEvent(item.event))
+                  }
+                }}
               >
                 <ItemIcon className="sidebar-item-icon" aria-hidden="true" />
                 <span className="sidebar-item-label">{item.label}</span>
               </button>
-              <ul className="sidebar-submenu" role="list" aria-label={`${item.label} options`}>
-                {item.children.map((child) => {
-                  const ChildIcon = child.icon
-                  return (
-                    <li key={child.to ?? child.event ?? child.label}>
-                      {child.to ? (
-                        <NavLink
-                          to={child.to}
-                          className="sidebar-item sidebar-submenu-item"
-                          title={child.label}
-                          onClick={() => setCtxSubOpen(null)}
-                        >
-                          <ChildIcon className="sidebar-item-icon" aria-hidden="true" />
-                          <span className="sidebar-item-label">{child.label}</span>
-                        </NavLink>
-                      ) : (
-                        <button
-                          type="button"
-                          className="sidebar-item sidebar-submenu-item"
-                          title={child.label}
-                          onClick={() => {
-                            if (child.event) window.dispatchEvent(new CustomEvent(child.event))
-                            setCtxSubOpen(null)
-                          }}
-                        >
-                          <ChildIcon className="sidebar-item-icon" aria-hidden="true" />
-                          <span className="sidebar-item-label">{child.label}</span>
-                        </button>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
             </li>
           )
-        }
-        if (item.to) {
-          return (
-            <li key={item.to}>
-              <NavLink
-                to={item.to}
-                className="sidebar-item sidebar-domain-sub-item sidebar-context-btn"
-                title={item.label}
-              >
-                <ItemIcon className="sidebar-item-icon" aria-hidden="true" />
-                <span className="sidebar-item-label">{item.label}</span>
-              </NavLink>
-            </li>
-          )
-        }
-        return (
-          <li key={item.event ?? item.label}>
-            <button
-              type="button"
-              className="sidebar-item sidebar-domain-sub-item sidebar-context-btn"
-              title={item.label}
-              disabled={item.disabled ?? false}
-              onClick={() => {
-                if (!item.disabled && item.event) {
-                  window.dispatchEvent(new CustomEvent(item.event))
-                }
-              }}
-            >
-              <ItemIcon className="sidebar-item-icon" aria-hidden="true" />
-              <span className="sidebar-item-label">{item.label}</span>
-            </button>
-          </li>
-        )
-      })}
-    </ul>
-  ) : null
+        })}
+      </ul>
+    )
+  }
+
+  // Computed section elements used in render
+  const sectionSubEl = renderSectionItems(false)
 
   function handleMouseEnter() {
     if (collapseTimer.current) clearTimeout(collapseTimer.current)
@@ -335,6 +392,7 @@ export default function Sidebar() {
             >
               <NavLink
                 to={to}
+                end={to === '/settings'}
                 className={({ isActive }) =>
                   `sidebar-item${isActive ? ' sidebar-item--active' : ''}`
                 }
@@ -346,7 +404,8 @@ export default function Sidebar() {
 
               {/* ── Nav sub-items — shown on hover ── */}
               {section && isReportingRoute && to === '/reports' ? sectionSubEl : null}
-              {subItems?.length && hoveredNav === to && !(section && isReportingRoute && to === '/reports') ? (
+              {section && isSettingsRoute && to === '/settings' && !activeDomainItem ? renderSectionItems(true) : null}
+              {subItems?.length && hoveredNav === to && !(section && isReportingRoute && to === '/reports') && !(section && isSettingsRoute && to === '/settings' && !activeDomainItem) ? (
                 <ul className="sidebar-domain-sub" role="list">
                   {subItems.map((sub) => {
                     const SubIcon = sub.icon
@@ -403,7 +462,7 @@ export default function Sidebar() {
                 </button>
 
                 <ul className="sidebar-submenu" role="list" aria-label="Create options">
-                  {CREATE_ITEMS.map(({ label: itemLabel, icon: ItemIcon, to: itemTo }) => (
+                  {computedCreateItems.map(({ label: itemLabel, icon: ItemIcon, to: itemTo }) => (
                     <li key={itemTo}>
                       <NavLink
                         to={itemTo}
@@ -497,7 +556,7 @@ export default function Sidebar() {
             Section items are now rendered inline under the domain header (REQ-SIDEBAR-F-007).
             This fallback block is preserved for edge cases where a section is registered
             but no domain route is matched (e.g. a future non-domain page with a section). */}
-        {section && Array.isArray(section.items) && !activeDomainItem && !isReportingRoute && (
+        {section && Array.isArray(section.items) && !activeDomainItem && !isReportingRoute && !isSettingsRoute && (
           <li>
             <div className="sidebar-context-section">
               <ul className="sidebar-context-list" role="list">

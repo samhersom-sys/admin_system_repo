@@ -95,4 +95,8 @@ export class Policy {
   // Added in migration 075
   @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deletedAt: Date | null
+
+  // Added — OQ-STAT-002: version status FK to lookup_policy_version_statuses (Original / Endorsed)
+  @Column({ name: 'version_status_id', type: 'int', nullable: true })
+  versionStatusId: number | null
 }

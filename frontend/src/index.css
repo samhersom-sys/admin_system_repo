@@ -5,6 +5,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .app-input-invalid {
+    @apply border-red-500 bg-red-50 focus:border-red-500 focus:ring-red-500;
+  }
+}
+
 /* === app-table — shared table component === */
 .app-table {
   width: 100%;
@@ -28,7 +34,8 @@
   padding: 0.2rem 0.5rem;
   border-top: 1px solid var(--table-border);
   white-space: nowrap;
-  text-align: left; /* default: all cells left-aligned; apply text-right on <td> for financial data */
+  text-align: left;
+  /* default: all cells left-aligned; apply text-right on <td> for financial data */
 }
 
 .app-table tbody tr:hover {

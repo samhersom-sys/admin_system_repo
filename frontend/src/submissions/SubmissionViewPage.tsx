@@ -19,6 +19,7 @@ import {
 } from '@/submissions/submissions.service'
 import type { Submission, SubmissionStatus, SubmissionEditLock } from '@/submissions/submissions.service'
 import { post } from '@/shared/lib/api-client/api-client'
+import { buildAuditDiff } from '@/shared/lib/audit/buildAuditDiff'
 import SubmissionTabs from '@/submissions/SubmissionTabs/SubmissionTabs'
 import { useSidebarSection } from '@/shell/SidebarContext'
 import { useNotifications } from '@/shell/NotificationDock'
@@ -33,6 +34,14 @@ import {
     FiUsers,
     FiAlertCircle,
 } from 'react-icons/fi'
+
+// REQ-SUB-VIEW-F-XXX — field labels for Submission Updated audit diff
+const SUBMISSION_FIELD_LABELS: Record<string, string> = {
+    insured: 'Insured',
+    inceptionDate: 'Inception Date',
+    expiryDate: 'Expiry Date',
+    renewalDate: 'Renewal Date',
+}
 
 // Broker-origin locked fields — list confirmed once OQ-044 is resolved
 const BROKER_ORIGIN_LOCKED_FIELDS: string[] = []
@@ -74,6 +83,12 @@ function submissionToForm(s: Submission): FormValues {
         expiryDate: s.expiryDate ?? '',
         renewalDate: s.renewalDate ?? '',
     }
+}
+
+function formatDate(iso: string | null | undefined): string {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-GB')
 }
 
 // ---------------------------------------------------------------------------
@@ -246,6 +261,7 @@ export default function SubmissionViewPage() {
             const currentSubmission = submissionRef.current
             if (isCascadeLockedRef.current || isConcurrentLockedRef.current || !currentSubmission) return
             try {
+                const prevFormValues = { ...formValuesRef.current }
                 const result = await updateSubmission(currentSubmission.id, formValuesRef.current)
                 setSubmission(result)
                 const fresh = submissionToForm(result)
@@ -253,11 +269,12 @@ export default function SubmissionViewPage() {
                 setSavedValues(fresh)
                 setActionError(null)
                 // Best-effort audit event — failure does not affect the save outcome
+                const _diffDesc = buildAuditDiff(prevFormValues, fresh as Record<string, unknown>, SUBMISSION_FIELD_LABELS)
                 post('/api/audit/event', {
                     entityType: 'Submission',
                     entityId: currentSubmission.id,
                     action: 'Submission Updated',
-                    details: {},
+                    details: _diffDesc ? { description: _diffDesc } : {},
                 }).catch(() => { /* silently ignore audit failures */ })
             } catch (err: unknown) {
                 const lockConflict = getLockConflict(err, currentSubmission.id)
@@ -397,7 +414,10 @@ export default function SubmissionViewPage() {
                         </div>
                         <div>
                             <p className="text-xs text-gray-400 mb-1">Insured</p>
-                            <p className="text-sm text-gray-900">{submission.insured}</p>
+                            {submission.insuredId
+                                ? <Link to={`/parties/${submission.insuredId}`} className="text-sm text-blue-600 hover:underline">{submission.insured}</Link>
+                                : <p className="text-sm text-gray-900">{submission.insured}</p>
+                            }
                         </div>
                         <div>
                             <p className="text-xs text-gray-400 mb-1">Placing Broker</p>
@@ -409,12 +429,26 @@ export default function SubmissionViewPage() {
                         </div>
                         <div>
                             <p className="text-xs text-gray-400 mb-1">Created Date</p>
-                            <p className="text-sm text-gray-700">{submission.createdDate}</p>
+                            <p className="text-sm text-gray-700">{formatDate(submission.createdDate)}</p>
                         </div>
                         <div>
                             <p className="text-xs text-gray-400 mb-1">Organisation</p>
                             <p className="text-sm text-gray-700">{submission.createdByOrgCode}</p>
                         </div>
+                        <div>
+                            <p className="text-xs text-gray-400 mb-1">Inception Date</p>
+                            <p className="text-sm text-gray-700">{formatDate(submission.inceptionDate)}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-400 mb-1">Expiry Date</p>
+                            <p className="text-sm text-gray-700">{formatDate(submission.expiryDate)}</p>
+                        </div>
+                        {submission.renewalDate && (
+                            <div>
+                                <p className="text-xs text-gray-400 mb-1">Renewal Date</p>
+                                <p className="text-sm text-gray-700">{formatDate(submission.renewalDate)}</p>
+                            </div>
+                        )}
                     </div>
                 </Card>
 

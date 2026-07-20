@@ -52,6 +52,9 @@ export default function CreatePartyPage() {
 
     useSidebarSection(SIDEBAR_SECTION)
 
+    const hasNameError = validationError === 'Name is required.'
+    const hasTypeError = validationError === 'Type is required.'
+
     const handleSave = useCallback(async () => {
         if (!name.trim()) {
             setValidationError('Name is required.')
@@ -123,7 +126,8 @@ export default function CreatePartyPage() {
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 aria-label="Party name"
-                                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                className={`w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 ${hasNameError ? 'app-input-invalid' : ''}`}
+                                aria-invalid={hasNameError ? 'true' : 'false'}
                             />
                         </div>
 
@@ -136,7 +140,8 @@ export default function CreatePartyPage() {
                                 value={type}
                                 onChange={(e) => setType(e.target.value)}
                                 aria-label="Party type"
-                                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                className={`w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 ${hasTypeError ? 'app-input-invalid' : ''}`}
+                                aria-invalid={hasTypeError ? 'true' : 'false'}
                             >
                                 <option value="">Select type…</option>
                                 {PARTY_ROLES.map((r) => (

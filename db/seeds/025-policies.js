@@ -17,6 +17,7 @@
  *   - submission_id looks up from SUB-2024-003 (Bound submission → same insured)
  *   - Status coverage: Active, Expired, Cancelled, Renewed
  *   - renewable coverage: Renewable, Non-Renewable (nullable)
+ *   - version_status_id: all policies seeded as 'Original' (ORIGINAL from lookup_policy_version_statuses)
  */
 
 'use strict'
@@ -125,8 +126,9 @@ const POLICIES = [
         grossWrittenPremium: 85000.00,
         status: 'Active',
         businessType: 'Property',
+        newOrRenewal: 'New',
         contractType: 'Policy Contract',
-        createdBy: 'admin',
+        createdBy: 'underwriter.north',
         createdByOrgCode: 'DEMO',
     },
     {
@@ -140,8 +142,9 @@ const POLICIES = [
         grossWrittenPremium: 62000.00,
         status: 'Active',
         businessType: 'Liability',
+        newOrRenewal: 'New',
         contractType: 'Policy Contract',
-        createdBy: 'admin',
+        createdBy: 'underwriter.south',
         createdByOrgCode: 'DEMO',
     },
     {
@@ -156,7 +159,7 @@ const POLICIES = [
         status: 'Active',
         businessType: 'Marine',
         contractType: 'Policy Contract',
-        createdBy: 'admin',
+        createdBy: 'underwriter.north',
         createdByOrgCode: 'DEMO',
     },
     {
@@ -171,7 +174,7 @@ const POLICIES = [
         status: 'Active',
         businessType: 'Property',
         contractType: 'Policy Contract',
-        createdBy: 'admin',
+        createdBy: 'underwriter.south',
         createdByOrgCode: 'DEMO',
     },
     {
@@ -186,7 +189,7 @@ const POLICIES = [
         status: 'Active',
         businessType: 'Marine',
         contractType: 'Policy Contract',
-        createdBy: 'admin',
+        createdBy: 'underwriter.north',
         createdByOrgCode: 'DEMO',
     },
     {
@@ -201,7 +204,7 @@ const POLICIES = [
         status: 'Active',
         businessType: 'Liability',
         contractType: 'Policy Contract',
-        createdBy: 'admin',
+        createdBy: 'underwriter.south',
         createdByOrgCode: 'DEMO',
     },
     {
@@ -215,8 +218,9 @@ const POLICIES = [
         grossWrittenPremium: 92000.00,
         status: 'Active',
         businessType: 'Property',
+        newOrRenewal: 'New',
         contractType: 'Policy Contract',
-        createdBy: 'admin',
+        createdBy: 'underwriter.partner',
         createdByOrgCode: 'DEMO',
     },
     {
@@ -230,8 +234,9 @@ const POLICIES = [
         grossWrittenPremium: 58000.00,
         status: 'Active',
         businessType: 'Marine',
+        newOrRenewal: 'New',
         contractType: 'Policy Contract',
-        createdBy: 'admin',
+        createdBy: 'underwriter.partner',
         createdByOrgCode: 'DEMO',
     },
     {
@@ -388,8 +393,9 @@ const POLICIES = [
         status: 'Renewed',
         renewable: 'Renewable',
         businessType: 'Liability',
+        newOrRenewal: 'Renewal',
         contractType: 'Policy Contract',
-        createdBy: 'admin',
+        createdBy: 'underwriter.partner',
         createdByOrgCode: 'DEMO',
     },
     {
@@ -404,8 +410,9 @@ const POLICIES = [
         status: 'Active',
         renewable: 'Renewable',
         businessType: 'Marine',
+        newOrRenewal: 'Renewal',
         contractType: 'Policy Contract',
-        createdBy: 'admin',
+        createdBy: 'underwriter.south',
         createdByOrgCode: 'DEMO',
     },
 
@@ -513,6 +520,26 @@ async function run() {
         let inserted = 0
         let skipped = 0
 
+        // Look up version status ID for 'Original' policies
+        let originalVersionStatusId = null
+        try {
+            const vsRes = await client.query(
+                `SELECT id FROM lookup_policy_version_statuses WHERE code = 'ORIGINAL' LIMIT 1`
+            )
+            if (vsRes.rows.length > 0) originalVersionStatusId = vsRes.rows[0].id
+        } catch (_) {
+            // Table may not exist if seeds run out of order — version_status_id will be NULL
+        }
+
+        const colsRes = await client.query(
+            `SELECT column_name
+             FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'policies'`
+        )
+        const policyCols = new Set(colsRes.rows.map((r) => String(r.column_name)))
+        const hasVersionStatusColumn = policyCols.has('version_status_id')
+        const hasNewOrRenewalColumn = policyCols.has('new_or_renewal')
+
         for (const p of POLICIES) {
             // Look up quote_id if quoteRef is specified
             let quoteId = null
@@ -539,24 +566,75 @@ async function run() {
                 [p.reference]
             )
             if (existing.rows.length > 0) {
-                console.log(`  ⊘ ${p.reference} — already exists (skipped)`)
-                skipped++
-                continue
-            }
-
-            await client.query(
-                `INSERT INTO policies (
-                    reference, quote_id, submission_id, insured, insured_id,
-                    placing_broker, inception_date, expiry_date,
-                    gross_written_premium, status, renewable, business_type, contract_type,
-                    created_by, created_by_org_code
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-                [
+                const updateSets = [
+                    'quote_id = $2',
+                    'submission_id = $3',
+                    'insured = $4',
+                    'insured_id = $5',
+                    'placing_broker = $6',
+                    'inception_date = $7',
+                    'expiry_date = $8',
+                    'gross_written_premium = $9',
+                    'status = $10',
+                    'renewable = $11',
+                    'business_type = $12',
+                    'contract_type = $13',
+                    'created_by = $14',
+                    'created_by_org_code = $15',
+                ]
+                const updateParams = [
                     p.reference, quoteId, submissionId, p.insured, p.insuredId,
                     p.placingBroker, p.inceptionDate, p.expiryDate,
                     p.grossWrittenPremium, p.status, p.renewable ?? null, p.businessType, p.contractType,
                     p.createdBy, p.createdByOrgCode,
                 ]
+
+                if (hasVersionStatusColumn) {
+                    updateSets.push('version_status_id = $16')
+                    updateParams.push(originalVersionStatusId)
+                }
+                if (hasNewOrRenewalColumn) {
+                    const idx = updateParams.length + 1
+                    updateSets.push(`new_or_renewal = $${idx}`)
+                    updateParams.push(p.newOrRenewal ?? null)
+                }
+
+                await client.query(
+                    `UPDATE policies
+                     SET ${updateSets.join(', ')}
+                     WHERE reference = $1`,
+                    updateParams
+                )
+                console.log(`  ↻ ${p.reference} — updated`)
+                skipped++
+                continue
+            }
+
+            const insertCols = [
+                'reference', 'quote_id', 'submission_id', 'insured', 'insured_id',
+                'placing_broker', 'inception_date', 'expiry_date',
+                'gross_written_premium', 'status', 'renewable', 'business_type', 'contract_type',
+                'created_by', 'created_by_org_code',
+            ]
+            const insertValues = [
+                p.reference, quoteId, submissionId, p.insured, p.insuredId,
+                p.placingBroker, p.inceptionDate, p.expiryDate,
+                p.grossWrittenPremium, p.status, p.renewable ?? null, p.businessType, p.contractType,
+                p.createdBy, p.createdByOrgCode,
+            ]
+            if (hasVersionStatusColumn) {
+                insertCols.push('version_status_id')
+                insertValues.push(originalVersionStatusId)
+            }
+            if (hasNewOrRenewalColumn) {
+                insertCols.push('new_or_renewal')
+                insertValues.push(p.newOrRenewal ?? null)
+            }
+
+            const placeholders = insertValues.map((_, idx) => `$${idx + 1}`).join(', ')
+            await client.query(
+                `INSERT INTO policies (${insertCols.join(', ')}) VALUES (${placeholders})`,
+                insertValues,
             )
             console.log(`  ✅ ${p.reference} (${p.status}) — inserted`)
             inserted++

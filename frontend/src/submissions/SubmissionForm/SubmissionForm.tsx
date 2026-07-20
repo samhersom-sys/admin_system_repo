@@ -140,7 +140,8 @@ export default function SubmissionForm({
                         type="text"
                         value={insuredName}
                         onChange={(e) => setInsuredName(e.target.value)}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        className={`w-full rounded-md border border-gray-300 px-3 py-2 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${errors.insuredName ? 'app-input-invalid' : ''}`}
+                        aria-invalid={errors.insuredName ? 'true' : 'false'}
                         aria-describedby={errors.insuredName ? 'insured-name-error' : undefined}
                     />
                     <button
@@ -173,7 +174,8 @@ export default function SubmissionForm({
                         type="date"
                         value={inceptionDate}
                         onChange={(e) => handleInceptionChange(e.target.value)}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        className={`w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${errors.inceptionDate ? 'app-input-invalid' : ''}`}
+                        aria-invalid={errors.inceptionDate ? 'true' : 'false'}
                         aria-describedby={errors.inceptionDate ? 'inception-date-error' : undefined}
                     />
                     {errors.inceptionDate && (
@@ -192,7 +194,8 @@ export default function SubmissionForm({
                         type="date"
                         value={expiryDate}
                         onChange={(e) => setExpiryDate(e.target.value)}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        className={`w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${errors.expiryDate ? 'app-input-invalid' : ''}`}
+                        aria-invalid={errors.expiryDate ? 'true' : 'false'}
                         aria-describedby={errors.expiryDate ? 'expiry-date-error' : undefined}
                     />
                     {errors.expiryDate && (

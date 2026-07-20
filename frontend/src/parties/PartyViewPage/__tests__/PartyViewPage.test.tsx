@@ -532,6 +532,24 @@ describe('PartyViewPage — Save Event', () => {
             expect(mockAddNotification).toHaveBeenCalledWith('Party updated successfully', 'success')
         })
     })
+
+    // REQ-PAR-DOM-F-078
+    it('T-PAR-VIEW-R078: party:save posts "Party Updated" audit event after successful save (REQ-PAR-DOM-F-078)', async () => {
+        const updated = makeParty()
+        mockUpdateParty.mockResolvedValueOnce(updated)
+        mockPostPartyAudit.mockResolvedValue(undefined)
+        renderPage()
+        await waitForPageLoad()
+        act(() => { window.dispatchEvent(new Event('party:edit')) })
+        await waitFor(() => { expect(screen.getByDisplayValue('Acme Insurance Ltd')).toBeInTheDocument() })
+        act(() => { window.dispatchEvent(new Event('party:save')) })
+        await waitFor(() =>
+            expect(mockPostPartyAudit).toHaveBeenCalledWith(
+                1,
+                expect.objectContaining({ action: 'Party Updated', entityType: 'Party', entityId: 1 }),
+            )
+        )
+    })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════

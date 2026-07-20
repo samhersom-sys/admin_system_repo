@@ -5,9 +5,10 @@ import { QuotesService } from './quotes.service'
 import { Quote } from '../entities/quote.entity'
 import { QuoteSection } from '../entities/quote-section.entity'
 import { AuditModule } from '../audit/audit.module'
+import { SubmissionsModule } from '../submissions/submissions.module'
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Quote, QuoteSection]), AuditModule],
+    imports: [TypeOrmModule.forFeature([Quote, QuoteSection]), AuditModule, SubmissionsModule],
     controllers: [QuotesController],
     providers: [QuotesService],
 })

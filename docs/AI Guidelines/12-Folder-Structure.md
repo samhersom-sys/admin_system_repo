@@ -14,6 +14,10 @@ This document is the authoritative reference for the folder structure of the Pol
 
 ```
 Cleaned/
+  .github/                       ← VS Code AI agent customisation files (see §12.9)
+    copilot-instructions.md      ← Shared baseline inherited by all agents
+    agents/                      ← Specialist agent definitions (*.agent.md)
+    prompts/                     ← Delivery pipeline entry points (*.prompt.md)
   docs/                          ← Project documentation (renamed from documentation/)
     AI Guidelines/               ← Rules for how the AI must behave (read first)
     Project Documentation/       ← Architecture, domain, and workflow docs
@@ -90,6 +94,40 @@ Cleaned/
 - `package.json` — npm requires it at the workspace root
 - `.env.*` files — NestJS and migration scripts load them from fixed relative paths; moving them would break all sub-project env loading
 - `docker-compose.yml` — Docker Compose defaults to the current directory; keeping it at root avoids mandatory `-f` flag boilerplate
+
+---
+
+## 12.9  .github/ — AI Agent Customisation Files
+
+`.github/` is the home for all VS Code Copilot agent and prompt files.  These files are committed to the repository and shared by all contributors.  They are not application code.
+
+```
+.github/
+  copilot-instructions.md          ← Shared baseline: project context, Three Artifact Rule, domain list,
+                                       folder rules, prohibited actions.  Inherited by ALL agents.
+  agents/
+    orchestrator.agent.md          ← Routes delivery modes; enforces Three Artifact Rule gate
+    business-analyst.agent.md      ← Writes SMART requirements and Impact Analysis
+    test-analyst.agent.md          ← Writes test specs with @req traceability tags
+    solution-architect.agent.md    ← Reviews architectural fit; read-only gate
+    database-architect.agent.md    ← Designs entities and seed data
+    developer.agent.md             ← Full-stack implementation
+    quality-guardian.agent.md      ← Exit gate review; read-only; never edits
+  prompts/
+    feature-delivery.prompt.md            ← Full pipeline entry point (New Feature mode)
+    bug-fix.prompt.md                     ← Dev → TA → QG pipeline
+    architecture-review.prompt.md         ← SA-led pipeline
+    requirements-review.prompt.md         ← BA → SA → QG pipeline
+    db-change.prompt.md                   ← DBA → Dev → QG pipeline
+    resume-delivery.prompt.md             ← Resume from last approved gate
+    post-delivery-retrospective.prompt.md ← Efficiency, docs health, code org, loose ends
+    discovery.prompt.md                   ← Review and baseline existing implementation
+```
+
+**Rules:**
+- Do not add application code, environment files, or database scripts here
+- Do not add CI/CD workflow files to `agents/` or `prompts/` — they belong in `.github/workflows/`
+- The full agent collaboration standard is defined in `docs/AI Guidelines/17-Agent-Collaboration-Standards.md`
 
 ---
 
@@ -877,3 +915,45 @@ frontend/src/shared/
     formatters/
     ...
 ```
+
+---
+
+### §12.7e — Sub-Module Nesting
+
+When a module grows to cover multiple clearly distinct sub-domains, it may be split into named sub-folders. Each sub-folder follows the same module layout defined in §12.7 (pages, service, requirements file, `__tests__/`).
+
+**When to sub-module:**
+- The module has 4 or more pages covering clearly distinct subject areas with separate requirements and test coverage needs
+- A flat listing of files in the module folder has become difficult to navigate
+
+**When NOT to sub-module:**
+- Do not split speculatively — raise an Open Question and agree the sub-domain boundaries before moving any files
+- Do not create sub-modules for fewer than 4 distinct concerns; use naming conventions in a flat structure instead
+
+**Pattern (using `settings/` as canonical example):**
+
+```
+settings/
+  account/                        ← sub-module: account administration
+    AccountAdministrationPage.tsx
+    AccountCreatePage.tsx
+    AccountDetailPage.tsx
+    account.requirements.md
+    __tests__/
+  organisation/                   ← sub-module: organisation details
+    OrganisationDetailPage.tsx
+    organisation.requirements.md
+    __tests__/
+  products/                       ← sub-module: product configuration
+    ProductsPage.tsx
+    products.requirements.md
+    __tests__/
+  rating-rules/                   ← sub-module: rating rule management
+    ...
+  platform/                       ← sub-module: platform-level admin
+    ...
+  settings.requirements.md        ← top-level scope doc; links to sub-module requirements
+  settings.service.ts             ← shared settings service (if applicable)
+```
+
+The `settings/` module is the canonical example. Before restructuring an existing module into sub-modules, raise an Open Question to agree sub-folder names and page allocation. Do not flatten sub-module files back to the parent level once split.
