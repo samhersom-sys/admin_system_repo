@@ -326,6 +326,17 @@ The page `h2` heading shall display `Transaction {number}: {transaction_type}` (
 
 ---
 
+## 4. Coverage Date/Time Delta Requirements (Policy + Policy Detail)
+
+1. **REQ-POL-FE-F-050:** Policy sections and policy coverage detail views shall display `Effective Date`, `Effective Time`, `Expiry Date`, and `Expiry Time` fields with the same labels and formats used on quote coverage surfaces. Acceptance criteria: all four fields are rendered in both policy grid/list and policy detail views when data is available.
+2. **REQ-POL-FE-F-051:** UI defaults shall be applied for new policy coverage and policy coverage-detail entries when values are missing: effective date from parent level, expiry date from parent inception plus one year where parent expiry is missing, effective time default `00:00:00` unless parent-level value exists, and expiry time default `23:59:59` unless overridden. Acceptance criteria: creating a new row without manual date/time input pre-populates all four values according to precedence.
+3. **REQ-POL-FE-F-052:** Grid and detail surfaces shall stay aligned by reusing canonical API values; edits saved from either surface shall appear identically on the other surface after refresh. Acceptance criteria: edit-on-grid then open-detail shows matching values, and edit-on-detail then open-grid shows matching values.
+4. **REQ-POL-FE-F-053:** `policies.service.ts` and page DTO mappings shall accept optional coverage and coverage-detail date/time fields (`effectiveDate`, `effectiveTime`, `expiryDate`, `expiryTime`) and shall not fail when legacy API responses omit those fields. Acceptance criteria: TypeScript types compile and policy pages render legacy records with missing fields without runtime exceptions.
+5. **REQ-POL-FE-F-054:** Quote-to-policy issue behavior shall preserve quote coverage and coverage-detail date/time values in the first policy render; frontend formatting shall not alter server-provided persisted values. Acceptance criteria: immediately after issuing a policy from quote, displayed non-null date/time values match quote source values.
+6. **REQ-POL-FE-F-055:** Non-functional constraints shall include tenant-safe rendering, compatibility-window support for mixed old/new payload shapes, and rollback-safe fallbacks for absent fields. Acceptance criteria: tenant data boundaries remain unchanged in UI behavior and rollback/missing-field scenarios show defaults or blank-safe rendering instead of crashes.
+
+---
+
 ## 5. Router Requirements
 
 **REQ-POL-FE-C-001:** The application router shall register `PoliciesListPage` at path `/policies`, `PolicyViewPage` at path `/policies/:id`, and `PolicySectionViewPage` at path `/policies/:policyId/sections/:sectionId`. The `/policies/:id` route shall be matched only after `/policies/new` when a new-policy creation form is added in a future batch.
@@ -407,6 +418,17 @@ The page `h2` heading shall display `Transaction {number}: {transaction_type}` (
 | REQ-POL-FE-F-044 | Transaction view sidebar: Back to Policy only | (visual — no dedicated test) |
 | REQ-POL-BE-F-016 | GET /api/policies/:id/transactions/:txId/sections/:sectionId returns snapshot | (Layer 2 deferred) |
 | REQ-POL-FE-C-004 | Router: PolicyTransactionViewPage route registered | (implied by T-POL-FE-F-R026b route render) |
+| REQ-POL-FE-F-045 | PolicyEndorsementPage posts 'Endorsement Opened' audit event on mount (entityType: 'PolicyEndorsement', entityId: endorsementId) | T-POL-ENDORSE-R045 |
+| REQ-POL-FE-F-046 | PolicyEndorsementPage posts 'Endorsement Closed' audit event on unmount | (deferred — unmount test has race conditions) |
+| REQ-POL-FE-F-047 | PolicyEndorsementPage Audit tab fetches events from GET /api/audit/PolicyEndorsement/:endorsementId | T-POL-ENDORSE-R047 |
+| REQ-POL-FE-F-048 | PolicyEndorsementPage handleIssue posts 'Endorsement Issued' to /api/audit/event after successful issue | T-POL-ENDORSE-R048 |
+| REQ-POL-FE-F-049 | If endorsement.transaction_type === 'Cancellation', handleIssue also cross-posts 'Policy Cancelled' to policy audit | T-POL-ENDORSE-R049 |
+| REQ-POL-FE-F-050 | Policy coverage surfaces render Effective/Expiry date+time fields with quote parity labels | pending — Stage coverage-datetime |
+| REQ-POL-FE-F-051 | Policy coverage defaults applied from parent precedence with 00:00:00/23:59:59 fallbacks | pending — Stage coverage-datetime |
+| REQ-POL-FE-F-052 | Grid/detail alignment for policy coverage date/time values | pending — Stage coverage-datetime |
+| REQ-POL-FE-F-053 | policies.service.ts DTO compatibility for optional date/time fields | pending — Stage coverage-datetime |
+| REQ-POL-FE-F-054 | Issue-to-policy first render preserves quote date/time values | pending — Stage coverage-datetime |
+| REQ-POL-FE-F-055 | Tenant-safe, compatibility-window, rollback-safe frontend behavior | pending — Stage coverage-datetime |
 
 ---
 
@@ -430,3 +452,5 @@ The page `h2` heading shall display `Transaction {number}: {transaction_type}` (
 | 2026-04-29 | Parity refinement: REQ-POL-FE-F-007 updated to enforce Quote-aligned section table column order/labels (including Effective Date, Days on Cover, Tax Receivable, Action). REQ-POL-FE-F-014 updated to require immediate audit refresh after posting `Policy Opened` so the entry is visible in the active tab. |
 | 2026-04-29 | Audit lifecycle refinement: REQ-POL-FE-F-014 moved `Policy Opened` audit post to page mount so open/close events are paired even when users never click the Audit tab. Audit tab remains read/display with refresh on activation. |
 | 2026-04-29 | BA-style policy transaction UX: rewrote REQ-POL-FE-F-013 (transaction tab columns, status badge, action routing); added REQ-POL-FE-F-041–044 (PolicyTransactionViewPage); updated REQ-POL-FE-S-001 (added getPolicySectionTransaction); added REQ-POL-BE-F-016 (section snapshot endpoint); added REQ-POL-FE-C-004 (router entry). Updated scope, Impact Analysis, and traceability table. Entry backfilled to comply with Three-Artifact Rule — code was written before requirements in error. |
+| 2026-05-01 | Endorsement audit coverage: added REQ-POL-FE-F-045–049. PolicyEndorsementPage now posts Endorsement Opened/Closed/Issued audit events and cross-posts Policy Cancelled when a cancellation endorsement is issued. Audit tab fetches from GET /api/audit/PolicyEndorsement/:endorsementId. Backend VALID_ENTITY_TYPES updated to include 'PolicyEndorsement'. |
+| 2026-07-10 | Coverage date/time delta added: REQ-POL-FE-F-050–055 for policy coverage and coverage-detail field visibility, defaults, grid/detail alignment, service DTO compatibility, issue-flow parity, and non-functional compatibility constraints. |

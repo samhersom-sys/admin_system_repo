@@ -1,12 +1,12 @@
-﻿/**
- * search.spec.ts — SearchService unit tests
+/**
+ * search.spec.ts � SearchService unit tests
  * Domain: SRCH-BE-NE
- * Standard: AI Guidelines §06-Testing-Standards.md §6.2
+ * Standard: AI Guidelines �06-Testing-Standards.md �6.2
  *
  * Coverage:
- *   R01 — search: parameter validation (invalid type, invalid dates)
- *   R02 — search: default mode (no filters → recently opened records)
- *   R03 — search: filter mode (filters present → filtered queries)
+ *   R01 � search: parameter validation (invalid type, invalid dates)
+ *   R02 � search: default mode (no filters ? recently opened records)
+ *   R03 � search: filter mode (filters present ? filtered queries)
  */
 
 import { Test, TestingModule } from '@nestjs/testing'
@@ -47,45 +47,45 @@ describe('SearchService', () => {
   afterEach(() => jest.clearAllMocks())
 
   // -------------------------------------------------------------------------
-  // REQ-SRCH-BE-NE-R01 — parameter validation
+  // REQ-SRCH-BE-NE-R01 � parameter validation
   // -------------------------------------------------------------------------
-  describe('search — validation', () => {
+  describe('search � validation', () => {
     it('T-SRCH-BE-NE-R01a: throws BadRequestException for an invalid single type', async () => {
-      await expect(service.search({ type: 'InvalidType' }, 'TST'))
+      await expect(service.search({ type: 'InvalidType' }, null, null, 'TST'))
         .rejects.toThrow(BadRequestException)
     })
 
     it('T-SRCH-BE-NE-R01b: throws BadRequestException when all types in a multi-type string are invalid', async () => {
-      await expect(service.search({ types: 'Foo,Bar' }, 'TST'))
+      await expect(service.search({ types: 'Foo,Bar' }, null, null, 'TST'))
         .rejects.toThrow(BadRequestException)
     })
 
     it('T-SRCH-BE-NE-R01c: throws BadRequestException for an invalid date param', async () => {
-      await expect(service.search({ inceptionFrom: 'not-a-date', reference: 'ABC' }, 'TST'))
+      await expect(service.search({ inceptionFrom: 'not-a-date', reference: 'ABC' }, null, null, 'TST'))
         .rejects.toThrow(BadRequestException)
     })
 
     it('T-SRCH-BE-NE-R01d: does NOT throw for a valid type param', async () => {
       mockEmptyQueries()
-      await expect(service.search({ type: 'Submission' }, 'TST'))
+      await expect(service.search({ type: 'Submission' }, null, null, 'TST'))
         .resolves.toBeDefined()
     })
 
     it('T-SRCH-BE-NE-R01e: accepts a comma-separated types string with all valid types', async () => {
       mockEmptyQueries()
-      await expect(service.search({ types: 'Submission,Quote', reference: 'SUB' }, 'TST'))
+      await expect(service.search({ types: 'Submission,Quote', reference: 'SUB' }, null, null, 'TST'))
         .resolves.toBeDefined()
     })
   })
 
   // -------------------------------------------------------------------------
-  // REQ-SRCH-BE-NE-R02 — default mode (no filters → most recently created records)
+  // REQ-SRCH-BE-NE-R02 � default mode (no filters ? most recently created records)
   // -------------------------------------------------------------------------
-  describe('search — default mode', () => {
+  describe('search � default mode', () => {
     it('T-SRCH-BE-NE-R02a: returns result shape with entity type keys', async () => {
       mockEmptyQueries()
 
-      const result = await service.search({}, 'TST')
+      const result = await service.search({}, null, null, 'TST')
       expect(result).toHaveProperty('submissions')
       expect(result).toHaveProperty('quotes')
       expect(result).toHaveProperty('policies')
@@ -97,7 +97,7 @@ describe('SearchService', () => {
     it('T-SRCH-BE-NE-R02b: returns empty arrays when no records exist', async () => {
       mockEmptyQueries()
 
-      const result = await service.search({}, 'TST')
+      const result = await service.search({}, null, null, 'TST')
       expect(result.submissions).toEqual([])
       expect(result.quotes).toEqual([])
     })
@@ -122,7 +122,7 @@ describe('SearchService', () => {
         .mockResolvedValueOnce([])               // claims filterMode
         .mockResolvedValueOnce([])               // claims attachLastOpened
 
-      const result = await service.search({}, 'TST')
+      const result = await service.search({}, null, null, 'TST')
       expect(result.submissions.length).toBe(2)
       expect(result.submissions[0].id).toBe(5)
     })
@@ -130,7 +130,7 @@ describe('SearchService', () => {
     it('T-SRCH-BE-NE-R02e: does not query audit_event for default mode ordering', async () => {
       mockEmptyQueries(12)
 
-      await service.search({}, 'TST')
+      await service.search({}, null, null, 'TST')
       const allCalls = mockDataSource.query.mock.calls
       const auditOrderingCall = allCalls.find(call =>
         typeof call[0] === 'string' &&
@@ -142,13 +142,13 @@ describe('SearchService', () => {
   })
 
   // -------------------------------------------------------------------------
-  // REQ-SRCH-BE-NE-R03 — filter mode (at least one filter present)
+  // REQ-SRCH-BE-NE-R03 � filter mode (at least one filter present)
   // -------------------------------------------------------------------------
-  describe('search — filter mode', () => {
+  describe('search � filter mode', () => {
     it('T-SRCH-BE-NE-R03a: returns result shape with all entity keys', async () => {
       mockEmptyQueries()
 
-      const result = await service.search({ reference: 'SUB-001' }, 'TST')
+      const result = await service.search({ reference: 'SUB-001' }, null, null, 'TST')
       expect(result).toHaveProperty('submissions')
       expect(result).toHaveProperty('quotes')
     })
@@ -156,7 +156,7 @@ describe('SearchService', () => {
     it('T-SRCH-BE-NE-R03b: filters only the requested type when type param is present', async () => {
       mockEmptyQueries()
 
-      const result = await service.search({ type: 'Submission', reference: 'SUB' }, 'TST')
+      const result = await service.search({ type: 'Submission', reference: 'SUB' }, null, null, 'TST')
       // Quotes, policies etc. stay empty because type filter limits scope
       expect(result).toBeDefined()
       expect(Array.isArray(result.submissions)).toBe(true)
@@ -172,15 +172,15 @@ describe('SearchService', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
 
-      const result = await service.search({ type: 'Submission', reference: 'SUB' }, 'TST')
+      const result = await service.search({ type: 'Submission', reference: 'SUB' }, null, null, 'TST')
       expect(result.submissions.length).toBeGreaterThanOrEqual(0)
     })
 
     it('T-SRCH-BE-NE-R03d: returns empty arrays when a query throws (graceful fallback)', async () => {
       mockDataSource.query.mockRejectedValue(new Error('DB error'))
 
-      // Should not throw — errors per entity type are caught and become []
-      const result = await service.search({ reference: 'X' }, 'TST')
+      // Should not throw � errors per entity type are caught and become []
+      const result = await service.search({ reference: 'X' }, null, null, 'TST')
       expect(result).toBeDefined()
     })
   })

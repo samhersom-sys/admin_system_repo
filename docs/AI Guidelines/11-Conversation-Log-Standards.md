@@ -109,6 +109,16 @@ Created `AI Guidelines/11-Conversation-Log-Standards.md` defining the log format
 
 ---
 
+## 11.9  Multi-Agent Session Log Format
+
+When a session involves more than one specialist agent (Orchestrator, BA, TA, SA, DBA, Developer, QG), the standard entry format in §11.3 must be extended with additional fields.
+
+Use the format defined in `docs/AI Guidelines/17-Agent-Collaboration-Standards.md §17.9`.
+
+Single-agent sessions continue to use the standard format in §11.3 unchanged.
+
+---
+
 ## 11.8  Handoff Precision In Multi-Root Workspaces
 
 When a session summary, retrospective entry, or handoff is written in a workspace that contains multiple repos, legacy folders, or reference copies, the summary must identify the active implementation location precisely.

@@ -17,6 +17,7 @@ import {
     type ReportTemplate,
 } from '@/reporting/reporting.service'
 import { DASHBOARD_TEMPLATES } from '@/reporting/DashboardCreatePage/DashboardTemplates'
+import { CORE_DASHBOARD_TEMPLATES } from '@/reporting/coreDashboards'
 import {
     DASHBOARD_DATA_SOURCES,
     type DashboardFieldOption,
@@ -31,8 +32,10 @@ function gridSpan(value: number) {
     return String(Math.max(1, value))
 }
 
-export default function DashboardViewPage() {
+export default function DashboardViewPage({ templateId: templateIdProp }: { templateId?: number } = {}) {
     const { reportId } = useParams<{ reportId: string }>()
+    // When rendered as a homepage embed, templateIdProp takes priority over the URL param
+    const resolvedId = templateIdProp != null ? String(templateIdProp) : reportId
     const { addNotification } = useNotifications()
 
     const [loading, setLoading] = useState(true)
@@ -63,12 +66,44 @@ export default function DashboardViewPage() {
     }, [])
 
     useEffect(() => {
-        if (!reportId) {
+        if (!resolvedId) {
             return
         }
+
+        const loadInitialWidgetData = async (loadedDashboard: ReportTemplate & { dashboardConfig: { pages: DashboardPage[] } }) => {
+            const defaultFilters = createDefaultDashboardFilters()
+            const widgetList = loadedDashboard.dashboardConfig.pages.flatMap((p) =>
+                (p.widgets ?? []).map((w) => normalizeDashboardWidget(w)).filter((w) => w.type !== 'text'),
+            )
+            const results = await Promise.all(
+                widgetList.map((w) =>
+                    getDashboardWidgetData(w, w.ignoresDashboardFilters ? createDefaultDashboardFilters() : defaultFilters)
+                        .then((data): [string, DashboardWidgetDataResponse] => [w.id, data])
+                        .catch(() => null),
+                ),
+            )
+            const map: Record<string, DashboardWidgetDataResponse> = {}
+            for (const entry of results) {
+                if (entry) map[entry[0]] = entry[1]
+            }
+            setInitialWidgetData(map)
+        }
+
+        const coreDashboard = CORE_DASHBOARD_TEMPLATES[resolvedId]
+        if (coreDashboard) {
+            setLoading(true)
+            setDashboard(coreDashboard)
+            setPages(coreDashboard.dashboardConfig.pages)
+            setShowMetadata(coreDashboard.dashboardConfig.showMetadata)
+            setCurrentPageId(coreDashboard.dashboardConfig.pages[0]?.id ?? 1)
+            void loadInitialWidgetData(coreDashboard)
+                .catch(() => addNotification('Could not load dashboard widgets.', 'error'))
+                .finally(() => setLoading(false))
+            return
+        }
+
         setLoading(true)
-        const defaultFilters = createDefaultDashboardFilters()
-        getDashboard(parseInt(reportId, 10))
+        getDashboard(parseInt(resolvedId, 10))
             .then(async (loadedDashboard) => {
                 if (loadedDashboard.type !== 'dashboard') {
                     throw new Error('Not a dashboard')
@@ -77,28 +112,14 @@ export default function DashboardViewPage() {
                 setPages(loadedDashboard.dashboardConfig.pages)
                 setShowMetadata(loadedDashboard.dashboardConfig.showMetadata)
                 setCurrentPageId(loadedDashboard.dashboardConfig.pages[0]?.id ?? 1)
-                const widgetList = loadedDashboard.dashboardConfig.pages.flatMap((p) =>
-                    (p.widgets ?? []).map((w) => normalizeDashboardWidget(w)).filter((w) => w.type !== 'text'),
-                )
-                const results = await Promise.all(
-                    widgetList.map((w) =>
-                        getDashboardWidgetData(w, w.ignoresDashboardFilters ? createDefaultDashboardFilters() : defaultFilters)
-                            .then((data): [string, DashboardWidgetDataResponse] => [w.id, data])
-                            .catch(() => null),
-                    ),
-                )
-                const map: Record<string, DashboardWidgetDataResponse> = {}
-                for (const entry of results) {
-                    if (entry) map[entry[0]] = entry[1]
-                }
-                setInitialWidgetData(map)
+                await loadInitialWidgetData(loadedDashboard)
             })
             .catch(() => {
                 setDashboard(null)
                 addNotification('Could not load dashboard.', 'error')
             })
             .finally(() => setLoading(false))
-    }, [reportId, addNotification])
+    }, [resolvedId, addNotification])
 
     const currentPage = useMemo(
         () => pages.find((page) => page.id === currentPageId) ?? pages[0] ?? null,

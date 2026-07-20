@@ -5,7 +5,7 @@
  */
 
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import AccountDetailPage from '../AccountDetailPage'
@@ -23,6 +23,8 @@ jest.mock('react-router-dom', () => ({
 jest.mock('../settings.service', () => ({
     getUserById: jest.fn(),
     updateUser: jest.fn(),
+    getUserAudit: jest.fn(),
+    postUserAudit: jest.fn(),
 }))
 
 jest.mock('@/shared/lib/auth-session/auth-session', () => ({
@@ -42,6 +44,11 @@ jest.mock('@/shell/SidebarContext', () => ({
 }))
 
 import * as settingsService from '../settings.service'
+
+const MOCK_AUDIT = [
+    { action: 'Account Opened', user: 'admin@policyforge.com', date: '2026-05-01T10:00:00Z', details: null, changes: null },
+    { action: 'Account Updated', user: 'admin@policyforge.com', date: '2026-05-02T11:00:00Z', details: null, changes: { Role: { old: 'client_admin', new: 'user' } } },
+]
 
 const MOCK_USER = {
     id: 2,
@@ -69,7 +76,9 @@ function renderPage(userId = '2') {
 beforeEach(() => {
     jest.clearAllMocks();
     (settingsService.getUserById as jest.Mock).mockResolvedValue(MOCK_USER);
-    (settingsService.updateUser as jest.Mock).mockResolvedValue(MOCK_USER)
+    (settingsService.updateUser as jest.Mock).mockResolvedValue(MOCK_USER);
+    (settingsService.getUserAudit as jest.Mock).mockResolvedValue(MOCK_AUDIT);
+    (settingsService.postUserAudit as jest.Mock).mockResolvedValue(undefined)
 })
 
 // ---------------------------------------------------------------------------
@@ -124,17 +133,16 @@ describe('T-SETTINGS-USERS-D01: loads account details from API', () => {
 })
 
 // ---------------------------------------------------------------------------
-// D02 — Navigation
+// D02 — No in-page back button (REQ-SETTINGS-USERS-D-D07)
 // ---------------------------------------------------------------------------
 
-describe('T-SETTINGS-USERS-D02: back navigation', () => {
-    it('back button navigates to account admin list', async () => {
+describe('T-SETTINGS-USERS-D02: no in-page back button', () => {
+    it('does not render a back button in the page body', async () => {
         renderPage()
         await waitFor(() => {
-            expect(screen.getByLabelText('Back to account administration')).toBeInTheDocument()
+            expect(screen.getByRole('heading', { name: 'Company Admin' })).toBeInTheDocument()
         })
-        await userEvent.click(screen.getByLabelText('Back to account administration'))
-        expect(mockNavigate).toHaveBeenCalledWith('/settings/account')
+        expect(screen.queryByLabelText('Back to account administration')).not.toBeInTheDocument()
     })
 })
 
@@ -151,20 +159,20 @@ describe('T-SETTINGS-USERS-D03: edit and save account', () => {
         expect(screen.getByLabelText('Role')).toHaveValue('client_admin')
     })
 
-    it('calls updateUser with new role on save', async () => {
+    it('calls updateUser with new role on save via sidebar event', async () => {
         (settingsService.updateUser as jest.Mock).mockResolvedValue({ ...MOCK_USER, role: 'user' })
         renderPage()
         await waitFor(() => {
             expect(screen.getByLabelText('Role')).toBeInTheDocument()
         })
-        const roleSelect = screen.getByLabelText('Role')
-        await userEvent.selectOptions(roleSelect, 'user')
-
-        const saveBtn = screen.getByLabelText('Save account changes')
-        await userEvent.click(saveBtn)
-
+        await userEvent.selectOptions(screen.getByLabelText('Role'), 'user')
+        // Trigger save via custom event (sidebar)
+        fireEvent(window, new CustomEvent('settings:account:save'))
         await waitFor(() => {
-            expect(settingsService.updateUser).toHaveBeenCalledWith(2, { role: 'user', isActive: true })
+            expect(settingsService.updateUser).toHaveBeenCalledWith(
+                2,
+                expect.objectContaining({ role: 'user', isActive: true })
+            )
         })
     })
 
@@ -174,7 +182,7 @@ describe('T-SETTINGS-USERS-D03: edit and save account', () => {
             expect(screen.getByLabelText('Role')).toBeInTheDocument()
         })
         await userEvent.selectOptions(screen.getByLabelText('Role'), 'user')
-        await userEvent.click(screen.getByLabelText('Save account changes'))
+        fireEvent(window, new CustomEvent('settings:account:save'))
         await waitFor(() => {
             expect(mockAddNotification).toHaveBeenCalledWith('Account updated successfully.', 'success')
         })
@@ -187,7 +195,7 @@ describe('T-SETTINGS-USERS-D03: edit and save account', () => {
             expect(screen.getByLabelText('Role')).toBeInTheDocument()
         })
         await userEvent.selectOptions(screen.getByLabelText('Role'), 'user')
-        await userEvent.click(screen.getByLabelText('Save account changes'))
+        fireEvent(window, new CustomEvent('settings:account:save'))
         await waitFor(() => {
             expect(mockAddNotification).toHaveBeenCalledWith('Save failed', 'error')
         })
@@ -224,7 +232,7 @@ describe('T-SETTINGS-USERS-D04: internal admin account shows role as read-only t
         expect(screen.queryByLabelText('Role')).not.toBeInTheDocument()
     })
 
-    it('does not show Save button for internal_admin users', async () => {
+    it('does not render a Save button in the page body for internal_admin users', async () => {
         (settingsService.getUserById as jest.Mock).mockResolvedValue({
             ...MOCK_USER,
             id: 5,
@@ -234,6 +242,231 @@ describe('T-SETTINGS-USERS-D04: internal admin account shows role as read-only t
         await waitFor(() => {
             expect(screen.getByText('Internal Admin')).toBeInTheDocument()
         })
+        // Save is in sidebar, not as a page button
         expect(screen.queryByLabelText('Save account changes')).not.toBeInTheDocument()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// D05 — Tab navigation (REQ-SETTINGS-USERS-D-D01)
+// ---------------------------------------------------------------------------
+
+describe('T-SETTINGS-USERS-D05: tab navigation renders Details and Audit tabs', () => {
+    it('renders both Details and Audit tabs', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByTestId('tab-details')).toBeInTheDocument()
+            expect(screen.getByTestId('tab-audit')).toBeInTheDocument()
+        })
+    })
+
+    it('Details tab is active by default', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByTestId('tab-details')).toBeInTheDocument()
+        })
+        // Details content (role select) is visible by default
+        expect(screen.getByLabelText('Role')).toBeInTheDocument()
+    })
+
+    it('clicking Audit tab hides Details content', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByTestId('tab-audit')).toBeInTheDocument()
+        })
+        fireEvent.click(screen.getByTestId('tab-audit'))
+        await waitFor(() => {
+            expect(screen.queryByLabelText('Role')).not.toBeInTheDocument()
+        })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// D06 — Audit tab content (REQ-SETTINGS-USERS-D-D02)
+// ---------------------------------------------------------------------------
+
+describe('T-SETTINGS-USERS-D06: audit tab shows AuditTable with events', () => {
+    it('calls getUserAudit on first audit tab activation', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByTestId('tab-audit')).toBeInTheDocument()
+        })
+        fireEvent.click(screen.getByTestId('tab-audit'))
+        await waitFor(() => {
+            expect(settingsService.getUserAudit).toHaveBeenCalledWith(2)
+        })
+    })
+
+    it('does not call getUserAudit until audit tab is clicked', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Role')).toBeInTheDocument()
+        })
+        expect(settingsService.getUserAudit).not.toHaveBeenCalled()
+    })
+
+    it('renders audit event actions in the table', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByTestId('tab-audit')).toBeInTheDocument()
+        })
+        fireEvent.click(screen.getByTestId('tab-audit'))
+        await waitFor(() => {
+            expect(screen.getByText('Account Opened')).toBeInTheDocument()
+            expect(screen.getByText('Account Updated')).toBeInTheDocument()
+        })
+    })
+
+    it('shows empty state when no audit events exist', async () => {
+        (settingsService.getUserAudit as jest.Mock).mockResolvedValue([])
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByTestId('tab-audit')).toBeInTheDocument()
+        })
+        fireEvent.click(screen.getByTestId('tab-audit'))
+        await waitFor(() => {
+            expect(screen.getByText(/no audit history/i)).toBeInTheDocument()
+        })
+    })
+
+    it('shows error when audit fetch fails', async () => {
+        (settingsService.getUserAudit as jest.Mock).mockRejectedValue(new Error('Audit load failed'))
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByTestId('tab-audit')).toBeInTheDocument()
+        })
+        fireEvent.click(screen.getByTestId('tab-audit'))
+        await waitFor(() => {
+            expect(screen.getByText('Audit load failed')).toBeInTheDocument()
+        })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// D07 — Lifecycle audit events (REQ-SETTINGS-USERS-D-D03)
+// ---------------------------------------------------------------------------
+
+describe('T-SETTINGS-USERS-D07: lifecycle audit events posted on mount/unmount', () => {
+    it('posts Account Opened event on mount', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Role')).toBeInTheDocument()
+        })
+        await waitFor(() => {
+            expect(settingsService.postUserAudit).toHaveBeenCalledWith(
+                2,
+                expect.objectContaining({ action: 'Account Opened' })
+            )
+        })
+    })
+
+    it('posts Account Closed event on unmount', async () => {
+        const { unmount } = renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Role')).toBeInTheDocument()
+        })
+        unmount()
+        await waitFor(() => {
+            expect(settingsService.postUserAudit).toHaveBeenCalledWith(
+                2,
+                expect.objectContaining({ action: 'Account Closed' })
+            )
+        })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// D08 — Field change audit on save (REQ-SETTINGS-USERS-D-D04)
+// ---------------------------------------------------------------------------
+
+describe('T-SETTINGS-USERS-D08: Account Updated audit event posted on save', () => {
+    it('posts Account Updated with changes when role is changed and saved', async () => {
+        (settingsService.updateUser as jest.Mock).mockResolvedValue({ ...MOCK_USER, role: 'user' })
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Role')).toBeInTheDocument()
+        })
+        await userEvent.selectOptions(screen.getByLabelText('Role'), 'user')
+        fireEvent(window, new CustomEvent('settings:account:save'))
+        await waitFor(() => {
+            expect(settingsService.postUserAudit).toHaveBeenCalledWith(
+                2,
+                expect.objectContaining({
+                    action: 'Account Updated',
+                    changes: expect.objectContaining({
+                        Role: { old: 'client_admin', new: 'user' },
+                    }),
+                })
+            )
+        })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// D09 — Sidebar section registered (REQ-SETTINGS-USERS-D-D08)
+// ---------------------------------------------------------------------------
+
+describe('T-SETTINGS-USERS-D09: sidebar section registered', () => {
+    it('calls useSidebarSection with Account Administration title', async () => {
+        const { useSidebarSection } = require('@/shell/SidebarContext')
+        renderPage()
+        await waitFor(() => {
+            expect(useSidebarSection).toHaveBeenCalledWith(
+                expect.objectContaining({ title: 'Account Administration' })
+            )
+        })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// D10 — More editable fields + ID read-only (REQ-SETTINGS-USERS-D-D06)
+// ---------------------------------------------------------------------------
+
+describe('T-SETTINGS-USERS-D10: editable fields and read-only ID', () => {
+    it('shows ID as read-only text', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByText('2')).toBeInTheDocument()
+        })
+        expect(screen.queryByLabelText('ID')).not.toBeInTheDocument()
+    })
+
+    it('renders Full Name as an editable input', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Full Name')).toBeInTheDocument()
+        })
+        expect(screen.getByLabelText('Full Name')).toHaveValue('Company Admin')
+    })
+
+    it('renders Email as an editable input', async () => {
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Email')).toBeInTheDocument()
+        })
+        expect(screen.getByLabelText('Email')).toHaveValue('admin@company.com')
+    })
+
+    it('includes Full Name change in audit when fullName is changed and saved', async () => {
+        (settingsService.updateUser as jest.Mock).mockResolvedValue({ ...MOCK_USER, fullName: 'Updated Name' })
+        renderPage()
+        await waitFor(() => {
+            expect(screen.getByLabelText('Full Name')).toBeInTheDocument()
+        })
+        const nameInput = screen.getByLabelText('Full Name')
+        await userEvent.clear(nameInput)
+        await userEvent.type(nameInput, 'Updated Name')
+        fireEvent(window, new CustomEvent('settings:account:save'))
+        await waitFor(() => {
+            expect(settingsService.postUserAudit).toHaveBeenCalledWith(
+                2,
+                expect.objectContaining({
+                    action: 'Account Updated',
+                    changes: expect.objectContaining({
+                        'Full Name': { old: 'Company Admin', new: 'Updated Name' },
+                    }),
+                })
+            )
+        })
     })
 })

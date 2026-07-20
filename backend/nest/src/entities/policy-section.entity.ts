@@ -167,4 +167,8 @@ export class PolicySection {
 
   @Column({ name: 'signed_premium_line', type: 'numeric', precision: 18, scale: 2, nullable: true })
   signedPremiumLine: string | null
+
+  // Earning engine (Phase 2) — REQ-EARN-S-002
+  @Column({ name: 'resolved_earning_pattern_id', type: 'int', nullable: true })
+  resolvedEarningPatternId: number | null
 }

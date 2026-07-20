@@ -38,8 +38,14 @@ export class PolicySectionCoverage {
   @Column({ name: 'effective_date', type: 'date', nullable: true })
   effectiveDate: string | null
 
+  @Column({ name: 'effective_time', type: 'time', precision: 3, nullable: true })
+  effectiveTime: string | null
+
   @Column({ name: 'expiry_date', type: 'date', nullable: true })
   expiryDate: string | null
+
+  @Column({ name: 'expiry_time', type: 'time', precision: 3, nullable: true })
+  expiryTime: string | null
 
   @Column({ name: 'limit_currency', type: 'text', nullable: true })
   limitCurrency: string | null
@@ -116,8 +122,14 @@ export class QuoteSectionCoverage {
   @Column({ name: 'effective_date', type: 'date', nullable: true })
   effectiveDate: string | null
 
+  @Column({ name: 'effective_time', type: 'time', precision: 3, nullable: true })
+  effectiveTime: string | null
+
   @Column({ name: 'expiry_date', type: 'date', nullable: true })
   expiryDate: string | null
+
+  @Column({ name: 'expiry_time', type: 'time', precision: 3, nullable: true })
+  expiryTime: string | null
 
   @Column({ name: 'limit_currency', type: 'text', nullable: true })
   limitCurrency: string | null

@@ -227,4 +227,270 @@ export class LocationsScheduleService {
     if (!rows.length) throw new NotFoundException('Import not found')
     return rows[0]
   }
+
+  /** Shared quote access + edit-lock guard used by all normalised CRUD methods */
+  private async assertQuoteEditable(
+    quoteId: number,
+    orgCode: string,
+  ): Promise<Record<string, unknown>> {
+    const rows = await this.dataSource.query<Record<string, unknown>[]>(
+      `SELECT id, created_by_org_code, status FROM quotes WHERE id = $1`,
+      [quoteId],
+    )
+    if (!rows.length) throw new NotFoundException('Quote not found')
+    const quote = rows[0]
+    if (quote['created_by_org_code'] !== orgCode) throw new ForbiddenException('Forbidden')
+    const status = String(quote['status'] ?? '')
+    if (!['Created', 'Quoted', 'Draft'].includes(status)) {
+      throw new BadRequestException(`Location schedule is locked for quote status: ${status}`)
+    }
+    return quote
+  }
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-011 — POST /api/quotes/:id/locations/rows
+  // -------------------------------------------------------------------------
+  async addLocation(
+    quoteId: number,
+    orgCode: string,
+    body: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    await this.assertQuoteEditable(quoteId, orgCode)
+
+    const rows = await this.dataSource.query<Record<string, unknown>[]>(
+      `INSERT INTO locations
+              (quote_id, country, country_code, state, state_code, city,
+               address1, address2, address3, zip_code)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [
+        quoteId,
+        body['country'] ?? null,
+        body['country_code'] ?? null,
+        body['state'] ?? null,
+        body['state_code'] ?? null,
+        body['city'] ?? null,
+        body['address1'] ?? null,
+        body['address2'] ?? null,
+        body['address3'] ?? null,
+        body['zip_code'] ?? null,
+      ],
+    )
+    return rows[0]
+  }
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-012 — PUT /api/quotes/:id/locations/rows/:locationId
+  // -------------------------------------------------------------------------
+  async updateLocation(
+    quoteId: number,
+    locationId: number,
+    orgCode: string,
+    body: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    await this.assertQuoteEditable(quoteId, orgCode)
+
+    const rows = await this.dataSource.query<Record<string, unknown>[]>(
+      `UPDATE locations
+          SET country       = COALESCE($3, country),
+              country_code  = COALESCE($4, country_code),
+              state         = COALESCE($5, state),
+              state_code    = COALESCE($6, state_code),
+              city          = COALESCE($7, city),
+              address1      = COALESCE($8, address1),
+              address2      = COALESCE($9, address2),
+              address3      = COALESCE($10, address3),
+              zip_code      = COALESCE($11, zip_code),
+              updated_at    = NOW()
+        WHERE id = $1 AND quote_id = $2
+       RETURNING *`,
+      [
+        locationId,
+        quoteId,
+        body['country'] ?? null,
+        body['country_code'] ?? null,
+        body['state'] ?? null,
+        body['state_code'] ?? null,
+        body['city'] ?? null,
+        body['address1'] ?? null,
+        body['address2'] ?? null,
+        body['address3'] ?? null,
+        body['zip_code'] ?? null,
+      ],
+    )
+    if (!rows.length) throw new NotFoundException('Location not found')
+    return rows[0]
+  }
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-013 — DELETE /api/quotes/:id/locations/rows/:locationId
+  // -------------------------------------------------------------------------
+  async deleteLocation(
+    quoteId: number,
+    locationId: number,
+    orgCode: string,
+  ): Promise<{ message: string }> {
+    await this.assertQuoteEditable(quoteId, orgCode)
+
+    const loc = await this.dataSource.query<Record<string, unknown>[]>(
+      `SELECT id FROM locations WHERE id = $1 AND quote_id = $2`,
+      [locationId, quoteId],
+    )
+    if (!loc.length) throw new NotFoundException('Location not found')
+
+    await this.dataSource.query(
+      `DELETE FROM location_coverages WHERE location_id = $1`,
+      [locationId],
+    )
+    await this.dataSource.query(
+      `DELETE FROM locations WHERE id = $1`,
+      [locationId],
+    )
+    return { message: 'Location deleted' }
+  }
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-014 — POST /api/quotes/:id/locations/rows/:locationId/coverages
+  // -------------------------------------------------------------------------
+  async addCoverage(
+    quoteId: number,
+    locationId: number,
+    orgCode: string,
+    body: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    await this.assertQuoteEditable(quoteId, orgCode)
+
+    const rows = await this.dataSource.query<Record<string, unknown>[]>(
+      `INSERT INTO location_coverages
+              (location_id, quote_id, section_id, coverage_type, coverage_sub_type,
+               coverage_type_id, coverage_sub_type_id, currency, sum_insured, rating_schedule_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [
+        locationId,
+        quoteId,
+        body['section_id'] ?? null,
+        body['coverage_type'] ?? null,
+        body['coverage_sub_type'] ?? null,
+        body['coverage_type_id'] ?? null,
+        body['coverage_sub_type_id'] ?? null,
+        body['currency'] ?? 'GBP',
+        body['sum_insured'] ?? 0,
+        body['rating_schedule_id'] ?? null,
+      ],
+    )
+    return rows[0]
+  }
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-015 — PUT /api/quotes/:id/locations/rows/:locationId/coverages/:coverageId
+  // -------------------------------------------------------------------------
+  async updateCoverage(
+    quoteId: number,
+    locationId: number,
+    coverageId: number,
+    orgCode: string,
+    body: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    await this.assertQuoteEditable(quoteId, orgCode)
+
+    const rows = await this.dataSource.query<Record<string, unknown>[]>(
+      `UPDATE location_coverages
+          SET section_id           = COALESCE($4, section_id),
+              coverage_type        = COALESCE($5, coverage_type),
+              coverage_sub_type    = COALESCE($6, coverage_sub_type),
+              coverage_type_id     = COALESCE($7, coverage_type_id),
+              coverage_sub_type_id = COALESCE($8, coverage_sub_type_id),
+              currency             = COALESCE($9, currency),
+              sum_insured          = COALESCE($10, sum_insured),
+              rating_schedule_id   = COALESCE($11, rating_schedule_id),
+              updated_at           = NOW()
+        WHERE id = $1 AND location_id = $2 AND quote_id = $3
+       RETURNING *`,
+      [
+        coverageId,
+        locationId,
+        quoteId,
+        body['section_id'] ?? null,
+        body['coverage_type'] ?? null,
+        body['coverage_sub_type'] ?? null,
+        body['coverage_type_id'] ?? null,
+        body['coverage_sub_type_id'] ?? null,
+        body['currency'] ?? null,
+        body['sum_insured'] ?? null,
+        body['rating_schedule_id'] ?? null,
+      ],
+    )
+    if (!rows.length) throw new NotFoundException('Coverage row not found')
+    return rows[0]
+  }
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-016 — DELETE /api/quotes/:id/locations/rows/:locationId/coverages/:coverageId
+  // -------------------------------------------------------------------------
+  async deleteCoverage(
+    quoteId: number,
+    locationId: number,
+    coverageId: number,
+    orgCode: string,
+  ): Promise<{ message: string }> {
+    await this.assertQuoteEditable(quoteId, orgCode)
+
+    const rows = await this.dataSource.query<{ id: number }[]>(
+      `DELETE FROM location_coverages
+        WHERE id = $1 AND location_id = $2 AND quote_id = $3
+       RETURNING id`,
+      [coverageId, locationId, quoteId],
+    )
+    if (!rows.length) throw new NotFoundException('Coverage row not found')
+    return { message: 'Coverage row deleted' }
+  }
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-017 — POST /api/locations-schedule/imports/:quoteId/save-version
+  // Snapshots current quote_location_rows into locations_schedule_versions.
+  // -------------------------------------------------------------------------
+  async saveVersion(
+    quoteId: number,
+    orgCode: string,
+    createdBy: string,
+  ): Promise<Record<string, unknown>> {
+    // Access check
+    const quoteRows = await this.dataSource.query<Record<string, unknown>[]>(
+      `SELECT id, created_by_org_code FROM quotes WHERE id = $1`,
+      [quoteId],
+    )
+    if (!quoteRows.length) throw new NotFoundException('Quote not found')
+    if (quoteRows[0]['created_by_org_code'] !== orgCode) throw new ForbiddenException('Forbidden')
+
+    // Read current normalised rows to snapshot
+    const locationRows = await this.dataSource.query<Record<string, unknown>[]>(
+      `SELECT * FROM quote_location_rows WHERE quote_id = $1 ORDER BY id`,
+      [quoteId],
+    )
+
+    // Get next version number
+    const countRows = await this.dataSource.query<{ max_version: string }[]>(
+      `SELECT COALESCE(MAX(version_number), 0) AS max_version
+         FROM locations_schedule_versions WHERE import_id = $1`,
+      [quoteId],
+    )
+    const nextVersion = Number(countRows[0]?.max_version ?? 0) + 1
+
+    // Deactivate all previous active versions for this import
+    await this.dataSource.query(
+      `UPDATE locations_schedule_versions SET is_active = FALSE WHERE import_id = $1`,
+      [quoteId],
+    )
+
+    // Insert new snapshot
+    const inserted = await this.dataSource.query<Record<string, unknown>[]>(
+      `INSERT INTO locations_schedule_versions
+              (import_id, version_number, payload, created_by, is_active)
+       VALUES ($1, $2, $3, $4, TRUE)
+       RETURNING id, import_id AS "importId", version_number, created_at`,
+      [quoteId, nextVersion, JSON.stringify({ rows: locationRows }), createdBy],
+    )
+    return inserted[0]
+  }
 }

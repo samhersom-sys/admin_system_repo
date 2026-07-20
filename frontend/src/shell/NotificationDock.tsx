@@ -81,6 +81,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const [notifications, setNotifications] = useState<AppNotification[]>([])
     const [addedSignal, setAddedSignal] = useState(0)
 
+    // Mirror of notifications so callbacks can read current state without being
+    // re-created on every change (keeps addNotification/removeNotification stable).
+    const notificationsRef = useRef<AppNotification[]>([])
+    useEffect(() => { notificationsRef.current = notifications }, [notifications])
+
     // Load notifications for current user/org on mount
     useEffect(() => {
         const session = getSession()
@@ -100,6 +105,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         ): Promise<AppNotification | undefined> => {
             const message = typeof messageOrOptions === 'string' ? messageOrOptions : messageOrOptions.message
             const type: AppNotification['type'] = typeof messageOrOptions === 'string' ? typeArg : (messageOrOptions.type ?? 'info')
+
+            // Idempotent by client id — if a notification with this id already
+            // exists, return it instead of creating a duplicate. Prevents the
+            // unsaved-changes warning from being pushed repeatedly.
+            if (options.id) {
+                const existing = notificationsRef.current.find((n) => n.payload?.clientId === options.id)
+                if (existing) return existing
+            }
+
             const session = getSession()
             const user = session?.user as { name?: string; orgCode?: string } | undefined
             try {
@@ -147,7 +161,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         async (id: string | number): Promise<void> => {
             if (!isNumericId(id)) {
                 const clientId = String(id)
-                const toDelete = notifications
+                const toDelete = notificationsRef.current
                     .filter((n) => n.payload?.clientId === clientId && isNumericId(n.id))
                     .map((n) => n.id)
                 setNotifications((prev) =>
@@ -163,7 +177,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             setNotifications((prev) => prev.filter((n) => String(n.id) !== String(id)))
             try { await deleteNotification(id) } catch { }
         },
-        [notifications]
+        []
     )
 
     // markAsRead

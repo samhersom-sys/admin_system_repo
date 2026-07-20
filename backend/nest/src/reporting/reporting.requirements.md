@@ -24,6 +24,7 @@
   - `GET /api/report-templates/:id/history`
   - `GET /api/report-field-mappings/:domain`
   - `GET /api/date-basis`
+  - `GET /api/report-field-mappings/policyUserSummary`
 - New core-report datasource route:
   - `GET /api/login-activity`
 - New route:
@@ -145,6 +146,26 @@ Acceptance criteria:
 - Each row includes `user`, `loggedInDate`, and `durationOfLogin`.
 - `durationOfLogin` is returned as a human-readable string (`Xm` or `Xh Ym`).
 - Results are ordered by most recent `last_login` first.
+
+### R11 — Core Dashboard Datasource: Policy User Summary
+`GET /api/report-field-mappings/policyUserSummary` shall expose a reporting datasource backed by an org-scoped, aggregated policy user summary query for core dashboard table widgets.
+
+Acceptance criteria:
+- The datasource is tenant-scoped via `org_code` and the existing reporting org filter path.
+- The field list includes `user`, `hierarchy`, `userOrgCode`, `hierarchyLevel1`, `hierarchyLevel2`, `hierarchyLevel3`, `hierarchyLevel4`, `hierarchyLevel5`, `hierarchyPath`, `expiringPolicyCount`, `renewablePolicyCount`, `newBusinessPolicyCount`, `renewedPolicyCount`, `lapsedPolicyCount`, `cancelledPolicyCount`, `netNewPolicyCount`, `policyCount`, `retentionRatio`, `expiringGrossWrittenPremium`, `renewableGrossWrittenPremium`, `newBusinessGrossWrittenPremium`, `renewedGrossWrittenPremium`, `lapsedGrossWrittenPremium`, `cancelledGrossWrittenPremium`, `netNewGrossWrittenPremium`, `policyGrossWrittenPremium`, `retentionRatioGrossWrittenPremium`, and `totalGrossWrittenPremium`.
+- Hierarchy values are resolved from Organisation Configuration hierarchy entities and support dashboard custom-attribute filtering down to user-level rows.
+- `retentionRatio` shall be calculated as `(renewedPolicyCount / renewablePolicyCount) * 100`, capped at `100`, and rounded to 4 decimal places.
+- `retentionRatioGrossWrittenPremium` shall be calculated as `(renewedGrossWrittenPremium / renewableGrossWrittenPremium) * 100`, capped at `100`, and rounded to 4 decimal places.
+- The datasource can be consumed by `POST /api/dashboards/widgets/data` table widgets without introducing a new endpoint.
+
+### R12 — Seed Data: Organisation Hierarchy for Dashboard Drill-Down
+The development seed set shall include organisation hierarchy demo data aligned with reporting drill-down requirements.
+
+Acceptance criteria:
+- `db:seed` includes a dedicated organisation hierarchy seed script.
+- Seed data creates or updates hierarchy levels including `Organisation`, `Region`, `Team`, and `User`.
+- Seed data creates DEMO hierarchy entities and parent-child links, plus Organisation Configuration config/link rows used by settings.
+- Seed data includes users mapped to leaf hierarchy entities so `policyUserSummary` can return distinct hierarchy-filterable user rows.
 
 ## 5. Open Questions
 

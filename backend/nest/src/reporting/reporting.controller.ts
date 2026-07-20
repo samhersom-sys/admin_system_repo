@@ -112,6 +112,6 @@ export class ReportingController {
     @Post('dashboards/widgets/data')
     @HttpCode(HttpStatus.OK)
     getDashboardWidgetData(@Req() req: any, @Body() body: Record<string, any>) {
-        return this.reportingService.getDashboardWidgetData(req.user.orgCode, body.widget, body.filters)
+        return this.reportingService.getDashboardWidgetData(req.user.orgCode, body.widget, body.filters, req.user.id, req.user.username)
     }
 }

@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 @Controller('search')
 @UseGuards(JwtAuthGuard)
 export class SearchController {
-    constructor(private readonly searchService: SearchService) {}
+    constructor(private readonly searchService: SearchService) { }
 
     @Get('created-by-options')
     getCreatedByOptions(@Req() req: any) {
@@ -18,6 +18,8 @@ export class SearchController {
         const user = req.user
         return this.searchService.search(
             query,
+            user.id ?? null,
+            user.name ?? user.username ?? null,
             user.orgCode,
         )
     }

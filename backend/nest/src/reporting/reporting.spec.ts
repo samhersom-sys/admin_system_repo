@@ -35,7 +35,9 @@ const SEED_MEASURES: Record<string, Array<{ key: string; label: string; col: str
     policies: [
         { key: 'countAll', label: 'Count of Policies', col: '*', type: 'count' },
         { key: 'countActive', label: 'Count of Active Policies', col: '*', type: 'count', filterExpr: "status = 'Active'" },
+        { key: 'countExpiring', label: 'Count of Expiring Policies', col: '*', type: 'count', filterExpr: "CAST(expiry_date AS date) >= CURRENT_DATE" },
         { key: 'countLapsed', label: 'Count of Lapsed Policies', col: '*', type: 'count', filterExpr: "status = 'Expired'" },
+        { key: 'countCancelled', label: 'Count of Cancelled Policies', col: '*', type: 'count', filterExpr: "status = 'Cancelled'" },
         { key: 'countRenewed', label: 'Count of Renewed Policies', col: '*', type: 'count', filterExpr: "status = 'Renewed'" },
         { key: 'countRenewable', label: 'Count of Renewable Policies', col: '*', type: 'count', filterExpr: "renewable = 'Renewable'" },
         { key: 'retentionRatio', label: 'Retention Ratio', col: '*', type: 'ratio', ratioNumerator: "status = 'Renewed'", ratioDenominator: "renewable = 'Renewable'" },
@@ -438,6 +440,31 @@ describe('ReportingService', () => {
             expect(fields.some((f) => f.key === 'effectiveDate' && f.type === 'date')).toBe(true)
         })
 
+        it('returns field list for policyUserSummary domain with user KPI and premium columns', async () => {
+            const fields = await service.getFieldMappings('policyUserSummary', 'TST')
+            const keys = fields.map((f) => f.key)
+            expect(keys).toContain('user')
+            expect(keys).toContain('hierarchy')
+            expect(keys).toContain('userOrgCode')
+            expect(keys).toContain('hierarchyLevel1')
+            expect(keys).toContain('hierarchyLevel2')
+            expect(keys).toContain('hierarchyLevel3')
+            expect(keys).toContain('hierarchyLevel4')
+            expect(keys).toContain('hierarchyLevel5')
+            expect(keys).toContain('hierarchyPath')
+            expect(keys).toContain('renewablePolicyCount')
+            expect(keys).toContain('newBusinessPolicyCount')
+            expect(keys).toContain('renewedPolicyCount')
+            expect(keys).toContain('policyCount')
+            expect(keys).toContain('retentionRatio')
+            expect(keys).toContain('renewableGrossWrittenPremium')
+            expect(keys).toContain('newBusinessGrossWrittenPremium')
+            expect(keys).toContain('renewedGrossWrittenPremium')
+            expect(keys).toContain('policyGrossWrittenPremium')
+            expect(keys).toContain('retentionRatioGrossWrittenPremium')
+            expect(keys).toContain('totalGrossWrittenPremium')
+        })
+
         it('submissions domain includes workflowStatus and clearanceStatus fields', async () => {
             const fields = await service.getFieldMappings('submissions', 'TST')
             expect(fields.some((f) => f.key === 'workflowStatus')).toBe(true)
@@ -474,17 +501,21 @@ describe('ReportingService', () => {
             expect(fields.find((f) => f.key === 'countRenewalBusiness')?.label).toBe('Count of Renewal Business Quotes')
         })
 
-        it('T-RPT-BE-R049c — policies domain exposes countAll, countActive, countLapsed, countRenewed, countRenewable and retentionRatio measures', async () => {
+        it('T-RPT-BE-R049c — policies domain exposes countAll, countActive, countExpiring, countLapsed, countCancelled, countRenewed, countRenewable and retentionRatio measures', async () => {
             const fields = await service.getFieldMappings('policies', 'TST')
             const keys = fields.map((f) => f.key)
             expect(fields.find((f) => f.key === 'countAll')?.label).toBe('Count of Policies')
             expect(fields.find((f) => f.key === 'countActive')?.label).toBe('Count of Active Policies')
             expect(fields.find((f) => f.key === 'grossWrittenPremium')?.label).toBe('Gross Net Written Premium')
+            expect(keys).toContain('countExpiring')
             expect(keys).toContain('countLapsed')
+            expect(keys).toContain('countCancelled')
             expect(keys).toContain('countRenewed')
             expect(keys).toContain('countRenewable')
             expect(keys).toContain('retentionRatio')
+            expect(fields.find((f) => f.key === 'countExpiring')?.label).toBe('Count of Expiring Policies')
             expect(fields.find((f) => f.key === 'countLapsed')?.label).toBe('Count of Lapsed Policies')
+            expect(fields.find((f) => f.key === 'countCancelled')?.label).toBe('Count of Cancelled Policies')
             expect(fields.find((f) => f.key === 'countRenewed')?.label).toBe('Count of Renewed Policies')
             expect(fields.find((f) => f.key === 'countRenewable')?.label).toBe('Count of Renewable Policies')
             expect(fields.find((f) => f.key === 'retentionRatio')?.label).toBe('Retention Ratio')
@@ -662,6 +693,90 @@ describe('ReportingService', () => {
                     { source: 'Parties', reference: '', name: 'Demo Brokers Ltd' },
                 ],
             })
+        })
+
+        it('runs a single-source policyUserSummary table widget without unsupported-source errors', async () => {
+            mockDataSource.query.mockResolvedValue([
+                {
+                    user: 'alice',
+                    hierarchy: 'PolicyForge Demo Org > North Region > North Team 1 > alice',
+                    hierarchyLevel2: 'North Region',
+                    renewablePolicyCount: 4,
+                    newBusinessPolicyCount: 2,
+                    renewedPolicyCount: 3,
+                    policyCount: 9,
+                    retentionRatio: 0.75,
+                },
+            ])
+
+            const result = await service.getDashboardWidgetData('TST', {
+                type: 'table',
+                attributes: [
+                    'policyUserSummary::hierarchy',
+                    'policyUserSummary::hierarchyLevel2',
+                    'policyUserSummary::renewablePolicyCount',
+                    'policyUserSummary::newBusinessPolicyCount',
+                    'policyUserSummary::renewedPolicyCount',
+                    'policyUserSummary::policyCount',
+                    'policyUserSummary::retentionRatio',
+                ],
+            }, undefined)
+
+            expect(result).toEqual({
+                type: 'table',
+                rows: [
+                    {
+                        user: 'alice',
+                        hierarchy: 'PolicyForge Demo Org > North Region > North Team 1 > alice',
+                        hierarchyLevel2: 'North Region',
+                        renewablePolicyCount: 4,
+                        newBusinessPolicyCount: 2,
+                        renewedPolicyCount: 3,
+                        policyCount: 9,
+                        retentionRatio: 0.75,
+                    },
+                ],
+            })
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('policy_user_summary'),
+                expect.arrayContaining(['TST']),
+            )
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('LEAST('),
+                expect.arrayContaining(['TST']),
+            )
+        })
+
+        it('accepts case-insensitive source keys for dashboard table widgets', async () => {
+            mockDataSource.query.mockResolvedValue([{ user: 'alice', policyCount: 9 }])
+
+            await expect(service.getDashboardWidgetData('TST', {
+                type: 'table',
+                attributes: ['PolicyUserSummary::user', 'PolicyUserSummary::policyCount'],
+            }, undefined)).resolves.toEqual({
+                type: 'table',
+                rows: [{ user: 'alice', policyCount: 9 }],
+            })
+        })
+
+        it('applies hierarchy custom attribute filters to policyUserSummary widgets', async () => {
+            mockDataSource.query.mockResolvedValue([{ user: 'alice', policyCount: 9 }])
+
+            await service.getDashboardWidgetData('TST', {
+                type: 'table',
+                attributes: ['policyUserSummary::user', 'policyUserSummary::policyCount'],
+            }, {
+                customAttributes: [{
+                    field: 'policyUserSummary::hierarchyLevel2',
+                    operator: 'equals',
+                    value: 'North Region',
+                }],
+            })
+
+            expect(mockDataSource.query).toHaveBeenCalledWith(
+                expect.stringContaining('"hierarchyLevel2" = $2'),
+                expect.arrayContaining(['TST', 'North Region']),
+            )
         })
     })
 })

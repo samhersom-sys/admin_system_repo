@@ -273,6 +273,13 @@ None — all required tables and columns already exist.
 
 **REQ-PAR-DOM-F-077:** When the `selectedParty` prop is provided, the trigger input shall display `selectedParty.name`.
 
+**REQ-PAR-DOM-F-078:** `PartyViewPage` shall post a best-effort audit event with `action: 'Party Updated'` to `postPartyAudit` after a successful `handleSave`. The `details.description` field shall contain a human-readable field diff (using `buildAuditDiff`) listing changed fields in the format `"Label: old → new"`. If no fields changed, `details` shall be `{}`.
+
+Acceptance criteria:
+- `postPartyAudit(id, { action: 'Party Updated', entityType: 'Party', entityId: id, ... })` called after successful save.
+- Field diff description included in `details.description` when fields changed.
+- Failure of the audit post does not surface an error to the user.
+
 ---
 
 ## 3. Traceability
@@ -343,6 +350,7 @@ None — all required tables and columns already exist.
 | REQ-PAR-DOM-F-075 | `parties/CoverholderSearch/__tests__/CoverholderSearch.test.tsx` | T-PAR-COVER-R075 |
 | REQ-PAR-DOM-F-076 | `parties/CoverholderSearch/__tests__/CoverholderSearch.test.tsx` | T-PAR-COVER-R076 |
 | REQ-PAR-DOM-F-077 | `parties/CoverholderSearch/__tests__/CoverholderSearch.test.tsx` | T-PAR-COVER-R077 |
+| REQ-PAR-DOM-F-078 | `parties/PartyViewPage/__tests__/PartyViewPage.test.tsx` | T-PAR-VIEW-R078 |
 
 ---
 

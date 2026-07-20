@@ -6,6 +6,173 @@ When a question is answered, the status changes from `Open` to `Answered` and th
 
 ---
 
+## OQ-058: Coverage Defaults — Parent-Time Precedence Rule Confirmation
+
+- **Raised:** 2026-07-10
+- **Status:** Open
+- **Context:** New requirements add coverage and coverage-detail `effective_time` / `expiry_time` defaults using parent-level values when present; fallback values are `00:00:00` and `23:59:59`.
+- **Question:** For quote and policy coverage flows, is parent-level time inheritance mandatory whenever parent values exist, or optional per product specification?
+- **Why it matters:** This determines whether server logic always overrides fallback defaults with parent times, and affects deterministic test assertions for defaulting.
+- **Dependencies:** REQ-QUO-BE-NE-F-049, REQ-POL-BE-NE-F-017, REQ-QUO-FE-F-083, REQ-POL-FE-F-051.
+- **Answer:** [Pending]
+
+---
+
+## OQ-059: Coverage Expiry Default — One-Year Basis Definition
+
+- **Raised:** 2026-07-10
+- **Status:** Open
+- **Context:** Requirements specify expiry defaults to parent inception + 1 year where applicable.
+- **Question:** Should "+ 1 year" be implemented as calendar-year addition (same day next year, with leap-year handling) or fixed day-count addition (365 days), and should end-of-day rounding apply when parent times are absent?
+- **Why it matters:** Different methods can produce different dates around leap years and month-end boundaries, affecting quote/policy consistency.
+- **Dependencies:** REQ-QUO-BE-NE-F-049, REQ-POL-BE-NE-F-017.
+- **Answer:** [Pending]
+
+---
+
+## OQ-060: Compatibility Window Length for Mixed Client Payloads
+
+- **Raised:** 2026-07-10
+- **Status:** Open
+- **Context:** The delta requires backward compatibility for payloads that omit new coverage date/time fields while supporting new clients sending them.
+- **Question:** What is the mandated compatibility window duration (for example, one release cycle, 90 days, or indefinite) during which both payload shapes must be supported?
+- **Why it matters:** This decision drives deprecation timelines, validation strictness, and release communication.
+- **Dependencies:** REQ-QUO-BE-NE-F-054, REQ-POL-BE-NE-F-022, REQ-QUO-FE-F-087, REQ-POL-FE-F-055.
+- **Answer:** [Pending]
+
+---
+
+## OQ-061: Rollback Safety Scope for Date/Time Migration
+
+- **Raised:** 2026-07-10
+- **Status:** Open
+- **Context:** Requirements call for rollback-safe migration and non-functional rollback guarantees.
+- **Question:** In rollback, should newly added coverage/coverage-detail date-time columns be dropped, retained but ignored, or retained with data archival to preserve auditability?
+- **Why it matters:** The decision changes migration down behavior, data retention expectations, and operational runbooks.
+- **Dependencies:** REQ-QUO-BE-NE-F-052, REQ-POL-BE-NE-F-020.
+- **Answer:** [Pending]
+
+---
+
+## OQ-052: Earnings — Is the earning engine in scope for this ticket?
+
+- **Raised:** 2026-06-19
+- **Status:** Answered — 2026-06-19
+- **Context:** The `EARN-CFG` implementation covers configuration only (pattern CRUD, rule CRUD). No service exists to read those patterns and calculate earned/unearned premium figures on a policy section.
+- **Question:** Is the earning engine — the process that reads a resolved pattern and produces earned/unearned premium amounts per period — in scope for this ticket, or is this strictly configuration-only for now?
+- **Why it matters:** If in scope, three tables (`earning_periods`, `earning_period_transactions` or similar), a calculation service, and reporting measures are all required. If out of scope, the current implementation is complete and the engine is a future ticket.
+- **References:** `EarningsConfigPage.requirements.md` — Scope (Out of scope: "Automatic calculation of earned/unearned figures"); REQ-EARN-CFG-F-003 through F-009
+- **Dependencies:** Blocks OQ-053 through OQ-057 if out of scope.
+- **Answer:** Yes — in scope. The earning engine shall be built. Patterns are configured by finance/actuarial users in the Settings module. At policy section creation a user populates a defined set of attributes; the engine evaluates those attributes against the configured rules to resolve the correct pattern. A background runtime job (not an inline synchronous calculation) shall be responsible for producing the earned/unearned figures. The engine must cover all combinations — every valid combination of policy section attributes must have a pattern defined.
+
+---
+
+## OQ-053: Earnings — How is a pattern resolved and linked to a policy section?
+
+- **Raised:** 2026-06-19
+- **Status:** Answered — 2026-06-19
+- **Context:** `earning_pattern_rules` contains selection criteria (class of business, contract type, product, include_incepted). Nothing currently evaluates those rules against a `policy_section` record and records which pattern applies. The `policy_sections` table has no `earning_pattern_id` column.
+- **Question:** When and how is a pattern resolved for a policy section?
+- **Why it matters:** Determines whether `policy_sections` needs a new column, whether a resolver service is needed, and whether retroactive rule changes affect already-incepted policies.
+- **References:** `backend/nest/src/entities/policy-section.entity.ts`; `backend/nest/src/entities/earning-pattern.entity.ts` (`EarningPatternRule`)
+- **Answer:** Option A — at section creation. When a user creates or updates a policy section, the system evaluates the `earning_pattern_rules` set (ordered by priority) against the section's attributes and writes the resolved `earning_pattern_id` FK onto `policy_sections`. This gives a stable, stored result that does not change if rules are later edited (protecting incepted business). All valid attribute combinations must have a matching rule; the system shall surface a validation error if no rule matches. The background runtime job (OQ-052) then uses the stored `earning_pattern_id` to run the calculation.
+
+---
+
+## OQ-054: Earnings — What is the `productId` FK target on `earning_pattern_rules`?
+
+- **Raised:** 2026-06-19
+- **Status:** Answered — 2026-06-19
+- **Context:** `earning_pattern_rules.product_id` is a nullable INT column intended to match earning rules to a specific product. No `products` table is defined in the NestJS backend or in any TypeORM entity. The `settings.service.ts` references a `/api/settings/products` endpoint backed by raw SQL against a `products` table.
+- **Question:** Should `earning_pattern_rules.product_id` reference the `products` table used by the settings module?
+- **Why it matters:** Without a known FK target the column is a loose INT with no referential integrity.
+- **References:** `backend/nest/src/entities/earning-pattern.entity.ts` (`productId`); `backend/nest/src/settings/settings.service.ts` (`getProducts`)
+- **Answer:** Remove `product_id` from `earning_pattern_rules`. The "products" concept has not been formally implemented in the NestJS backend with a TypeORM entity or stable schema. Including an unresolvable FK creates data integrity risk. Product-level pattern matching is deferred as an open requirement until the products module is formally implemented. An open question (OQ-EARN-PROD-001) shall track this. The rule matching criteria are reduced to: `class_of_business`, `contract_type`, and `include_incepted` for the current build.
+
+---
+
+## OQ-055: Earnings — Which existing measures should have earned/unearned variants?
+
+- **Raised:** 2026-06-19
+- **Status:** Answered — 2026-06-19
+- **Context:** The original request stated the Earnings module creates "Earned" and "Unearned" variants of existing measures. Currently only one premium measure exists in `measure_definitions`: `grossWrittenPremium`.
+- **Question:** Which measure keys need earned and unearned variants, and how should they be managed?
+- **Why it matters:** Determines schema changes to `measure_definitions` and what the earning engine must produce.
+- **References:** `db/seeds/032-measure-definitions.js`; `backend/nest/src/measures/measure-definition.entity.ts`
+- **Answer:** Yes — the `measure_definitions` table exists (entity: `MeasureDefinition`, seed: `032-measure-definitions.js`). A new boolean column `has_earning_variants` shall be added to the `measure_definitions` table. When `has_earning_variants = true` on a measure, the system automatically creates or exposes two derived variants: `{key}Earned` and `{key}Unearned`. This flag is set by `internal` measures only (tenant measures cannot self-declare earning variants). Initial measures flagged `has_earning_variants = true`: `grossWrittenPremium` (source: `policies`). The earned/unearned variants are `internal` seeded measures. Additional variants (e.g. net net premium, brokerage earned) are deferred until the premium decomposition model is agreed. Variant measures are surfaced in the reporting and dashboarding measures list alongside their parent.
+
+---
+
+## OQ-056: Earnings — Should earning be by accounting period or calendar day, and what defines an accounting period?
+
+- **Raised:** 2026-06-19
+- **Status:** Answered — 2026-06-19
+- **Context:** REQ-EARN-CFG-F-004 exposes an `earn_by` field (`day` or `period`) on each pattern.
+- **Question:** What defines an accounting period in this system?
+- **Why it matters:** The earning engine cannot operate in `period` mode without a defined period calendar.
+- **References:** REQ-EARN-CFG-F-004 (`earnBy`); `backend/nest/src/entities/earning-pattern.entity.ts` (`earnBy` column)
+- **Answer:** For the current build, both `earn_by = 'day'` and `earn_by = 'period'` shall use **calendar months** as the system period boundary. A calendar period is defined as the first to last day of each calendar month. The engine shall calculate earned amounts using exact day-count precision within each calendar month (no precision is lost — day-count is always the basis, calendar months define the aggregation buckets). Ledger periods — user-defined accounting periods that consume earned data into the general ledger — are a separate, more complex concept that has not yet been discussed. A new open question (OQ-LEDGER-001) shall track ledger periods as an open requirement. Ledger periods shall not be implemented in this ticket.
+
+---
+
+## OQ-057: Earnings — Should the policy section view and finance module display earned/unearned figures?
+
+- **Raised:** 2026-06-19
+- **Status:** Answered — 2026-06-19
+- **Context:** No changes were made to the policy section view page, the finance module, or the reporting module.
+- **Question:** Where in the UI should earned/unearned figures appear?
+- **Why it matters:** Without answers, no UI requirements can be written for the earning output.
+- **References:** `frontend/src/finance/`; `frontend/src/reporting/`; `backend/nest/src/reporting/field-mappings.ts`
+- **Answer:** Two integration points are confirmed:
+  1. **Finance Summary tab** — A "Finance Summary" tab shall be added to both the Policy Section view page and the Policy (layer) view page. This tab shall display the earned/unearned premium figures produced by the earning engine, broken down by calendar period. This is a read-only summary view driven by the engine output.
+  2. **Reporting and dashboarding measures list** — Earned and unearned premium measures shall appear in the measures list available to dashboard widget builders and custom report builders. These measures are backed by the earning engine output stored in the database.
+
+---
+
+## OQ-SA-EARN-001: Earning Pattern Resolver — Cross-Domain Call Mechanism
+
+- **Raised:** 2026-06-19
+- **Status:** Answered — 2026-06-19
+- **Context:** The SA review identified that calling `EarningsConfigService.resolvePatternForSection()` from `PoliciesService` would violate §04 no cross-domain service injection.
+- **Question:** Which of three options should be used for the pattern resolver? (A) Separate resolver endpoint called by frontend before section save; (B) NestJS pipe injected into PoliciesController; (C) Domain event with synchronous reply.
+- **Answer:** Option A — a dedicated `POST /api/earning-engine/sections/resolve` endpoint (JWT-guarded, roles: `client_admin`, `internal_admin`). The frontend calls this endpoint with the section's `classOfBusiness`, `contractType`, and `includeIncepted` values before saving the section. The resolver returns `resolvedEarningPatternId`, which the frontend includes in the section save payload. `PoliciesService` validates only that the FK value exists in `earning_patterns` — it does not import `EarningEngineService`. REQ-EARN-F-001 and REQ-EARN-F-002 updated accordingly.
+
+---
+
+## OQ-SA-EARN-002: Resolver Endpoint — Authentication and Rate Limiting
+
+- **Raised:** 2026-06-19
+- **Status:** Answered — 2026-06-19
+- **Context:** If Option A is chosen for OQ-SA-EARN-001, the new `POST /api/earning-engine/sections/resolve` endpoint must not be accessible to unauthenticated callers, as doing so would allow enumeration of an org's pattern configuration rules.
+- **Question:** Must the resolver endpoint be JWT-authenticated, and should it carry a rate limit?
+- **Answer:** Yes — the endpoint is guarded by `JwtAuthGuard` and `RolesGuard` with roles `['client_admin', 'internal_admin']`. Unauthenticated requests return 401; requests from roles below client_admin return 403. Rate limiting is not required beyond the standard NestJS application-level throttler already configured (if any); no bespoke per-endpoint rate limit is added in this ticket.
+
+- **Raised:** 2026-06-19
+- **Status:** Deferred
+- **Context:** `earning_pattern_rules` originally included a `product_id` column to allow patterns to be matched to specific products. Per OQ-054, `product_id` has been removed because the `products` concept has not been formally implemented in the NestJS backend with a TypeORM entity or stable schema.
+- **Question:** Once the products module is formally implemented (TypeORM entity, seed data, stable schema), should `earning_pattern_rules` be extended to include a product-level filter criterion?
+- **Why it matters:** Without product-level matching, organisations that have multiple products with different earning profiles must use class-of-business and contract-type alone to differentiate rules. For some organisations this may be insufficient.
+- **Dependencies:** Blocked by products module implementation. No action required in the current build.
+- **Answer:** [Deferred — to be revisited when the products module is implemented]
+
+---
+
+## OQ-LEDGER-001: Ledger Periods — Accounting User-Defined Period Boundaries
+
+- **Raised:** 2026-06-19
+- **Status:** Open
+- **Context:** Per OQ-056, the earning engine uses calendar months as the system period boundary for the current build. However, accounting users in an organisation typically work to "ledger periods" — explicitly defined, non-overlapping date ranges that determine when earned data is consumed into the general ledger (analogous to a financial accounting period close). Ledger periods differ from calendar months in that they can be defined independently by the organisation, can be opened/closed by an accounting user, and must not overlap.
+- **Question:**
+  1. Should ledger periods be a separate table (`ledger_periods`) with columns: `org_code`, `label` (e.g. "Jan 2026"), `start_date`, `end_date`, `status` ('open' | 'closed'), `closed_by`, `closed_at`?
+  2. Should the earning engine optionally aggregate earned figures into the user's ledger period boundaries rather than calendar month boundaries?
+  3. Who can open and close a ledger period — finance role only, or also client_admin?
+  4. Should a closed ledger period be immutable — i.e. no re-runs of the engine can alter figures for a closed period?
+- **Why it matters:** Ledger periods are a fundamental concept in insurance finance. Without them, earned figures cannot be reliably published to a general ledger or passed to a finance system. This is a significant scope item and must be requirements-driven before implementation.
+- **Dependencies:** OQ-056 (earning period definition); earning engine output schema; Finance module integration (OQ-057).
+- **Answer:** [Pending — open requirement; not in scope for the current earning engine build]
+
+---
+
 ## OQ-001: Clearance Domain Boundary
 
 - **Raised:** 2026-03-05
@@ -714,3 +881,295 @@ Invoicing components (`InvoiceLineItems`, `InvoiceSummary`) are shared and may b
   3. No additional HTTP round-trip on page load.
   4. The legacy `audit.service.js` `recordAuditEvent()` already returns `{ success, audit, otherUsersOpen }` in its response shape.
 - **Answer:** Return `otherUsersOpen: string[]` as part of the `POST /api/quotes/:id/audit` response (`{ success: true, audit, otherUsersOpen }`). REQ-AUDIT-BE-F-014 and REQ-QUO-BE-NE-F-014 specified accordingly.
+
+---
+
+## OQ-STAT-001: Submission `is_active` — stored boolean or derived from status?
+
+- **Raised:** 2026-05-19
+- **Status:** Answered — 2026-05-19
+- **Context:** Submissions need an efficient way to filter active vs inactive records. The status column already implies activity (e.g. `Open` is active, `Closed` is not), so one option is to derive `is_active` from status at query time; the other is to store it as a dedicated boolean.
+- **Question:** Should `is_active` be a stored boolean column on `submission`, or should activity be derived from the `status` column at query time?
+- **Why it matters:** Determines whether the DB schema needs a new column and whether a nightly sync job is required to keep it consistent.
+- **Answer:** Stored boolean. Add `is_active BOOLEAN DEFAULT TRUE NULL` to the `submission` table. Terminal states (`Expired, Cancelled, Lapsed, Renewed, Closed, Disbanded`) set it to `false`. It is maintained by application events and nightly jobs (Checkpoint E). This enables efficient indexed filtering without recomputing from status on every query. Implemented in Checkpoint C.
+
+---
+
+## OQ-STAT-002: Policy version status — stored lookup FK or plain text column?
+
+- **Raised:** 2026-05-19
+- **Status:** Answered — 2026-05-19
+- **Context:** Policies can be Original (first issuance from a quote) or Endorsed (a version created via an endorsement). The policy record needs to identify which it is.
+- **Question:** Should policy version status (`Original`/`Endorsed`) be stored as a plain text column, or as an integer FK referencing a lookup table?
+- **Why it matters:** A FK provides referential integrity and follows the established lookup pattern; a text column is simpler but allows invalid values.
+- **Answer:** FK column. Add `version_status_id INT NULL` to `policies` referencing `lookup_policy_version_statuses(id)`. Create `lookup_policy_version_statuses` table seeded with `Original` and `Endorsed`. Follows the same lookup pattern as `status_id` on policies. Implemented in Checkpoint C.
+
+---
+
+## OQ-STAT-003: Quote status `Draft` — rename to `Created`?
+
+- **Raised:** 2026-05-19
+- **Status:** Answered — 2026-05-19
+- **Context:** The quote status `Draft` does not accurately reflect the concept. A quote that has been created and persisted is not a draft — it is a live record awaiting action. `Created` better matches domain language and aligns with the lifecycle progression (Created → Quoted → Bound → Issued).
+- **Question:** Should the `Draft` quote status be renamed to `Created`?
+- **Why it matters:** Affects `lookup_quote_statuses`, `quotes.service.ts` create/copy/markQuoted logic, all tests, and requirements documentation.
+- **Answer:** Yes. Rename `Draft` → `Created` throughout. `lookup_quote_statuses` seed updated; `quotes.service.ts` `create()` and `copy()` now produce `status = 'Created'`; `markQuoted()` guard updated to check `!== 'Created'`. A migration script (`tools/migrate-quotes-draft-to-created.js`) handles existing production data. Implemented in Checkpoint B.
+
+---
+
+## OQ-STAT-004: `Declined` as a submission status — remove or keep?
+
+- **Raised:** 2026-05-19
+- **Status:** Answered — 2026-05-19
+- **Context:** The legacy submission status set included `Declined`. In practice, a submission is not declined — individual quotes are declined. When all quotes are declined or the client withdraws, the submission moves to `Closed`.
+- **Question:** Should `Declined` remain as a valid submission status?
+- **Why it matters:** Determines whether `lookup_submission_statuses` retains the `Declined` row and whether `SUB-2024-004` (the only seeded `Declined` submission) needs to be updated.
+- **Answer:** No. Remove `Declined` from `lookup_submission_statuses`. `Declined` is valid only as a quote status. Existing seed `SUB-2024-004` changed from `Declined` → `Closed`. Implemented in Checkpoint C.
+
+---
+
+## OQ-STAT-005: Renewal submission links — single FK or bidirectional pair?
+
+- **Raised:** 2026-05-19
+- **Status:** Answered — 2026-05-19
+- **Context:** When a submission is renewed, a new submission is created. The expiring submission needs to know where its renewal went; the new submission needs to know its origin.
+- **Question:** Should the renewal link be a single FK column on one of the two submissions, or a bidirectional pair of nullable columns on both?
+- **Why it matters:** Determines how renewal chains are traversed in both directions (e.g. "show me the renewal of this submission" and "show me the submission this was renewed from").
+- **Answer:** Bidirectional pair. Two nullable INT columns on `submission`:
+  - `renewed_submission_id` — on the expiring submission; stores the ID of the new renewal submission.
+  - `renewed_from_submission_id` — on the new renewal submission; stores the ID of the expiring submission.
+  Both are nullable and have no DB-level FK constraint (to avoid circular dependency issues during inserts). Implemented in Checkpoint C.
+
+---
+
+## OQ-STAT-006: `Issued` status — add to quote and submission lifecycles?
+
+- **Raised:** 2026-05-19
+- **Status:** Answered — 2026-05-19
+- **Context:** After a quote is bound and `issuePolicy()` runs, the quote stays in `Bound` status. This is incorrect — the quote has progressed beyond Bound to a policy being live. A quote with a successfully issued policy should be in a distinct terminal status.
+- **Question:** Should `Issued` be added to the quote lifecycle and submission lifecycle? At what point does the transition happen?
+- **Why it matters:** Without `Issued`, there is no way to distinguish a Bound-but-not-yet-issued quote from a Bound-and-issued quote. The submission status also cannot reflect "a policy has been issued from this submission" until `Issued` exists.
+- **Answer:** Yes. Add `Issued` to `lookup_quote_statuses` (at `order_index` 4, after `Bound`). `issuePolicy()` in `quotes.service.ts` now sets `quote.status = 'Issued'` immediately after inserting the policy record. `Issued` also added to `lookup_submission_statuses` (at `order_index` 4). Submission status inheritance (setting the submission to `Issued`) is implemented in Checkpoint D. Implemented (quote side) in Checkpoint B; submission side in Checkpoint D.
+
+---
+
+## OQ-STAT-007: Full submission status set — what values?
+
+- **Raised:** 2026-05-19
+- **Status:** Answered — 2026-05-19
+- **Context:** The legacy submission status set was `Open, Quoted, Declined, Closed, Disbanded` (5 values). With the removal of `Declined` and the addition of policy lifecycle states that a submission inherits, the full set needs to be redefined.
+- **Question:** What is the complete set of valid submission statuses?
+- **Why it matters:** Determines `lookup_submission_statuses` rows, seed data coverage, and the status filter options in the search form.
+- **Answer:** 11 statuses, in order:
+  1. `Open` (is_active: true) — submission is open and awaiting quotes
+  2. `Quoted` (is_active: true) — at least one quote has been provided
+  3. `Bound` (is_active: true) — a quote has been bound, pending issuance
+  4. `Issued` (is_active: true) — policy has been issued
+  5. `Active` (is_active: true) — linked policy is currently active
+  6. `Expired` (is_active: false) — linked policy has expired
+  7. `Cancelled` (is_active: false) — linked policy has been cancelled
+  8. `Lapsed` (is_active: false) — linked policy has lapsed
+  9. `Renewed` (is_active: false) — submission has been renewed into a new submission
+  10. `Closed` (is_active: false) — submission has been closed (all quotes declined)
+  11. `Disbanded` (is_active: false) — submission has been disbanded
+  Implemented in Checkpoint C.
+
+---
+
+## OQ-STAT-008: Auto-decline sibling quotes on bind — configurable per organisation?
+
+- **Raised:** 2026-05-19
+- **Status:** Deferred
+- **Context:** Checkpoint D implements `bind()` auto-decline: when a quote is bound, all other `Created`/`Quoted` quotes on the same submission are automatically set to `Declined`. This behaviour will be hardcoded initially.
+- **Question:** Should auto-decline of sibling quotes on bind be configurable per organisation (e.g. some orgs may want to keep sibling quotes open for comparison or re-use)?
+- **Why it matters:** If yes, a new org-level settings table and config flag are needed before the feature is shipped to production. If no, the behaviour is universal and no settings infrastructure is required.
+- **Dependencies:** Blocked until org settings module is designed (not yet in scope). Checkpoint D implements the hardcoded version first.
+- **Answer:** Deferred — implement as hardcoded auto-decline in Checkpoint D. Revisit when the org settings module is built.
+
+---
+
+## OQ-SETTINGS-001: Settings module sub-domain restructuring — agree folder names and page allocation
+
+- **Raised:** 2026-05-19
+- **Status:** Open
+- **Context:** The `settings/` frontend module contains 7+ distinct concern areas (account administration, organisation details, product configuration, rating rules, platform admin, reporting config, data quality) in a flat folder. §12.7e now defines a sub-module nesting pattern with `settings/` as the canonical example.
+- **Question:** Before any files are moved, agree: (a) the exact sub-folder names, (b) which pages and components belong to each sub-folder, (c) whether a top-level `settings.service.ts` is needed or services are per sub-module.
+- **Why it matters:** File moves must be done in a single committed checkpoint with all imports updated. Starting without agreement risks partial restructuring.
+- **Dependencies:** None — design decision only, no downstream blockers.
+- **Answer:** Pending
+
+---
+
+## OQ-STAT-009: Legacy `submit()` and `decline()` statuses outside the 11-value set
+
+- **Raised:** 2026-05-19
+- **Status:** Open
+- **Context:** `SubmissionsService.submit()` currently sets `status = 'In Review'` and `SubmissionsService.decline()` sets `status = 'Declined'`. Both values are absent from the 11-value status set defined in OQ-STAT-007 (`Open`, `Quoted`, `Bound`, `Issued`, `Active`, `Expired`, `Cancelled`, `Lapsed`, `Renewed`, `Closed`, `Disbanded`). The seeds in `004-lookup-submission-statuses.js` do not include either value.
+- **Question:** What is the correct replacement status for (a) `submit()` — the action of submitting a submission for underwriter review, and (b) `decline()` — the action of an underwriter declining a submission?
+- **Why it matters:** Until resolved, `submit()` and `decline()` will write values that are not in the lookup table, which will cause seed integrity failures and UI display gaps.
+- **Dependencies:** Requires business clarification on whether 'In Review' and/or 'Declined' should be added to the 11-value set, or whether the methods should map to existing values.
+- **Answer:** Pending
+
+---
+
+## OQ-STAT-010: Terminal status transitions — when should `updateStatusFromQuote` set `isActive = false`?
+
+- **Raised:** 2026-05-19
+- **Status:** Open
+- **Context:** `updateStatusFromQuote()` is currently only called with `isActive = true` (for 'Bound' and 'Issued' transitions). REQ-SUB-BE-NE-F-C01 specifies that terminal statuses (`Expired`, `Cancelled`, `Lapsed`, `Renewed`, `Closed`, `Disbanded`) must set `is_active = false`. No service method currently calls `updateStatusFromQuote` with `isActive = false`.
+- **Question:** Which service methods trigger terminal submission status transitions, and should they call `updateStatusFromQuote(submissionId, '<terminal>', false, orgCode)` directly or defer to the nightly reconciliation job?
+- **Why it matters:** Without a clear ownership rule, terminal status + isActive transitions may be applied inconsistently (partly by service methods, partly by the nightly job), causing data integrity issues.
+- **Dependencies:** Relates to OQ-STAT-011 (nightly reconciliation job scope).
+- **Answer:** Pending
+
+---
+
+## OQ-STAT-011: Nightly `isActive` reconciliation job — scope and trigger mechanism
+
+- **Raised:** 2026-05-19
+- **Status:** Open
+- **Context:** REQ-SUB-BE-NE-F-C01 references a nightly reconciliation job (Checkpoint E) that synchronises `is_active` with `status` for all submissions. This job is not yet designed or tracked as a formal checkpoint.
+- **Question:** (a) What is the trigger mechanism (CRON, database event, admin-initiated)? (b) Should it operate only on records where `is_active` is inconsistent with the current status, or perform a full sweep? (c) Should it log a reconciliation audit trail? (d) What is the agreed Checkpoint label (Checkpoint E)?
+- **Why it matters:** Without defining scope and trigger, the job cannot be estimated or spec'd. If omitted, submissions that miss the real-time transition calls will remain with stale `is_active` values.
+- **Dependencies:** OQ-STAT-010 (defines which transitions are handled in real-time vs deferred to the job).
+- **Answer:** Pending
+
+---
+
+## OQ-CHOME-001: Recent Records and My Tasks — report_templates subtype
+
+- **Raised:** 2026-06-29
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — 2026-06-29
+- **Context:** The homepage widgets "Recent Records" and "My Tasks" are currently hardcoded in `HomeDashboard.tsx`. To promote them to the reporting stack they need a `type` in `report_templates`.
+- **Question:** Should "Recent Records" and "My Tasks" use a new subtype (e.g. `type: 'widget'`) in `report_templates`, or be regular `type: 'core'` entries?
+- **Answer:** "Recent Records" and "My Tasks" become standard `type: 'core'` entries in `report_templates` — no new subtype needed.
+
+---
+
+## OQ-CHOME-002: Homepage widget types — which types are supported?
+
+- **Raised:** 2026-06-29
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — 2026-06-29
+- **Context:** A user configuring a dashboard as their homepage may want to add widgets of various types (table, chart, metric). The question was whether all types should be supported or only a subset.
+- **Question:** Which widget types (table, chart, metric, text) should be supported when a user adds a widget to a homepage dashboard?
+- **Answer:** Any widget type (table, chart, metric) — user defines the widget type, sees a live preview, and explicitly saves it.
+
+---
+
+## OQ-CHOME-003: Relationship between the Overview tab and the master homepage
+
+- **Raised:** 2026-06-29
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — 2026-06-29
+- **Context:** The current `home/index.tsx` hardcodes an "Overview" tab backed by `HomeDashboard` (five fixed widgets). The configurable homepage must determine what happens to this tab.
+- **Question:** Does the master homepage _replace_ the Overview tab, sit alongside it, or is the Overview tab removed and replaced entirely?
+- **Answer:** The "Overview" tab is replaced by the master homepage dashboard. If a user has a dashboard set as "master homepage", that renders as the home page. If no master is set (or master is turned off), the Overview tab does not show. The default system-provided homepage is itself a pre-configured dashboard (same layout as the current Overview tab) which is set as master by default but can be changed.
+
+---
+
+## OQ-CHOME-004: Homepage configuration scope — per-user or per-organisation?
+
+- **Raised:** 2026-06-29
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — 2026-06-29
+- **Context:** Dashboard configuration is currently per-user (dashboards in `report_templates` are created by individual users). The question was whether the master homepage pointer should be per-user, per-role, or per-organisation.
+- **Question:** Is homepage configuration per-user or per-organisation?
+- **Answer:** Per user only.
+
+---
+
+## OQ-CHOME-005: Where should the master homepage pointer be stored?
+
+- **Raised:** 2026-06-29
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — 2026-06-29
+- **Context:** A pointer is needed to record which dashboard is a user's master homepage. Options included a new `homepages` table, a column on `users`, or a `user_preferences` table.
+- **Question:** Which table/column should store the per-user `masterHomepageTemplateId` pointer?
+- **Answer:** Homepages ARE dashboards stored in `report_templates`. No new homepage table is needed. Only a per-user pointer is required: `master_homepage_template_id` on the `users` table (or `user_preferences`). BA includes this in the DB Impact Analysis; final structure deferred to DBA. See REQ-HOME-CFG-DB-F-001.
+
+---
+
+## OQ-CHOME-006: New homepage config page or reuse existing dashboard infrastructure?
+
+- **Raised:** 2026-06-29
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — 2026-06-29
+- **Context:** Creating a homepage could require a purpose-built configuration screen, or the existing `DashboardConfigurePage` / `DashboardCreatePage` infrastructure could be reused.
+- **Question:** Should a new homepage-specific configuration page be built, or should the existing dashboard create/configure pages be reused?
+- **Answer:** Reuse existing dashboard grid and `DashboardConfigurePage`. All existing Overview tab functionality (KPI strip, GWP charts, Recent Records, My Tasks) must be achievable via the dashboard widget model.
+
+---
+
+## OQ-CHOME-007: Can multiple dashboards be the master homepage simultaneously?
+
+- **Raised:** 2026-06-29
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — 2026-06-29
+- **Context:** The `showOnHomepage` flag can be true on multiple dashboards for the same user. The question was whether more than one of those can be the "master" homepage (the one rendered at `/app-home`).
+- **Question:** Can multiple dashboards be simultaneously designated as the user's master homepage?
+- **Answer:** Every dashboard can have `show_on_homepage: true`. One of those can be designated the user's master homepage. Only one master at a time per user.
+
+---
+
+## OQ-CHOME-008: Is homepage configuration multi-tenant?
+
+- **Raised:** 2026-06-29
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — 2026-06-29
+- **Context:** The platform is multi-tenant. The question was whether the master homepage configuration must carry explicit `tenant_id` scoping, or whether user-level scoping is sufficient.
+- **Question:** Does the homepage configuration need explicit multi-tenant scoping (e.g. a `tenant_id` column on a `user_preferences` table)?
+- **Answer:** Per-user (users are already tenant-scoped, so multi-tenant isolation is automatic). No additional `tenant_id` column is needed beyond what already exists on the `users` table.
+
+---
+
+## OQ-CHOME-009: HOME-CFG — Legacy `/api/recent-records-data` Route Disposition
+
+- **Raised:** 2026-06-29
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — SA 2026-06-30
+- **Context:** The existing `RecentActivityWidget` calls `GET /api/recent-records-data` (handled by `DashboardController`). The formalised canonical endpoint for the promoted "Recent Records" core template is `GET /api/recent-records`.
+- **Question:** Should the legacy route be kept as an alias, deprecated with notice, or removed immediately?
+- **Why it matters:** Immediate removal breaks `RecentActivityWidget` before migration is complete. Keeping both routes permanently creates maintenance confusion.
+- **References:** REQ-HOME-CFG-FE-F-008; `backend/nest/src/dashboard/dashboard.controller.ts`
+- **Answer:** Alias + deprecate-with-notice. Add `@Get('recent-records')` to `DashboardController` pointing to the same `dashboardService.getRecentRecords()` handler. Add a `// @deprecated — use GET /api/recent-records` comment to the existing `@Get('recent-records-data')` handler. Formal route removal is deferred to a follow-up migration ticket. No callers are broken in the interim.
+
+---
+
+## OQ-CHOME-010: HOME-CFG — New-User Preference Seed Strategy
+
+- **Raised:** 2026-06-29
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — SA 2026-06-30
+- **Context:** When a user has no `user_homepage_preferences` row for a core template, the UI must decide whether to treat the absence as `show_on_homepage = false` (opt-in) or to rely on a system-default seed row.
+- **Question:** Should the "Default Homepage" Dashboard toggle show as ON for all new users from an absent-row fallback, or only after the seed explicitly creates a preference row?
+- **Why it matters:** Fallback logic creates implicit state invisible to the database. Seed rows are explicit and testable.
+- **References:** REQ-HOME-CFG-FE-F-001; REQ-HOME-CFG-DB-F-002
+- **Answer:** Explicit seed row. At new user creation the system creates an explicit `user_homepage_preferences` row for the "Default Homepage" template with `show_on_homepage = true` and `homepage_page_order = 1`. The UI always reads from the preferences table; there is no fallback. An absent row resolves to `false` via the column default, but the seed prevents new users from silently reaching that state.
+
+---
+
+## OQ-CHOME-011: HOME-CFG — Tenancy Column on `user_homepage_preferences`
+
+- **Raised:** 2026-06-30
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — SA 2026-06-30
+- **Context:** REQ-HOME-CFG-DB-F-002 specifies `tenant_id (FK → organizations.id)` on the new `user_homepage_preferences` table. However OQ-CHOME-008 (resolved at BA stage) already concluded that per-user isolation is sufficient. Additionally, the existing `users`, `report_templates`, and most other entities use `org_code` (varchar) for tenancy — not an integer `tenant_id` FK.
+- **Question:** Should `user_homepage_preferences` use `tenant_id` INT FK (per formal architectural rule §05) or `org_code` varchar (consistent with existing implementation pattern)?
+- **Why it matters:** A mixed `tenant_id`/`orgCode` data model within the same feature creates bridging complexity and confuses future developers.
+- **References:** REQ-HOME-CFG-DB-F-002 AC-DB-002c; OQ-CHOME-008; `backend/nest/src/entities/user.entity.ts`; `backend/nest/src/entities/report-template.entity.ts`
+- **Answer:** Use `org_code` (varchar NOT NULL), matching the existing `users` and `report_templates` patterns. OQ-CHOME-008 established that per-user isolation is sufficient — the `user_id` FK already scopes to a single tenant. REQ-HOME-CFG-DB-F-002 AC-DB-002c must be corrected from `tenant_id has a FK to organizations.id` to `org_code (varchar NOT NULL) stores the authenticated user's orgCode`.
+
+---
+
+## OQ-CHOME-012: HOME-CFG — `getDashboardWidgetData` Requires `userId`/`username` Injection
+
+- **Raised:** 2026-06-30
+- **Feature:** Configurable Homepage (HOME-CFG)
+- **Status:** Resolved — SA 2026-06-30
+- **Context:** `POST /api/dashboards/widgets/data` currently calls `reportingService.getDashboardWidgetData(req.user.orgCode, body.widget, body.filters)`. The proposed `recent-records` widget source requires user-scoped query filtering (matching the existing `DashboardService.getRecentRecords()` signature which takes `orgCode`, `userId`, and `username`).
+- **Question:** Should `reporting.controller.ts` be updated to also pass `req.user.id` and `req.user.username` to the service method?
+- **Why it matters:** Without user identity, the `recent-records` special-case handler in `ReportingService` cannot filter to the authenticated user's recent records. Passing all-org records instead would be a data scope violation.
+- **References:** REQ-HOME-CFG-FE-F-010; `backend/nest/src/reporting/reporting.controller.ts`; `backend/nest/src/dashboard/dashboard.service.ts getRecentRecords()`
+- **Answer:** Yes. `reporting.controller.ts` must pass `req.user.id` and `req.user.username` alongside `req.user.orgCode` to `getDashboardWidgetData`. This is an additive change to an internal method signature with no external API contract impact. `reporting.controller.ts` must be added to the BA Impact Analysis for this feature.

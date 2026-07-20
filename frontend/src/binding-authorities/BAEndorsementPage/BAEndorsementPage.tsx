@@ -899,6 +899,16 @@ export default function BAEndorsementPage() {
                     <option key={item} value={item} />
                 ))}
             </datalist>
+
+            {/* Editable status badge */}
+            {endorsement && (
+                <div className="fixed bottom-20 right-4 z-40">
+                    <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium shadow-sm ${isEditable ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                        <span className={`h-2.5 w-2.5 rounded-full ${isEditable ? 'bg-green-500' : 'bg-amber-400'}`} aria-hidden="true" />
+                        <span>{isEditable ? 'Editable' : 'Read-only'}</span>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

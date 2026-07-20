@@ -118,8 +118,52 @@ Acceptance criteria:
 
 Acceptance criteria:
 - `role: "internal_admin"` → 400
+
+### R09 — Filter bar styled to match Search page
+The search/filter bar MUST match the visual style of the SearchForm component.
+
+Acceptance criteria:
+- Container: `rounded-lg border bg-white shadow-sm`
+- Labels: `block text-sm font-medium text-gray-700`
+- Inputs/selects: `w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500`
+- Fields laid out in a responsive grid
+
+### R10 — Pagination
+The table MUST be paginated, matching the SearchResults pagination style.
+
+Acceptance criteria:
+- "Rows per page" selector with options [25, 50, 100]
+- Page navigation: First, Back, numbered pages, Next, Last buttons
+- Page resets to 1 when filters or sort change
+- Summary line shows "X–Y of Z accounts"
+
+### R11 — New Account button in header
+The page header MUST contain a "+ New Account" button that navigates to `/settings/account/new`.
+
+Acceptance criteria:
+- Button renders in the header row beside the page title
+- Styled like the "New Quote" button in QuotesListPage (brand coloured, rounded)
+- Clicking navigates to `/settings/account/new`
+
+### R12 — Sidebar section: Account Administration
+The page MUST register a sidebar section titled "Account Administration" with a "New Account" action.
+
+Acceptance criteria:
+- `useSidebarSection` called with `{ title: 'Account Administration', items: [{ label: 'New Account', icon: FiPlus, event: 'settings:account:new' }] }`
+- Page listens for `'settings:account:new'` custom event and navigates to `/settings/account/new`
 - `role: "superuser"` → 400
 - Empty body (no `role` and no `isActive`) → 400
+
+### R09 — Filter bar style matches Search page
+The filter bar MUST use the same visual style as the global Search page (`SearchForm`).
+
+Acceptance criteria:
+- Container: `rounded-lg border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-4`
+- Labels: `block text-sm font-medium text-gray-700 mb-1` (not xs/gray-600)
+- Inputs and selects: `w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500`
+- Filter fields rendered in a responsive grid: `grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4`
+- Count and Clear button appear below the grid row
+- Existing filter functionality (name, email, org, role, status) is unchanged
 
 ---
 

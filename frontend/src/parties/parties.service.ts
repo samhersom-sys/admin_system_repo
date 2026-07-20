@@ -157,7 +157,7 @@ export async function getPartyAudit(partyId: string | number): Promise<AuditEven
 /** F-038 — Post an audit event for a party. */
 export async function postPartyAudit(
     partyId: string | number,
-    event: { action: string; entityType: string; entityId: number; performedBy?: string }
+    event: { action: string; entityType: string; entityId: number; performedBy?: string; details?: Record<string, unknown> }
 ): Promise<void> {
     return post<void>(`/api/parties/${partyId}/audit`, event)
 }

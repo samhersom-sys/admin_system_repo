@@ -390,7 +390,7 @@ describe('T-SUB-VIEW-R08: creator fields displayed as read-only — no inputs', 
     it('displays createdDate on screen', async () => {
         renderPage()
         await waitFor(() => {
-            expect(screen.getByText(/2026-03-10/)).toBeInTheDocument()
+            expect(screen.getByText(/10\/03\/2026/)).toBeInTheDocument()
         })
     })
 

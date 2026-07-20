@@ -9,16 +9,29 @@
 
 import { post, get, put, del } from '@/shared/lib/api-client/api-client'
 
+type LookupOption = string | { code?: string | null; name?: string | null; label?: string | null; value?: string | null }
+
+function normaliseLookupValues(items: LookupOption[] | null | undefined): string[] {
+    return (items ?? [])
+        .map((item) => {
+            if (typeof item === 'string') return item
+            return item.name ?? item.label ?? item.code ?? item.value ?? ''
+        })
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type QuoteStatus = 'Draft' | 'Quoted' | 'Bound' | 'Declined'
+export type QuoteStatus = 'Draft' | 'Created' | 'Quoted' | 'Bound' | 'Declined'
 
 export interface Quote {
     id: number
     reference: string
     submission_id?: number | null
+    product_id?: number | null
     insured: string
     insured_id?: string | null
     status: QuoteStatus
@@ -53,6 +66,7 @@ export interface CreateQuoteInput {
     insured: string
     insured_id?: number
     submission_id?: number | null
+    product_id?: number | null
     business_type?: string
     inception_date?: string
     expiry_date?: string
@@ -117,7 +131,7 @@ export function defaultQuoteExpiry(inceptionDate: string): string {
  * Per REQ-QUO-FE-F-018: only Draft quotes are editable.
  */
 export function isQuoteEditable(status: QuoteStatus): boolean {
-    return status === 'Draft'
+    return status === 'Draft' || status === 'Created'
 }
 
 // ---------------------------------------------------------------------------
@@ -153,9 +167,11 @@ export async function markQuoteAsQuoted(id: number): Promise<Quote> {
     return post<Quote>(`/api/quotes/${id}/quote`, {})
 }
 
-/** Transition a Quoted quote to Bound status. */
-export async function bindQuote(id: number): Promise<Quote> {
-    return post<Quote>(`/api/quotes/${id}/bind`, {})
+/** Transition a Quoted quote to Bound status.
+ * @param declineSiblings - When true (default), other Created/Quoted quotes on the same submission are auto-declined.
+ */
+export async function bindQuote(id: number, declineSiblings: boolean = true): Promise<Quote> {
+    return post<Quote>(`/api/quotes/${id}/bind`, { declineSiblings })
 }
 
 /** Transition a quote to Declined status. */
@@ -204,11 +220,33 @@ export interface QuoteSection {
     premium_currency: string | null
     gross_premium: number | null
     gross_gross_premium: number | null
+    gross_deductions?: number | null
     deductions: number | null
     net_premium: number | null
     tax_receivable: number | null
+    tax_payable?: number | null
+    gross_gross_premium_written?: number | null
+    gross_gross_premium_signed?: number | null
+    gross_deductions_written?: number | null
+    gross_deductions_signed?: number | null
+    gross_premium_written?: number | null
+    gross_premium_signed?: number | null
+    deductions_written?: number | null
+    deductions_signed?: number | null
+    net_premium_written?: number | null
+    net_premium_signed?: number | null
+    tax_receivable_written?: number | null
+    tax_receivable_signed?: number | null
+    tax_payable_written?: number | null
+    tax_payable_signed?: number | null
     annual_gross_premium: number | null
     annual_net_premium: number | null
+    limit_amount_movement?: number | null
+    excess_amount_movement?: number | null
+    sum_insured_amount_movement?: number | null
+    gross_premium_movement?: number | null
+    annual_gross_premium_movement?: number | null
+    annual_net_premium_movement?: number | null
     written_order: number | null
     signed_order: number | null
     // Gap-fill fields from migrations 102–104 (REQ-QUO-FE-F-074)
@@ -242,7 +280,24 @@ export interface QuoteSectionPatch {
     sum_insured_amount?: number | null
     premium_currency?: string
     gross_premium?: number | null
+    gross_deductions?: number | null
+    net_premium?: number | null
     tax_receivable?: number | null
+    tax_payable?: number | null
+    gross_gross_premium_written?: number | null
+    gross_gross_premium_signed?: number | null
+    gross_deductions_written?: number | null
+    gross_deductions_signed?: number | null
+    gross_premium_written?: number | null
+    gross_premium_signed?: number | null
+    deductions_written?: number | null
+    deductions_signed?: number | null
+    net_premium_written?: number | null
+    net_premium_signed?: number | null
+    tax_receivable_written?: number | null
+    tax_receivable_signed?: number | null
+    tax_payable_written?: number | null
+    tax_payable_signed?: number | null
     annual_gross_premium?: number | null
     annual_net_premium?: number | null
     written_order?: number | null
@@ -303,6 +358,39 @@ export interface Coverage {
     annual_net_premium: number | null
     limit_currency: string | null
     limit_amount: number | null
+    sum_insured_currency?: string | null
+    sum_insured?: number | null
+    gross_premium?: number | null
+    net_premium?: number | null
+}
+
+export interface CoverageDetail {
+    id: number
+    quote_id: number
+    section_id: number
+    coverage_id: number
+    reference: string | null
+    coverage_detail_type_id?: number | null
+    coverage_detail_sub_type_id?: number | null
+    effective_date?: string | null
+    effective_time?: string | null
+    expiry_date?: string | null
+    expiry_time?: string | null
+    sum_insured_currency?: string | null
+    sum_insured?: number | null
+    payload?: Record<string, unknown> | null
+}
+
+export interface CreateCoverageDetailInput {
+    coverage_detail_type_id?: number | null
+    coverage_detail_sub_type_id?: number | null
+    effective_date?: string | null
+    effective_time?: string | null
+    expiry_date?: string | null
+    expiry_time?: string | null
+    sum_insured_currency?: string | null
+    sum_insured?: number | null
+    payload?: Record<string, unknown>
 }
 
 export interface CreateCoverageInput {
@@ -325,6 +413,38 @@ export async function createCoverage(quoteId: number, sectionId: number, input: 
 
 export async function deleteCoverage(quoteId: number, sectionId: number, coverageId: number): Promise<void> {
     return del<void>(`/api/quotes/${quoteId}/sections/${sectionId}/coverages/${coverageId}`)
+}
+
+export async function listCoverageDetails(quoteId: number, sectionId: number, coverageId: number): Promise<CoverageDetail[]> {
+    return get<CoverageDetail[]>(`/api/quotes/${quoteId}/sections/${sectionId}/coverages/${coverageId}/details`)
+}
+
+export async function createCoverageDetail(
+    quoteId: number,
+    sectionId: number,
+    coverageId: number,
+    input: CreateCoverageDetailInput,
+): Promise<CoverageDetail> {
+    return post<CoverageDetail>(`/api/quotes/${quoteId}/sections/${sectionId}/coverages/${coverageId}/details`, input)
+}
+
+export async function updateCoverageDetail(
+    quoteId: number,
+    sectionId: number,
+    coverageId: number,
+    detailId: number,
+    patch: CreateCoverageDetailInput,
+): Promise<CoverageDetail> {
+    return put<CoverageDetail>(`/api/quotes/${quoteId}/sections/${sectionId}/coverages/${coverageId}/details/${detailId}`, patch)
+}
+
+export async function deleteCoverageDetail(
+    quoteId: number,
+    sectionId: number,
+    coverageId: number,
+    detailId: number,
+): Promise<void> {
+    return del<void>(`/api/quotes/${quoteId}/sections/${sectionId}/coverages/${coverageId}/details/${detailId}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -355,23 +475,33 @@ export async function saveParticipations(sectionId: number, participations: Omit
 // ---------------------------------------------------------------------------
 
 export async function getContractTypes(): Promise<string[]> {
-    return get<string[]>('/api/lookups/contractTypes')
+    const rows = await get<LookupOption[]>('/api/lookups/contractTypes')
+    return normaliseLookupValues(rows)
 }
 
 export async function getMethodsOfPlacement(): Promise<string[]> {
-    return get<string[]>('/api/lookups/methodsOfPlacement')
+    const rows = await get<LookupOption[]>('/api/lookups/methodsOfPlacement')
+    return normaliseLookupValues(rows)
 }
 
 export async function getRenewalStatuses(): Promise<string[]> {
-    return get<string[]>('/api/lookups/renewalStatuses')
+    const rows = await get<LookupOption[]>('/api/lookups/renewalStatuses')
+    return normaliseLookupValues(rows)
 }
 
 export async function getCurrencies(): Promise<string[]> {
-    return get<string[]>('/api/lookups/currencies')
+    const rows = await get<LookupOption[]>('/api/lookups/currencies')
+    return normaliseLookupValues(rows)
 }
 
 export async function getClassesOfBusiness(): Promise<string[]> {
-    return get<string[]>('/api/lookups/classesOfBusiness')
+    const rows = await get<LookupOption[]>('/api/lookups/classesOfBusiness')
+    return normaliseLookupValues(rows)
+}
+
+export async function getLossQualifiers(): Promise<string[]> {
+    const rows = await get<LookupOption[]>('/api/lookups/lossQualifiers')
+    return normaliseLookupValues(rows)
 }
 
 export async function getRiskCodes(): Promise<string[]> {

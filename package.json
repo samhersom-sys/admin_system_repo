@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "kill:ports": "node developertools/kill-ports.js",
-    "dev:local": "npm run kill:ports && concurrently --kill-others --names \"BE,FE,WEB\" --prefix-colors \"cyan,green,magenta\" \"npm run start:dev --prefix backend/nest\" \"npm run dev --prefix frontend\" \"npm run dev --prefix website\"",
+    "dev:app": "npm run kill:ports && concurrently --names \"BE,FE\" --prefix-colors \"cyan,green\" \"npm run start:dev --prefix backend/nest\" \"npm run dev --prefix frontend\"",
+    "dev:local": "npm run kill:ports && concurrently --kill-others-on-fail --names \"BE,FE,WEB\" --prefix-colors \"cyan,green,magenta\" \"npm run start:dev --prefix backend/nest\" \"npm run dev --prefix frontend\" \"npm run dev --prefix website\"",
     "dev:local:clean": "npm run kill:ports && npm run build:backend && concurrently --kill-others --names \"BE,FE,WEB\" --prefix-colors \"cyan,green,magenta\" \"node backend/nest/dist/main.js\" \"npm run dev --prefix frontend\" \"npm run dev --prefix website\"",
     "build:backend": "npm run build --prefix backend/nest",
     "backend": "node backend/nest/dist/main.js",
@@ -18,7 +19,7 @@
     "test:e2e:ui": "npx playwright test --ui",
     "dev:local:fresh": "npm run db:setup && npm run dev:local",
     "db:sync": "node backend/nest/node_modules/ts-node/dist/bin.js --project backend/nest/tsconfig.json backend/nest/src/database/db-sync.ts",
-    "db:seed": "node db/seeds/001-users.js && node db/seeds/002-parties.js && node db/seeds/003-submissions.js && node db/seeds/004-lookup-submission-statuses.js && node db/seeds/005-lookup-quote-statuses.js && node db/seeds/006-lookup-policy-statuses.js && node db/seeds/007-lookup-ba-statuses.js && node db/seeds/008-lookup-contract-types.js && node db/seeds/009-lookup-methods-of-placement.js && node db/seeds/010-lookup-renewal-statuses.js && node db/seeds/011-lookup-loss-qualifiers.js && node db/seeds/012-lookup-claim-statuses.js && node db/seeds/013-lookup-classes-of-business.js && node db/seeds/014-lookup-basis-for-order.js && node db/seeds/015-lookup-analysis-basis.js && node db/seeds/016-lookup-date-basis.js && node db/seeds/017-lookup-workflow-statuses.js && node db/seeds/018-lookup-party-roles.js && node db/seeds/019-lookup-currencies.js && node db/seeds/020-lookup-coverages.js && node db/seeds/021-notification-messages.js && node db/seeds/022-notification-templates.js && node db/seeds/023-system-error-catalog.js && node db/seeds/024-quotes.js && node db/seeds/025-policies.js && node db/seeds/026-binding-authorities.js && node db/seeds/027-quote-sections.js && node db/seeds/028-policy-sections.js && node db/seeds/029-quote-section-coverages.js && node db/seeds/030-policy-section-coverages.js && node db/seeds/031-binding-authority-transactions.js && node db/seeds/032-measure-definitions.js",
+    "db:seed": "node db/seeds/001-users.js && node db/seeds/002-parties.js && node db/seeds/003-submissions.js && node db/seeds/004-lookup-submission-statuses.js && node db/seeds/005-lookup-quote-statuses.js && node db/seeds/006-lookup-policy-statuses.js && node db/seeds/007-lookup-ba-statuses.js && node db/seeds/008-lookup-contract-types.js && node db/seeds/009-lookup-methods-of-placement.js && node db/seeds/010-lookup-renewal-statuses.js && node db/seeds/011-lookup-loss-qualifiers.js && node db/seeds/012-lookup-claim-statuses.js && node db/seeds/013-lookup-classes-of-business.js && node db/seeds/014-lookup-basis-for-order.js && node db/seeds/015-lookup-analysis-basis.js && node db/seeds/016-lookup-date-basis.js && node db/seeds/017-lookup-workflow-statuses.js && node db/seeds/018-lookup-party-roles.js && node db/seeds/019-lookup-currencies.js && node db/seeds/020-lookup-coverages.js && node db/seeds/033-lookup-policy-version-statuses.js && node db/seeds/021-notification-messages.js && node db/seeds/022-notification-templates.js && node db/seeds/023-system-error-catalog.js && node db/seeds/024-quotes.js && node db/seeds/025-policies.js && node db/seeds/026-binding-authorities.js && node db/seeds/027-quote-sections.js && node db/seeds/028-policy-sections.js && node db/seeds/029-quote-section-coverages.js && node db/seeds/030-policy-section-coverages.js && node db/seeds/031-binding-authority-transactions.js && node db/seeds/032-measure-definitions.js && node db/seeds/034-organisation-hierarchy-demo.js",
     "db:setup": "npm run db:sync && npm run db:seed",
     "db:reset": "node db/seeds/000-truncate.js && npm run db:seed"
   },
@@ -26,6 +27,7 @@
     "@playwright/test": "^1.58.2",
     "bcryptjs": "^3.0.3",
     "concurrently": "^9.2.1",
+    "exceljs": "^4.4.0",
     "jest": "^29.7.0",
     "pg": "^8.20.0",
     "supertest": "^7.2.2",

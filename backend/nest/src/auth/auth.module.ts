@@ -7,10 +7,11 @@ import { JwtStrategy } from './jwt.strategy'
 import { RolesGuard } from './roles.guard'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { User } from '../entities/user.entity'
+import { Organisation } from '../entities/organisation.entity'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Organisation]),
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',

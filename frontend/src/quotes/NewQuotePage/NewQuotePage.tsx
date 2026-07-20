@@ -10,13 +10,15 @@
  *  - Sidebar Save action fires 'submission:save' DOM event
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FiSave, FiTrash2 } from 'react-icons/fi'
 import { getSession } from '@/shared/lib/auth-session/auth-session'
 import { createQuote, defaultQuoteExpiry } from '@/quotes/quotes.service'
 import { getSubmission } from '@/submissions/submissions.service'
 import type { Submission } from '@/submissions/submissions.service'
+import { getProducts } from '@/settings/settings.service'
+import type { Product } from '@/settings/settings.service'
 import InsuredSearch from '@/parties/InsuredSearch/InsuredSearch'
 import type { Party } from '@/parties/parties.service'
 import SubmissionSearch from '@/submissions/SubmissionSearch/SubmissionSearch'
@@ -60,10 +62,31 @@ export default function NewQuotePage() {
     const [inceptionDate, setInceptionDate] = useState('')
     const [expiryDate, setExpiryDate] = useState('')
     const [quoteCurrency, setQuoteCurrency] = useState('USD')
+    const [productId, setProductId] = useState<number | null>(null)
+    const [productCategory, setProductCategory] = useState('')
+    const [products, setProducts] = useState<Product[]>([])
     const [saveError, setSaveError] = useState<string | null>(null)
     const [isSaving, setIsSaving] = useState(false)
 
     useSidebarSection(SIDEBAR_SECTION)
+
+    // Load available products
+    useEffect(() => {
+        getProducts()
+            .then((prods) => setProducts(prods))
+            .catch((err: unknown) => {
+                console.warn('Failed to load products:', err instanceof Error ? err.message : String(err))
+            })
+    }, [])
+
+    const productCategories = useMemo(
+        () => [...new Set(products.map((product) => product.product_type).filter(Boolean))].sort(),
+        [products],
+    )
+    const filteredProducts = useMemo(
+        () => (productCategory ? products.filter((product) => product.product_type === productCategory) : products),
+        [products, productCategory],
+    )
 
     useEffect(() => {
         if (!linkedSubmissionId || insuredParty) return
@@ -130,6 +153,7 @@ export default function NewQuotePage() {
                 inception_date: inceptionDate,
                 expiry_date: expiryDate || undefined,
                 quote_currency: quoteCurrency,
+                product_id: productId || undefined,
                 created_by: createdBy,
             })
             navigate(`/quotes/${created.id}`)
@@ -140,7 +164,7 @@ export default function NewQuotePage() {
         } finally {
             setIsSaving(false)
         }
-    }, [insuredParty, inceptionDate, expiryDate, businessType, quoteCurrency, linkedSubmission, linkedSubmissionId, createdBy, navigate, addNotification])
+    }, [insuredParty, inceptionDate, expiryDate, businessType, quoteCurrency, productId, linkedSubmission, linkedSubmissionId, createdBy, navigate, addNotification])
 
     // Attach DOM event listener for sidebar Save
     useEffect(() => {
@@ -243,6 +267,60 @@ export default function NewQuotePage() {
                     {insuredError && (
                         <p className="text-sm text-red-600">{insuredError}</p>
                     )}
+                </div>
+            </Card>
+
+            {/* Product Selection */}
+            <Card>
+                <div className="p-4 flex flex-col gap-3">
+                    <h2 className="text-sm font-semibold text-gray-700">Product</h2>
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        <div>
+                            <label htmlFor="product-category" className="block text-sm font-medium text-gray-700 mb-1">
+                                Product Category
+                            </label>
+                            <select
+                                id="product-category"
+                                aria-label="Product Category"
+                                value={productCategory}
+                                onChange={(e) => {
+                                    const nextCategory = e.target.value
+                                    setProductCategory(nextCategory)
+                                    setProductId(null)
+                                }}
+                                className="block w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                                <option value="">— Select —</option>
+                                {productCategories.map((category) => (
+                                    <option key={category} value={category}>{category}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor="product-id" className="block text-sm font-medium text-gray-700 mb-1">
+                                Product
+                            </label>
+                            <select
+                                id="product-id"
+                                aria-label="Product"
+                                value={productId || ''}
+                                onChange={(e) => {
+                                    const nextProductId = e.target.value ? Number(e.target.value) : null
+                                    setProductId(nextProductId)
+                                    const nextProduct = filteredProducts.find((product) => product.id === nextProductId)
+                                    if (nextProduct) setProductCategory(nextProduct.product_type)
+                                }}
+                                className="block w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                                <option value="">— Select —</option>
+                                {filteredProducts.map((prod) => (
+                                    <option key={prod.id} value={prod.id}>
+                                        {prod.name}{prod.code ? ` (${prod.code})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </Card>
 

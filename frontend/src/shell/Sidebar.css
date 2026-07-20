@@ -236,6 +236,23 @@
   white-space: nowrap;
 }
 
+/* Inline section title rendered as a heading item in the domain sub-list */
+.sidebar-context-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 4px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sidebar-muted);
+  white-space: nowrap;
+  cursor: default;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 2px;
+}
+
 /* ── Workspace panel ─────────────────────────────────────────────────────── */
 .workspace-panel {
   width: 240px;

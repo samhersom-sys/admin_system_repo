@@ -10,6 +10,7 @@ import {
     getFieldMappings,
     getDashboard,
     updateDashboard,
+    getDashboardWidgetData,
     type DashboardPage,
     type DashboardSection,
     type DashboardWidget,
@@ -40,6 +41,8 @@ const DATA_SOURCES = [
     { key: 'bindingAuthorities', label: 'Binding Authorities' },
     { key: 'parties', label: 'Parties' },
     { key: 'claims', label: 'Claims' },
+    { key: 'recent-records', label: 'Recent Records' },
+    { key: 'tasks', label: 'My Tasks' },
 ]
 
 const WIDGET_TYPES: Array<{ value: DashboardWidgetType, label: string }> = [
@@ -104,7 +107,8 @@ function toggleSelection(values: string[], nextValue: string) {
 }
 
 export default function DashboardConfigurePage() {
-    const { id } = useParams<{ id: string }>()
+    const { id, dashboardId } = useParams<{ id: string; dashboardId: string }>()
+    const resolvedId = id ?? dashboardId
     const { addNotification } = useNotifications()
 
     const [loading, setLoading] = useState(true)
@@ -117,6 +121,8 @@ export default function DashboardConfigurePage() {
     const [editor, setEditor] = useState<WidgetEditorState | null>(null)
     const [draftWidget, setDraftWidget] = useState<DashboardWidget | null>(null)
     const [fieldMappings, setFieldMappings] = useState<Record<string, FieldMapping[]>>({})
+    const [previewDataSource, setPreviewDataSource] = useState<string>('')
+    const [previewLoading, setPreviewLoading] = useState(false)
     const liveFilters = useMemo(() => createDefaultDashboardFilters(), [])
 
     const sidebarSection = useMemo<SidebarSection>(() => ({
@@ -144,19 +150,20 @@ export default function DashboardConfigurePage() {
     }, [])
 
     useEffect(() => {
-        if (!id) return
+        if (!resolvedId) return
         setLoading(true)
-        getDashboard(parseInt(id, 10))
+        getDashboard(parseInt(resolvedId, 10))
             .then((dashboard) => {
+                const cfg = (dashboard as any).dashboardConfig ?? (dashboard as any).config
                 setDashboardName(dashboard.name)
                 setDescription(dashboard.description ?? '')
-                setShowMetadata(dashboard.dashboardConfig.showMetadata)
-                setPages(dashboard.dashboardConfig.pages)
-                setCurrentPageId(dashboard.dashboardConfig.pages[0]?.id ?? 1)
+                setShowMetadata(cfg?.showMetadata ?? true)
+                setPages(cfg?.pages ?? [])
+                setCurrentPageId(cfg?.pages?.[0]?.id ?? 1)
             })
             .catch(() => addNotification('Could not load dashboard configuration.', 'error'))
             .finally(() => setLoading(false))
-    }, [id, addNotification])
+    }, [resolvedId, addNotification])
 
     const currentPage = useMemo(
         () => pages.find((page) => page.id === currentPageId) ?? pages[0] ?? null,
@@ -296,10 +303,10 @@ export default function DashboardConfigurePage() {
     }
 
     async function handleSave() {
-        if (!id) return
+        if (!resolvedId) return
         try {
             setSaving(true)
-            await updateDashboard(parseInt(id, 10), {
+            await updateDashboard(parseInt(resolvedId, 10), {
                 name: dashboardName,
                 description,
                 config: {
@@ -487,6 +494,34 @@ export default function DashboardConfigurePage() {
                                     >
                                         {WIDGET_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
                                     </select>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-sm font-medium text-gray-700" htmlFor="widget-data-source">Data Source</label>
+                                    <select
+                                        id="widget-data-source"
+                                        aria-label="Data Source"
+                                        value={previewDataSource}
+                                        onChange={(e) => {
+                                            const newSource = e.target.value
+                                            setPreviewDataSource(newSource)
+                                            if (newSource) {
+                                                setPreviewLoading(true)
+                                                const previewWidget = { ...draftWidget, source: newSource }
+                                                getDashboardWidgetData(previewWidget, liveFilters)
+                                                    .finally(() => setPreviewLoading(false))
+                                            }
+                                        }}
+                                        className="border border-gray-300 rounded px-3 py-2 text-sm"
+                                    >
+                                        <option value="">Select a data source...</option>
+                                        {DATA_SOURCES.map((ds) => <option key={ds.key} value={ds.key}>{ds.label}</option>)}
+                                    </select>
+                                    {previewLoading && (
+                                        <div data-testid="preview-loading" className="flex items-center gap-2 text-sm text-gray-500">
+                                            <span className="animate-spin inline-block w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full" />
+                                            Loading preview...
+                                        </div>
+                                    )}
                                 </div>
                                 {draftWidget.type === 'text' ? (
                                     <div className="flex flex-col gap-1">

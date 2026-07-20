@@ -21,7 +21,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { FiEdit2, FiFileText, FiEdit, FiClock, FiSearch } from 'react-icons/fi'
+import { FiEdit2, FiFileText, FiEdit, FiClock, FiSearch, FiMapPin } from 'react-icons/fi'
 import {
     getPolicy,
     getPolicySections,
@@ -35,6 +35,7 @@ import { useSidebarSection } from '@/shell/SidebarContext'
 import type { SidebarSection } from '@/shell/SidebarContext'
 import { useNotifications } from '@/shell/NotificationDock'
 import { getSession } from '@/shared/lib/auth-session/auth-session'
+import { get as apiGet } from '@/shared/lib/api-client/api-client'
 import BrokerSearch from '@/parties/BrokerSearch/BrokerSearch'
 import AuditTable from '@/shared/components/AuditTable/AuditTable'
 import Card from '@/shared/Card/Card'
@@ -64,6 +65,7 @@ const TABS: TabItem[] = [
     { key: 'financial-summary', label: 'Financial Summary' },
     { key: 'invoices', label: 'Invoices' },
     { key: 'transactions', label: 'Transactions' },
+    { key: 'finance-earning', label: 'Finance Summary' },
     { key: 'audit', label: 'Audit' },
 ]
 
@@ -91,15 +93,6 @@ const SECTION_COLUMNS: Column[] = [
     { key: 'tax_receivable', label: 'Tax Receivable', sortable: true, defaultWidth: 140 },
     { key: 'annual_gross_premium', label: 'Annual Rated GP', sortable: true, defaultWidth: 180 },
     { key: 'annual_net_premium', label: 'Annual Rated NP', sortable: true, defaultWidth: 180 },
-    { key: 'written_order', label: 'Written Order %', sortable: true, defaultWidth: 130 },
-    { key: 'signed_order', label: 'Signed Order %', sortable: true, defaultWidth: 130 },
-    { key: 'time_basis', label: 'Time Basis', sortable: true, defaultWidth: 140 },
-    { key: 'written_order_basis', label: 'Written Order Basis', sortable: true, defaultWidth: 170 },
-    { key: 'signed_order_basis', label: 'Signed Order Basis', sortable: true, defaultWidth: 170 },
-    { key: 'written_line_total', label: 'Written Line Total', sortable: true, defaultWidth: 160 },
-    { key: 'signed_line_total', label: 'Signed Line Total', sortable: true, defaultWidth: 160 },
-    { key: 'delegated_authority_ref', label: 'DA Ref', sortable: true, defaultWidth: 130 },
-    { key: 'delegated_authority_section_ref', label: 'DA Section Ref', sortable: true, defaultWidth: 160 },
 ]
 
 const INVOICE_COLUMNS: Column[] = [
@@ -120,17 +113,6 @@ const TRANSACTION_COLUMNS: Column[] = [
     { key: 'description', label: 'Description', sortable: false, defaultWidth: 200 },
     { key: '_actions', label: '', sortable: false, defaultWidth: 90 },
 ]
-
-// Module-level constant — required by useSidebarSection stable-ref rule (Guideline 14)
-const SIDEBAR_SECTION: SidebarSection = {
-    title: 'Policy',
-    items: [
-        { label: 'Edit', icon: FiEdit2, event: 'policy:edit' },
-        { label: 'Generate Document', icon: FiFileText, event: 'policy:generate-document' },
-        { label: 'Endorse Policy', icon: FiEdit, event: 'policy:endorse' },
-        { label: 'Audit', icon: FiClock, event: 'policy:audit' },
-    ],
-}
 
 // ---------------------------------------------------------------------------
 // Page
@@ -170,8 +152,25 @@ export default function PolicyViewPage() {
     // Broker tab
     const [placingBrokerName, setPlacingBrokerName] = useState('')
 
+    // Finance Summary (earning) tab
+    const [earningPeriods, setEarningPeriods] = useState<{ periodYear: number; periodMonth: number; earnedAmount: string; unearnedAmount: string }[]>([])
+    const [earningLoaded, setEarningLoaded] = useState(false)
+
     // Register sidebar section (F-005)
-    useSidebarSection(SIDEBAR_SECTION)
+    const sidebarSection = useMemo((): SidebarSection => {
+        const idSegment = id ?? ''
+        return {
+            title: 'Policy',
+            items: [
+                { label: 'Edit', icon: FiEdit2, event: 'policy:edit' },
+                { label: 'Generate Document', icon: FiFileText, event: 'policy:generate-document' },
+                { label: 'Endorse Policy', icon: FiEdit, event: 'policy:endorse' },
+                { label: 'Schedule of Values', icon: FiMapPin, to: `/policies/${idSegment}/locations` },
+                { label: 'Audit', icon: FiClock, event: 'policy:audit' },
+            ],
+        }
+    }, [id])
+    useSidebarSection(sidebarSection)
 
     // Load policy on mount
     useEffect(() => {
@@ -259,6 +258,21 @@ export default function PolicyViewPage() {
     function handleTabChange(key: string) {
         setActiveTab(key)
 
+        if (key === 'finance-earning' && !earningLoaded) {
+            setEarningLoaded(true)
+            const currentSections = sections
+            Promise.all(
+                currentSections.map((s) =>
+                    apiGet<{ earnedAmount: string; unearnedAmount: string }[]>(
+                        `/api/earning-engine/sections/${s.id}/periods`,
+                    ).catch(() => [] as { periodYear: number; periodMonth: number; earnedAmount: string; unearnedAmount: string }[]),
+                ),
+            ).then((results) => {
+                const all = results.flat()
+                setEarningPeriods(all)
+            })
+        }
+
         // Audit tab displays latest history
         if (key === 'audit') {
             getPolicyAudit(Number(id!))
@@ -297,11 +311,14 @@ export default function PolicyViewPage() {
     useEffect(() => {
         const onEdit = () => handleEdit()
         const onEndorse = () => handleEndorse()
+        const onAudit = () => setActiveTab('audit')
         window.addEventListener('policy:edit', onEdit)
         window.addEventListener('policy:endorse', onEndorse)
+        window.addEventListener('policy:audit', onAudit)
         return () => {
             window.removeEventListener('policy:edit', onEdit)
             window.removeEventListener('policy:endorse', onEndorse)
+            window.removeEventListener('policy:audit', onAudit)
         }
     }, [handleEdit, handleEndorse])
 
@@ -495,8 +512,13 @@ export default function PolicyViewPage() {
         return val != null ? String(val) : '—'
     }
 
+    const policyProduct = (() => {
+        const payload = (policy.payload ?? {}) as Record<string, unknown>
+        return (payload.product as Record<string, unknown> | undefined) ?? null
+    })()
+
     return (
-        <div className="p-6 flex flex-col gap-6">
+        <div className="p-6 flex flex-col gap-4">
             {/* Header — F-004 */}
             <Card>
                 <div className="flex items-center justify-between mb-4">
@@ -511,10 +533,10 @@ export default function PolicyViewPage() {
                     </span>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <div className="flex flex-col gap-3">
                         <FieldGroup title="Contract & Reference">
-                            <div className="flex flex-col gap-3 text-sm">
+                            <div className="flex flex-col gap-2 text-sm">
                                 <div>
                                     <p className="text-xs text-gray-500 mb-0.5">Class of Business</p>
                                     <p className="text-sm text-gray-900">{readPolicy('class_of_business', 'classOfBusiness')}</p>
@@ -538,14 +560,27 @@ export default function PolicyViewPage() {
                             </div>
                         </FieldGroup>
 
+                        <FieldGroup title="Product">
+                            <div className="flex flex-col gap-2 text-sm">
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Product Category</p>
+                                    <p className="text-sm text-gray-900">{typeof policyProduct?.category === 'string' && policyProduct.category ? policyProduct.category : '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 mb-0.5">Product</p>
+                                    <p className="text-sm text-gray-900">{typeof policyProduct?.name === 'string' && policyProduct.name ? policyProduct.name : '—'}</p>
+                                </div>
+                            </div>
+                        </FieldGroup>
+
                         <FieldGroup title="Insured">
                             <p className="text-sm text-gray-900">{policy.insured ?? '—'}</p>
                         </FieldGroup>
                     </div>
 
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3">
                         <FieldGroup title="Dates">
-                            <div className="flex flex-col gap-3 text-sm">
+                            <div className="flex flex-col gap-2 text-sm">
                                 <div>
                                     <p className="text-xs text-gray-500 mb-0.5">Inception Date</p>
                                     <p className="text-sm text-gray-900">{readPolicy('inception_date', 'inceptionDate')}</p>
@@ -576,7 +611,7 @@ export default function PolicyViewPage() {
                         </FieldGroup>
 
                         <FieldGroup title="Contract / Placement">
-                            <div className="flex flex-col gap-3 text-sm">
+                            <div className="flex flex-col gap-2 text-sm">
                                 <div>
                                     <p className="text-xs text-gray-500 mb-0.5">Contract Type</p>
                                     <p className="text-sm text-gray-900">{readPolicy('contract_type', 'contractType')}</p>
@@ -593,7 +628,7 @@ export default function PolicyViewPage() {
                         </FieldGroup>
 
                         <FieldGroup title="Renewal">
-                            <div className="flex flex-col gap-3 text-sm">
+                            <div className="flex flex-col gap-2 text-sm">
                                 <div>
                                     <p className="text-xs text-gray-500 mb-0.5">Renewable</p>
                                     <p className="text-sm text-gray-900">{readPolicy('renewable_indicator', 'renewable')}</p>
@@ -739,10 +774,70 @@ export default function PolicyViewPage() {
                 </Card>
             )}
 
+            {activeTab === 'finance-earning' && (
+                <Card title="Finance Summary">
+                    {earningPeriods.length === 0 ? (
+                        <p className="text-sm text-gray-400">
+                            No earning data available. Run the earning engine to generate figures.
+                        </p>
+                    ) : (() => {
+                        // Group by calendar period across all sections — REQ-EARN-F-016
+                        const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                        const periodMap = new Map<string, { earned: number; unearned: number }>()
+                        earningPeriods.forEach(p => {
+                            const key = `${p.periodYear}-${String(p.periodMonth).padStart(2, '0')}`
+                            const existing = periodMap.get(key) ?? { earned: 0, unearned: 0 }
+                            periodMap.set(key, {
+                                earned: existing.earned + parseFloat(p.earnedAmount),
+                                unearned: existing.unearned + parseFloat(p.unearnedAmount),
+                            })
+                        })
+                        const rows = Array.from(periodMap.entries())
+                            .sort(([a], [b]) => a.localeCompare(b))
+                            .map(([key, { earned, unearned }]) => {
+                                const [yr, mo] = key.split('-')
+                                return { label: `${MONTH_NAMES[parseInt(mo, 10) - 1]} ${yr}`, earned, unearned }
+                            })
+                        return (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 border-b border-gray-200">
+                                            <th className="px-4 py-3 font-medium text-gray-600">Period</th>
+                                            <th className="px-4 py-3 font-medium text-gray-600 text-right">GWP Earn</th>
+                                            <th className="px-4 py-3 font-medium text-gray-600 text-right">Unearned</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {rows.map(r => (
+                                            <tr key={r.label} className="border-b border-gray-100 hover:bg-gray-50">
+                                                <td className="px-4 py-2">{r.label}</td>
+                                                <td className="px-4 py-2 text-right font-mono">{r.earned.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
+                                                <td className="px-4 py-2 text-right font-mono">{r.unearned.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
+                    })()}
+                </Card>
+            )}
+
             {activeTab === 'audit' && (
                 <Card>
                     <AuditTable audit={audit as unknown[]} />
                 </Card>
+            )}
+
+            {/* Editable status badge */}
+            {policy && (
+                <div className="fixed bottom-20 right-4 z-40">
+                    <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium shadow-sm ${policy.status === 'Draft' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                        <span className={`h-2.5 w-2.5 rounded-full ${policy.status === 'Draft' ? 'bg-green-500' : 'bg-amber-400'}`} aria-hidden="true" />
+                        <span>{policy.status === 'Draft' ? 'Editable' : 'Read-only'}</span>
+                    </div>
+                </div>
             )}
         </div>
     )

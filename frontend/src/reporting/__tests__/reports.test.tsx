@@ -117,9 +117,9 @@ function renderListPage(path = '/reports') {
     )
 }
 
-function renderCreatePage(path = '/reports/create') {
+function renderCreatePage(path = '/reports/create', state?: unknown) {
     return render(
-        <MemoryRouter initialEntries={[path]}>
+        <MemoryRouter initialEntries={[{ pathname: path, state }]}>
             <Routes>
                 <Route path="/reports/create" element={<ReportCreatePage />} />
                 <Route path="/reports/edit/:id" element={<ReportCreatePage />} />
@@ -219,6 +219,13 @@ describe('ReportsListPage — /reports', () => {
         expect(await screen.findByTestId('run-page')).toBeInTheDocument()
     })
 
+    it('T-RPT-FE-F-R005c — Core Application Reports does not render a Data Source column', async () => {
+        mockGetReportTemplates.mockResolvedValue([])
+        renderListPage()
+        await screen.findByText('Submissions Report')
+        expect(screen.queryByRole('columnheader', { name: /data source/i })).not.toBeInTheDocument()
+    })
+
     // REQ-RPT-FE-F-006
     it('T-RPT-FE-F-R006 — custom report cards show Edit and Delete buttons', async () => {
         renderListPage()
@@ -254,8 +261,9 @@ describe('ReportsListPage — /reports', () => {
                 </Routes>
             </MemoryRouter>
         )
-        await screen.findByText('Ops Dashboard')
-        await userEvent.click(screen.getByTitle('View Dashboard'))
+        const opsCell = await screen.findByText('Ops Dashboard')
+        const opsRow = opsCell.closest('tr') ?? opsCell.closest('[role="row"]') ?? opsCell.parentElement!
+        await userEvent.click(within(opsRow).getByTitle('View Dashboard'))
         expect(await screen.findByText('dashboard-view')).toBeInTheDocument()
         expect(screen.queryByText('report-run')).not.toBeInTheDocument()
     })
@@ -293,6 +301,67 @@ describe('ReportsListPage — /reports', () => {
         expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
     })
+
+    it('T-RPT-FE-F-R009 — shows Core Application Dashboards and navigates View Dashboard to core slug route', async () => {
+        mockGetReportTemplates.mockResolvedValue([])
+        render(
+            <MemoryRouter initialEntries={['/reports']}>
+                <Routes>
+                    <Route path="/reports" element={<ReportsListPage />} />
+                    <Route path="/dashboards/view/:reportId" element={<div>dashboard-view</div>} />
+                </Routes>
+            </MemoryRouter>
+        )
+
+        expect(await screen.findByText('Core Application Dashboards')).toBeInTheDocument()
+        expect(screen.getByText('User Policy Performance Dashboard')).toBeInTheDocument()
+        await userEvent.click(screen.getByTitle('View Dashboard'))
+        expect(await screen.findByText('dashboard-view')).toBeInTheDocument()
+    })
+
+    // REQ-RPT-FE-F-010a
+    it('T-RPT-FE-F-R010a — Copy on core report navigates to /reports/create with name prefixed "Copy of"', async () => {
+        mockGetReportTemplates.mockResolvedValue([])
+        let capturedState: unknown
+        render(
+            <MemoryRouter initialEntries={['/reports']}>
+                <Routes>
+                    <Route path="/reports" element={<ReportsListPage />} />
+                    <Route
+                        path="/reports/create"
+                        element={<div data-testid="create-page">{JSON.stringify(capturedState)}</div>}
+                    />
+                </Routes>
+            </MemoryRouter>
+        )
+
+        await screen.findByText('Core Application Reports')
+        const copyButtons = screen.getAllByTitle('Copy to My Reports')
+        expect(copyButtons.length).toBeGreaterThan(0)
+        await userEvent.click(copyButtons[0])
+        expect(await screen.findByTestId('create-page')).toBeInTheDocument()
+    })
+
+    // REQ-RPT-FE-F-010b
+    it('T-RPT-FE-F-R010b — Copy on core dashboard calls createDashboard and navigates to /dashboards/configure/:id', async () => {
+        mockGetReportTemplates.mockResolvedValue([])
+        mockCreateDashboard.mockResolvedValue({ id: 77, name: 'Copy of User Policy Performance Dashboard', type: 'dashboard' })
+        render(
+            <MemoryRouter initialEntries={['/reports']}>
+                <Routes>
+                    <Route path="/reports" element={<ReportsListPage />} />
+                    <Route path="/dashboards/configure/:id" element={<div>configure-77</div>} />
+                </Routes>
+            </MemoryRouter>
+        )
+
+        await screen.findByText('Core Application Dashboards')
+        await userEvent.click(screen.getByTitle('Copy to My Dashboards'))
+        await waitFor(() => expect(mockCreateDashboard).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'Copy of User Policy Performance Dashboard' }),
+        ))
+        expect(await screen.findByText('configure-77')).toBeInTheDocument()
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -326,6 +395,13 @@ describe('ReportCreatePage — /reports/create and /reports/edit/:id', () => {
     it('T-RPT-FE-F-R011b — renders "Edit Report" heading on /reports/edit/:id route', async () => {
         renderCreatePage('/reports/edit/5')
         expect(await screen.findByRole('heading', { name: /edit report/i })).toBeInTheDocument()
+    })
+
+    // REQ-RPT-FE-F-010a (create-page side)
+    it('T-RPT-FE-F-R011c — pre-populates name from copyFrom navigation state', () => {
+        renderCreatePage('/reports/create', { copyFrom: { name: 'Copy of Submissions Report', description: 'All submissions with status and broker info.' } })
+        expect((screen.getByLabelText(/report name/i) as HTMLInputElement).value).toBe('Copy of Submissions Report')
+        expect((screen.getByLabelText(/description/i) as HTMLTextAreaElement).value).toBe('All submissions with status and broker info.')
     })
 
     // REQ-RPT-FE-F-012
@@ -1604,5 +1680,161 @@ describe('DashboardViewPage — /dashboards/view/:reportId', () => {
 
         // Loading placeholder must NOT be visible — data has loaded
         expect(screen.queryByText(/Loading live data/i)).not.toBeInTheDocument()
+    })
+
+    it('T-RPT-FE-F-R045 — core user policy performance dashboard slug renders both configured core tables', async () => {
+        mockGetDashboard.mockClear()
+        mockGetDashboardWidgetData
+            .mockResolvedValueOnce({
+                type: 'table',
+                rows: [{
+                    hierarchyLevel1: 'PolicyForge Demo Org',
+                    hierarchyLevel2: 'North Region',
+                    hierarchyLevel3: 'North Team 1',
+                    user: 'alice',
+                    expiringPolicyCount: 7,
+                    renewablePolicyCount: 4,
+                    newBusinessPolicyCount: 2,
+                    renewedPolicyCount: 3,
+                    lapsedPolicyCount: 1,
+                    cancelledPolicyCount: 1,
+                    netNewPolicyCount: 1,
+                    policyCount: 9,
+                    retentionRatio: 0.75,
+                }],
+            })
+            .mockResolvedValueOnce({
+                type: 'table',
+                rows: [{
+                    hierarchyLevel1: 'PolicyForge Demo Org',
+                    hierarchyLevel2: 'North Region',
+                    hierarchyLevel3: 'North Team 1',
+                    user: 'alice',
+                    expiringGrossWrittenPremium: 150000,
+                    renewableGrossWrittenPremium: 120000,
+                    newBusinessGrossWrittenPremium: 50000,
+                    renewedGrossWrittenPremium: 90000,
+                    lapsedGrossWrittenPremium: 10000,
+                    cancelledGrossWrittenPremium: 12000,
+                    netNewGrossWrittenPremium: 100000,
+                    policyGrossWrittenPremium: 260000,
+                    retentionRatioGrossWrittenPremium: 0.75,
+                }],
+            })
+
+        renderDashboardViewPage('/dashboards/view/core-user-policy-performance')
+
+        expect(await screen.findByRole('heading', { name: /user policy performance dashboard/i })).toBeInTheDocument()
+        expect(screen.getByText(/template:\s*twoRow/i)).toBeInTheDocument()
+        expect(screen.getByText('User Policy KPI Table')).toBeInTheDocument()
+        expect(screen.getByText('User Gross Written Premium Table')).toBeInTheDocument()
+        expect(mockGetDashboard).not.toHaveBeenCalled()
+        expect(mockGetDashboardWidgetData).toHaveBeenCalled()
+        expect(mockGetDashboardWidgetData).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({
+                attributes: [
+                    'policyUserSummary::hierarchyLevel1',
+                    'policyUserSummary::hierarchyLevel2',
+                    'policyUserSummary::hierarchyLevel3',
+                    'policyUserSummary::hierarchyLevel4',
+                    'policyUserSummary::hierarchyLevel5',
+                    'policyUserSummary::user',
+                    'policyUserSummary::expiringPolicyCount',
+                    'policyUserSummary::renewablePolicyCount',
+                    'policyUserSummary::newBusinessPolicyCount',
+                    'policyUserSummary::renewedPolicyCount',
+                    'policyUserSummary::lapsedPolicyCount',
+                    'policyUserSummary::cancelledPolicyCount',
+                    'policyUserSummary::policyCount',
+                    'policyUserSummary::retentionRatio',
+                    'policyUserSummary::netNewPolicyCount',
+                ],
+            }),
+            expect.any(Object),
+        )
+        expect(mockGetDashboardWidgetData).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({
+                attributes: [
+                    'policyUserSummary::hierarchyLevel1',
+                    'policyUserSummary::hierarchyLevel2',
+                    'policyUserSummary::hierarchyLevel3',
+                    'policyUserSummary::hierarchyLevel4',
+                    'policyUserSummary::hierarchyLevel5',
+                    'policyUserSummary::user',
+                    'policyUserSummary::expiringGrossWrittenPremium',
+                    'policyUserSummary::renewableGrossWrittenPremium',
+                    'policyUserSummary::newBusinessGrossWrittenPremium',
+                    'policyUserSummary::renewedGrossWrittenPremium',
+                    'policyUserSummary::lapsedGrossWrittenPremium',
+                    'policyUserSummary::cancelledGrossWrittenPremium',
+                    'policyUserSummary::policyGrossWrittenPremium',
+                    'policyUserSummary::retentionRatioGrossWrittenPremium',
+                    'policyUserSummary::netNewGrossWrittenPremium',
+                ],
+            }),
+            expect.any(Object),
+        )
+    })
+
+    it('T-RPT-FE-F-R047 — hierarchy column supports expand/collapse tree rows instead of a concatenated path string', async () => {
+        mockGetDashboard.mockClear()
+        mockGetDashboardWidgetData
+            .mockResolvedValueOnce({
+                type: 'table',
+                rows: [
+                    {
+                        hierarchyLevel1: 'PolicyForge Demo Org',
+                        hierarchyLevel2: 'North Region',
+                        hierarchyLevel3: 'North Team 1',
+                        user: 'alice',
+                        expiringPolicyCount: 5,
+                        policyCount: 4,
+                        retentionRatio: 0.5,
+                    },
+                    {
+                        hierarchyLevel1: 'PolicyForge Demo Org',
+                        hierarchyLevel2: 'South Region',
+                        hierarchyLevel3: 'South Team 1',
+                        user: 'bob',
+                        expiringPolicyCount: 6,
+                        policyCount: 6,
+                        retentionRatio: 0.75,
+                    },
+                ],
+            })
+            .mockResolvedValueOnce({
+                type: 'table',
+                rows: [
+                    {
+                        hierarchyLevel1: 'PolicyForge Demo Org',
+                        hierarchyLevel2: 'North Region',
+                        hierarchyLevel3: 'North Team 1',
+                        user: 'alice',
+                        expiringGrossWrittenPremium: 100000,
+                        policyGrossWrittenPremium: 100000,
+                        retentionRatioGrossWrittenPremium: 0.5,
+                    },
+                ],
+            })
+
+        renderDashboardViewPage('/dashboards/view/core-user-policy-performance')
+
+        expect((await screen.findAllByText('PolicyForge Demo Org')).length).toBeGreaterThan(0)
+        expect(screen.queryByText('PolicyForge Demo Org > North Region > North Team 1 > alice')).not.toBeInTheDocument()
+        expect(screen.queryByText('alice')).not.toBeInTheDocument()
+
+        await userEvent.click(screen.getAllByRole('button', { name: /expand policyforge demo org/i })[0])
+        expect((await screen.findAllByText('North Region')).length).toBeGreaterThan(0)
+
+        await userEvent.click(screen.getAllByRole('button', { name: /expand north region/i })[0])
+        expect((await screen.findAllByText('North Team 1')).length).toBeGreaterThan(0)
+
+        await userEvent.click(screen.getAllByRole('button', { name: /expand north team 1/i })[0])
+        expect(await screen.findByText('alice')).toBeInTheDocument()
+
+        const parentHierarchyCell = screen.getAllByText('PolicyForge Demo Org')[0].closest('td')
+        expect(parentHierarchyCell).toHaveClass('font-semibold')
     })
 })

@@ -10,6 +10,7 @@ import { MemoryRouter } from 'react-router-dom'
 import SettingsPage from './index'
 import PlatformAdminPanel from './PlatformAdminPanel'
 import DashboardReportingSettingsPage from './DashboardReportingSettingsPage'
+import EarningsConfigPage from './EarningsConfigPage'
 
 // Mocks
 
@@ -26,6 +27,16 @@ jest.mock('./settings.service', () => ({
   getMeasures: jest.fn(),
   createMeasure: jest.fn(),
   deactivateMeasure: jest.fn(),
+  getEarningPatterns: jest.fn(),
+  createEarningPattern: jest.fn(),
+  deactivateEarningPattern: jest.fn(),
+  getPatternPoints: jest.fn(),
+  createPatternPoint: jest.fn(),
+  deletePatternPoint: jest.fn(),
+  getEarningRules: jest.fn(),
+  createEarningRule: jest.fn(),
+  updateEarningRule: jest.fn(),
+  deactivateEarningRule: jest.fn(),
 }))
 
 const mockAddNotification = jest.fn()
@@ -42,14 +53,17 @@ function renderSettings() {
   )
 }
 
-const { getMeasures, createMeasure, deactivateMeasure } = jest.requireMock('./settings.service')
+const { getMeasures, createMeasure, deactivateMeasure,
+  getEarningPatterns, createEarningPattern, deactivateEarningPattern,
+  getEarningRules, createEarningRule, updateEarningRule, deactivateEarningRule,
+} = jest.requireMock('./settings.service')
 
 // ---------------------------------------------------------------------------
 // Tile grid — role visibility
 // ---------------------------------------------------------------------------
 
 describe('T-SETTINGS-GRID-R01: tiles shown to client_admin', () => {
-  it('renders all six standard tiles for client_admin', () => {
+  it('renders all standard tiles for client_admin', () => {
     mockRole = 'client_admin'
     renderSettings()
     expect(screen.getByText('Account Administration')).toBeInTheDocument()
@@ -58,6 +72,7 @@ describe('T-SETTINGS-GRID-R01: tiles shown to client_admin', () => {
     expect(screen.getByText('Rating Rules')).toBeInTheDocument()
     expect(screen.getByText('Data Quality Configuration')).toBeInTheDocument()
     expect(screen.getByText('Dashboard & Reporting')).toBeInTheDocument()
+    expect(screen.getByText('Earnings Configuration')).toBeInTheDocument()
   })
 
   it('does NOT render Module Licensing tile for client_admin', () => {
@@ -68,7 +83,7 @@ describe('T-SETTINGS-GRID-R01: tiles shown to client_admin', () => {
 })
 
 describe('T-SETTINGS-GRID-R02: tiles shown to internal_admin', () => {
-  it('renders all seven tiles including Module Licensing and Dashboard & Reporting for internal_admin', () => {
+  it('renders all tiles including Module Licensing, Dashboard & Reporting, and Earnings Configuration for internal_admin', () => {
     mockRole = 'internal_admin'
     renderSettings()
     expect(screen.getByText('Account Administration')).toBeInTheDocument()
@@ -78,6 +93,7 @@ describe('T-SETTINGS-GRID-R02: tiles shown to internal_admin', () => {
     expect(screen.getByText('Data Quality Configuration')).toBeInTheDocument()
     expect(screen.getByText('Module Licensing')).toBeInTheDocument()
     expect(screen.getByText('Dashboard & Reporting')).toBeInTheDocument()
+    expect(screen.getByText('Earnings Configuration')).toBeInTheDocument()
   })
 })
 
@@ -224,7 +240,7 @@ describe('T-SETTINGS-DASH-R001: Dashboard & Reporting tile is present on setting
 
 describe('T-SETTINGS-DASH-R002a: DashboardReportingSettingsPage loading state', () => {
   it('shows a loading spinner while measures are loading', () => {
-    getMeasures.mockReturnValue(new Promise(() => {}))
+    getMeasures.mockReturnValue(new Promise(() => { }))
     renderDashPage()
     expect(screen.getByLabelText('Loading measures')).toBeInTheDocument()
   })
@@ -287,5 +303,174 @@ describe('T-SETTINGS-DASH-R004: Add Custom Measure form creates a new measure', 
 
     await waitFor(() => expect(screen.getByText('Brand New Measure')).toBeInTheDocument())
     expect(createMeasure).toHaveBeenCalledWith(expect.objectContaining({ key: 'myNew', label: 'Brand New Measure' }))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Earnings Configuration
+// ---------------------------------------------------------------------------
+
+const STRAIGHT_LINE_PATTERN = {
+  id: 1, orgCode: 'TST', name: 'Standard Straight Line', patternType: 'straight_line',
+  earnBy: 'day', description: null, isActive: true,
+  createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+}
+const UPFRONT_PATTERN = {
+  id: 2, orgCode: 'TST', name: 'Upfront Full', patternType: 'upfront',
+  earnBy: 'day', description: 'All at inception', isActive: true,
+  createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+}
+const SAMPLE_RULE = {
+  id: 1, orgCode: 'TST', patternId: 1, priority: 0,
+  productId: null, classOfBusiness: 'Property', contractType: null,
+  includeIncepted: true, isActive: true,
+  createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+}
+
+function renderEarningsPage() {
+  return render(
+    <MemoryRouter>
+      <EarningsConfigPage />
+    </MemoryRouter>
+  )
+}
+
+describe('T-EARN-R01: Earnings Configuration tile appears on settings page', () => {
+  it('shows Earnings Configuration tile for client_admin', () => {
+    mockRole = 'client_admin'
+    renderSettings()
+    expect(screen.getByText('Earnings Configuration')).toBeInTheDocument()
+  })
+
+  it('shows Earnings Configuration tile for internal_admin', () => {
+    mockRole = 'internal_admin'
+    renderSettings()
+    expect(screen.getByText('Earnings Configuration')).toBeInTheDocument()
+  })
+
+  it('does NOT show Earnings Configuration tile for underwriter', () => {
+    mockRole = 'underwriter'
+    renderSettings()
+    expect(screen.queryByText('Earnings Configuration')).not.toBeInTheDocument()
+  })
+})
+
+describe('T-EARN-R02: EarningsConfigPage shows Patterns and Rules tabs', () => {
+  it('renders both tabs on load with Patterns as default', async () => {
+    getEarningPatterns.mockResolvedValue([])
+    renderEarningsPage()
+    expect(screen.getByRole('button', { name: /patterns/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /rules/i })).toBeInTheDocument()
+  })
+})
+
+describe('T-EARN-R03: EarningsConfigPage loads and displays patterns', () => {
+  it('shows loading state initially', () => {
+    getEarningPatterns.mockReturnValue(new Promise(() => { }))
+    renderEarningsPage()
+    expect(screen.getByText(/loading patterns/i)).toBeInTheDocument()
+  })
+
+  it('shows patterns after load', async () => {
+    getEarningPatterns.mockResolvedValue([STRAIGHT_LINE_PATTERN, UPFRONT_PATTERN])
+    renderEarningsPage()
+    await waitFor(() => expect(screen.getByText('Standard Straight Line')).toBeInTheDocument())
+    expect(screen.getByText('Upfront Full')).toBeInTheDocument()
+    expect(screen.getByText('Straight Line')).toBeInTheDocument()
+    expect(screen.getByText('Upfront')).toBeInTheDocument()
+  })
+
+  it('shows empty state when no patterns exist', async () => {
+    getEarningPatterns.mockResolvedValue([])
+    renderEarningsPage()
+    await waitFor(() => expect(screen.getByText(/no earning patterns configured/i)).toBeInTheDocument())
+  })
+
+  it('shows error state when fetch fails', async () => {
+    getEarningPatterns.mockRejectedValue(new Error('Server error'))
+    renderEarningsPage()
+    await waitFor(() => expect(screen.getByText('Server error')).toBeInTheDocument())
+  })
+})
+
+describe('T-EARN-R04: New Pattern form creates a pattern', () => {
+  it('opens form on "New Pattern" click', async () => {
+    getEarningPatterns.mockResolvedValue([])
+    renderEarningsPage()
+    await waitFor(() => expect(screen.getByText(/no earning patterns/i)).toBeInTheDocument())
+    fireEvent.click(screen.getByText('New Pattern'))
+    expect(screen.getByPlaceholderText(/standard straight line/i)).toBeInTheDocument()
+  })
+
+  it('calls createEarningPattern and adds pattern to list', async () => {
+    getEarningPatterns.mockResolvedValue([])
+    createEarningPattern.mockResolvedValue(STRAIGHT_LINE_PATTERN)
+    renderEarningsPage()
+    await waitFor(() => screen.getByText('New Pattern'))
+
+    fireEvent.click(screen.getByText('New Pattern'))
+    fireEvent.change(screen.getByPlaceholderText(/standard straight line/i), {
+      target: { value: 'Standard Straight Line' },
+    })
+    fireEvent.click(screen.getByText('Create Pattern'))
+
+    await waitFor(() => expect(createEarningPattern).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Standard Straight Line', patternType: 'straight_line' }),
+    ))
+    await waitFor(() => expect(screen.getByText('Standard Straight Line')).toBeInTheDocument())
+  })
+})
+
+describe('T-EARN-R06: Deactivate pattern removes it from list', () => {
+  it('removes pattern row after deactivation', async () => {
+    getEarningPatterns.mockResolvedValue([STRAIGHT_LINE_PATTERN])
+    deactivateEarningPattern.mockResolvedValue(undefined)
+    renderEarningsPage()
+
+    await waitFor(() => screen.getByText('Standard Straight Line'))
+    fireEvent.click(screen.getByLabelText(/Deactivate Standard Straight Line/i))
+
+    await waitFor(() => expect(screen.queryByText('Standard Straight Line')).not.toBeInTheDocument())
+    expect(deactivateEarningPattern).toHaveBeenCalledWith(1)
+  })
+})
+
+describe('T-EARN-R07: Rules tab shows rules list', () => {
+  it('shows rules after switching to Rules tab', async () => {
+    getEarningPatterns.mockResolvedValue([STRAIGHT_LINE_PATTERN])
+    getEarningRules.mockResolvedValue([SAMPLE_RULE])
+    renderEarningsPage()
+
+    await waitFor(() => screen.getByText('Standard Straight Line'))
+    fireEvent.click(screen.getByRole('button', { name: /rules/i }))
+
+    await waitFor(() => expect(screen.getByText('Property')).toBeInTheDocument())
+    expect(screen.getByText('Standard Straight Line')).toBeInTheDocument()
+    expect(screen.getByText('0')).toBeInTheDocument() // priority
+  })
+
+  it('shows empty state when no rules exist', async () => {
+    getEarningPatterns.mockResolvedValue([STRAIGHT_LINE_PATTERN])
+    getEarningRules.mockResolvedValue([])
+    renderEarningsPage()
+    fireEvent.click(screen.getByRole('button', { name: /rules/i }))
+    await waitFor(() => expect(screen.getByText(/no earning rules configured/i)).toBeInTheDocument())
+  })
+})
+
+describe('T-EARN-R09: Deactivate rule removes it from list', () => {
+  it('removes rule row after deactivation', async () => {
+    getEarningPatterns.mockResolvedValue([STRAIGHT_LINE_PATTERN])
+    getEarningRules.mockResolvedValue([SAMPLE_RULE])
+    deactivateEarningRule.mockResolvedValue(undefined)
+    renderEarningsPage()
+
+    fireEvent.click(screen.getByRole('button', { name: /rules/i }))
+    await waitFor(() => screen.getByText('Property'))
+
+    fireEvent.click(screen.getByLabelText(/Deactivate rule 1/i))
+
+    await waitFor(() => expect(screen.queryByText('Property')).not.toBeInTheDocument())
+    expect(deactivateEarningRule).toHaveBeenCalledWith(1)
   })
 })

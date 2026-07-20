@@ -107,7 +107,8 @@ export default function ProfilePage() {
             <input
               id="profile-name"
               type="text"
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className={`border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${nameError ? 'app-input-invalid' : ''}`}
+              aria-invalid={nameError ? 'true' : 'false'}
               value={name}
               onChange={e => setName(e.target.value)}
             />
@@ -169,7 +170,8 @@ export default function ProfilePage() {
             <input
               id="new-password"
               type="password"
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              className={`border border-gray-300 rounded-md px-3 py-2 text-sm ${newPassword.length > 0 && !passwordMeetsRules ? 'app-input-invalid' : ''}`}
+              aria-invalid={newPassword.length > 0 && !passwordMeetsRules ? 'true' : 'false'}
               value={newPassword}
               onChange={e => setNewPassword(e.target.value)}
             />
@@ -188,7 +190,8 @@ export default function ProfilePage() {
             <input
               id="confirm-password"
               type="password"
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              className={`border border-gray-300 rounded-md px-3 py-2 text-sm ${confirmPassword && !passwordsMatch ? 'app-input-invalid' : ''}`}
+              aria-invalid={confirmPassword && !passwordsMatch ? 'true' : 'false'}
               value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
             />

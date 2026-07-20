@@ -183,8 +183,16 @@ export default function QuoteCoverageDetailPage() {
                         <p className="text-gray-900">{coverage.effective_date ?? '—'}</p>
                     </div>
                     <div>
+                        <p className="text-xs text-gray-500">Effective Time</p>
+                        <p className="text-gray-900">{coverage.effective_time ?? '—'}</p>
+                    </div>
+                    <div>
                         <p className="text-xs text-gray-500">Expiry Date</p>
                         <p className="text-gray-900">{coverage.expiry_date ?? '—'}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-500">Expiry Time</p>
+                        <p className="text-gray-900">{coverage.expiry_time ?? '—'}</p>
                     </div>
                 </div>
             </FieldGroup>

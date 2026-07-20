@@ -4,6 +4,91 @@ Newest entries at the top. Do not delete or reformat — append only.
 
 ---
 
+### [2026-05-29] [10:00] — Earnings Configuration Feature — Full Implementation
+
+**Request:**
+Add an Earnings Configuration settings page supporting upfront, straight-line, and interpolated earning patterns, with a rules engine linking patterns to policy criteria, accessible to `client_admin` and `internal_admin` roles.
+
+**Outcome:**
+Full Three-Artifact Rule implementation: requirements file created (REQ-EARN-CFG-S-001, F-001 through F-009, C-001–C-002), 18 backend unit tests written and passing, 11 frontend component tests written and passing, code implemented across backend NestJS module and frontend React page. Domain code `EARN-CFG` registered in Guideline 13. Requirements file subsequently corrected to comply with Section 13 format (proper REQ IDs, Impact Analysis, Traceability table, Change Log, "shall" language, Design Notes appendix).
+
+**Files Changed:**
+- `frontend/src/settings/EarningsConfigPage.requirements.md` — created; rewritten to Section 13 standard
+- `docs/AI Guidelines/13-Requirements-Standards.md` — `EARN-CFG` domain code added to §4.1 table
+- `backend/nest/src/entities/earning-pattern.entity.ts` — created; EarningPattern, EarningPatternPoint, EarningPatternRule entities
+- `backend/nest/src/entities/index.ts` — earnings entities exported
+- `backend/nest/src/earnings-config/earnings-config.module.ts` — created
+- `backend/nest/src/earnings-config/earnings-config.service.ts` — created
+- `backend/nest/src/earnings-config/earnings-config.controller.ts` — created
+- `backend/nest/src/earnings-config/earnings-config.spec.ts` — created; 18 tests passing
+- `backend/nest/src/app.module.ts` — EarningsConfigModule imported
+- `frontend/src/settings/EarningsConfigPage.tsx` — created
+- `frontend/src/settings/settings.service.ts` — 10 earnings API functions + 7 types appended
+- `frontend/src/settings/index.tsx` — Earnings Configuration tile added
+- `frontend/src/settings/settings.test.tsx` — 11 new tests (T-EARN-R01 through T-EARN-R09) added; 33/33 passing
+- `frontend/src/main.jsx` — route `/settings/earnings-config` registered
+- `db/seeds/036-earning-patterns.js` — created; 3 demo patterns seeded
+
+**Open Questions / Deferred:**
+- OQ-EARN-001 (Deferred): earnings engine trigger (automatic vs. on-demand) — out of scope
+- OQ-EARN-002 (Assumed — first match wins): multi-pattern overlay not implemented
+
+---
+
+### [2026-05-19] [RETROSPECTIVE] — Checkpoint D: Bind Auto-Decline, Submission Inheritance, Widget Fix
+
+**Request:**
+Implement Checkpoint D of the OQ-STAT-001–008 status model redesign: (D1) `bind()` auto-declines sibling Created/Quoted quotes on the same submission; (D2) `bind()` and `issuePolicy()` propagate status to the parent submission via a new `updateStatusFromQuote()` method; (D3) fix stale `'Draft'` default in `RecentActivityWidget`.
+
+**Outcome:**
+Three-Artifact Rule followed. Requirements added (F-045, F-046, F-047 in quotes; F-002 updated, F-C03 added in submissions). New tests written (T-QUO-BE-NE-R06c–R06g, R37f–R37g; T-SUB-BE-NE-R02f, R13a–R13c). Code implemented across 5 files. 160 tests passing (0 failed). OQ-STAT-008 (org-configurable auto-decline) remains Deferred.
+
+**Files Changed:**
+- `backend/nest/src/quotes/quotes.requirements.md` — F-045, F-046, F-047 added; traceability updated; change log updated
+- `backend/nest/src/submissions/submissions.requirements.md` — F-002 updated (explicit isActive=true); F-C03 added; traceability and change log sections added
+- `backend/nest/src/quotes/quotes.spec.ts` — 8 new tests: R06c–R06g, R37f–R37g; SubmissionsService mock added
+- `backend/nest/src/submissions/submissions.spec.ts` — 4 new tests: R02f, R13a–R13c
+- `backend/nest/src/quotes/quotes.service.ts` — `bind()` auto-declines siblings + calls updateStatusFromQuote; `issuePolicy()` calls updateStatusFromQuote; SubmissionsService injected
+- `backend/nest/src/quotes/quotes.module.ts` — SubmissionsModule added to imports
+- `backend/nest/src/submissions/submissions.service.ts` — `create()` sets isActive=true explicitly; `updateStatusFromQuote()` method added
+- `backend/nest/src/submissions/submissions.module.ts` — exports: [SubmissionsService] added
+- `frontend/src/home/HomeWidgets/RecentActivityWidget.tsx` — quote status default 'Draft' → 'Created'
+
+**Open Questions / Deferred:**
+- OQ-STAT-008 (Deferred): per-org configurability of sibling auto-decline on bind
+- OQ-STAT-009 raised: replacement statuses for legacy `submit()` ('In Review') and `decline()` ('Declined') in SubmissionsService — both outside the 11-value set
+- OQ-STAT-010 raised: when should `updateStatusFromQuote` be called with `isActive = false` (terminal status transitions)
+- OQ-STAT-011 raised: scope and trigger of nightly `isActive` reconciliation job (Checkpoint E)
+
+---
+
+### [2026-05-19] [RETROSPECTIVE] — Checkpoint C: Status Model Schema + Seeds + Requirements Files
+
+**Request:**
+Implement Checkpoint C of the OQ-STAT-001–008 status model redesign: DB schema additions (is_active, renewal columns, version_status_id, new lookup table), seed updates, entity updates, and creation of new requirements files for submissions and policies modules.
+
+**Outcome:**
+Three-Artifact Rule followed. Seeds updated for 5 files. Two new entity columns added (Submission: isActive, renewedSubmissionId, renewedFromSubmissionId; Policy: versionStatusId). New requirements files created for submissions and policies. OQ-STAT-001 through OQ-STAT-008 recorded in 08-Open-Questions.md. All 81 existing tests still passing after changes.
+
+**Files Changed:**
+- `docs/Technical Documentation/08-Open-Questions.md` — OQ-STAT-001 through OQ-STAT-008 appended
+- `backend/nest/src/submissions/submissions.requirements.md` — created (new file)
+- `backend/nest/src/policies/policies.requirements.md` — created (new file)
+- `db/seeds/004-lookup-submission-statuses.js` — 11-value set; Declined removed
+- `db/seeds/003-submissions.js` — 13 submissions covering all statuses and renewal links
+- `db/seeds/024-quotes.js` — Draft renamed to Created; QUO-2024-007 (Issued) added
+- `db/seeds/025-policies.js` — version_status_id column added
+- `db/seeds/033-lookup-policy-version-statuses.js` — created (Original/Endorsed values)
+- `package.json` — seed 033 ordered before seed 021
+- `backend/nest/src/entities/submission.entity.ts` — isActive, renewedSubmissionId, renewedFromSubmissionId columns added
+- `backend/nest/src/entities/policy.entity.ts` — versionStatusId column added
+
+**Open Questions / Deferred:**
+- OQ-STAT-001 through OQ-STAT-008 recorded (see 08-Open-Questions.md)
+- OQ-STAT-008 explicitly Deferred: per-org configurability of bind auto-decline
+
+---
+
 ### [2026-05-08] [Today] — TypeORM Entity-First Migration + Full Release to Production
 
 **Request:**
@@ -964,20 +1049,20 @@ Fixed payload overwrite bug in updateSection � ody.written_order/ody.signed_
 
 ---
 
-### [2026-05-08] � Fix CI failures: remove audit defaultMode, LIMIT 200?2000, fix quotes test
+### [2026-05-08] � Fix CI failures: remove audit defaultMode, LIMIT 200?2000, fix quotes test
 
 **Request:**
 Fix two pre-existing backend CI failures (T-SRCH-BE-NE-R02c, T-SRCH-BE-NE-R02e in search.spec.ts) and one frontend CI failure (T-quotes-view-R19 in quotes.test.tsx). User confirmed plan: delete defaultMode method, replace LIMIT 200 with LIMIT 2000, update search.requirements.md, fix the quotes test.
 
 **Outcome:**
-Removed defaultMode and etchWithAuditOrFallback dead code from search.service.ts (both were already unreachable � search() had previously been changed to always call ilterMode directly). Removed unused hasFilters variable. Updated search() signature to remove userId and userName params (now unused); updated controller call site to match. Replaced all 6 LIMIT 200 occurrences in filterMode queries with LIMIT 2000. Updated search.requirements.md: revised �2 Recommended Approach, Potential Flaws 1 and 3, audit_events table role. Deleted T-SRCH-BE-NE-R02c (tested dead audit-first behaviour). Rewrote T-SRCH-BE-NE-R02e to verify no audit ordering query is made. Added new T-SRCH-BE-NE-R02d to verify filterMode returns most recently created submissions. Fixed T-quotes-view-R19 � FieldGroup title changed from "Quote & Referencing" to "Contract & Reference" in QuoteViewPage.tsx; test updated to match. All 13 backend search tests pass; T-quotes-view-R19 passes.
+Removed defaultMode and etchWithAuditOrFallback dead code from search.service.ts (both were already unreachable � search() had previously been changed to always call ilterMode directly). Removed unused hasFilters variable. Updated search() signature to remove userId and userName params (now unused); updated controller call site to match. Replaced all 6 LIMIT 200 occurrences in filterMode queries with LIMIT 2000. Updated search.requirements.md: revised �2 Recommended Approach, Potential Flaws 1 and 3, audit_events table role. Deleted T-SRCH-BE-NE-R02c (tested dead audit-first behaviour). Rewrote T-SRCH-BE-NE-R02e to verify no audit ordering query is made. Added new T-SRCH-BE-NE-R02d to verify filterMode returns most recently created submissions. Fixed T-quotes-view-R19 � FieldGroup title changed from "Quote & Referencing" to "Contract & Reference" in QuoteViewPage.tsx; test updated to match. All 13 backend search tests pass; T-quotes-view-R19 passes.
 
 **Files Changed:**
-- backend/nest/src/search/search.service.ts � removed defaultMode, fetchWithAuditOrFallback, hasFilters; updated search() signature; LIMIT 200?2000
-- backend/nest/src/search/search.controller.ts � removed userId/userName from search() call
-- backend/nest/src/search/search.spec.ts � deleted R02c, rewrote R02d and R02e, updated all search() call signatures
-- frontend/src/search/search.requirements.md � updated �2 approach, flaw 1, flaw 3, DB table role, added changelog entry
-- frontend/src/quotes/quotes.test.tsx � T-quotes-view-R19 updated to match renamed FieldGroup title
+- backend/nest/src/search/search.service.ts � removed defaultMode, fetchWithAuditOrFallback, hasFilters; updated search() signature; LIMIT 200?2000
+- backend/nest/src/search/search.controller.ts � removed userId/userName from search() call
+- backend/nest/src/search/search.spec.ts � deleted R02c, rewrote R02d and R02e, updated all search() call signatures
+- frontend/src/search/search.requirements.md � updated �2 approach, flaw 1, flaw 3, DB table role, added changelog entry
+- frontend/src/quotes/quotes.test.tsx � T-quotes-view-R19 updated to match renamed FieldGroup title
 
 **Open Questions / Deferred:**
 - None

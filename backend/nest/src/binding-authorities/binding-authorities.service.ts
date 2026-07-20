@@ -165,10 +165,46 @@ export class BindingAuthoritiesService {
     const rows = await this.baRepo.manager.query(
       `SELECT code
          FROM public.lookup_currencies
-        WHERE active = TRUE
+        WHERE is_active = TRUE
         ORDER BY code ASC`,
     )
     return rows.map((row: { code: string }) => row.code)
+  }
+
+  async listLossQualifiers(): Promise<string[]> {
+    const rows = await this.baRepo.manager.query(
+      `SELECT DISTINCT name
+         FROM public.lookup_loss_qualifiers
+        ORDER BY name ASC`,
+    )
+    return rows.map((row: { name: string }) => row.name)
+  }
+
+  async listContractTypes(): Promise<string[]> {
+    const rows = await this.baRepo.manager.query(
+      `SELECT name
+         FROM public.lookup_contract_types
+        ORDER BY name ASC`,
+    )
+    return rows.map((row: { name: string }) => row.name)
+  }
+
+  async listMethodsOfPlacement(): Promise<string[]> {
+    const rows = await this.baRepo.manager.query(
+      `SELECT name
+         FROM public.lookup_methods_of_placement
+        ORDER BY name ASC`,
+    )
+    return rows.map((row: { name: string }) => row.name)
+  }
+
+  async listRenewalStatuses(): Promise<string[]> {
+    const rows = await this.baRepo.manager.query(
+      `SELECT name
+         FROM public.lookup_renewal_statuses
+        ORDER BY name ASC`,
+    )
+    return rows.map((row: { name: string }) => row.name)
   }
 
   // ---------------------------------------------------------------------------
@@ -358,15 +394,15 @@ export class BindingAuthoritiesService {
             : 0
 
         const cur = {
-          limit_amount:         s.limit_amount         ?? null,
-          excess_amount:        s.excess_amount        ?? null,
-          sum_insured:          s.sum_insured          ?? null,
-          gross_premium:        s.gross_premium        ?? null,
-          net_premium:          s.net_premium          ?? null,
-          tax_receivable:       s.tax_receivable       ?? null,
-          deductions:           s.deductions           ?? null,
+          limit_amount: s.limit_amount ?? null,
+          excess_amount: s.excess_amount ?? null,
+          sum_insured: s.sum_insured ?? null,
+          gross_premium: s.gross_premium ?? null,
+          net_premium: s.net_premium ?? null,
+          tax_receivable: s.tax_receivable ?? null,
+          deductions: s.deductions ?? null,
           annual_gross_premium: s.annual_gross_premium ?? null,
-          annual_net_premium:   s.annual_net_premium   ?? null,
+          annual_net_premium: s.annual_net_premium ?? null,
         }
 
         await this.dataSource.query(
@@ -432,45 +468,45 @@ export class BindingAuthoritiesService {
     if (!rows.length) throw new NotFoundException(`BA section transaction not found.`)
     const d = rows[0]
     return {
-      id:               d.id,
-      transaction_id:   d.ba_transaction_id,
-      section_id:       d.section_id,
+      id: d.id,
+      transaction_id: d.ba_transaction_id,
+      section_id: d.section_id,
       section_reference: d.section_reference,
-      ba_reference:     d.ba_reference,
+      ba_reference: d.ba_reference,
       transaction_type: d.transaction_type,
-      effective_date:   d.effective_date,
+      effective_date: d.effective_date,
       current: {
-        limit_amount:         d.limit_amount,
-        excess_amount:        d.excess_amount,
-        sum_insured:          d.sum_insured,
-        gross_premium:        d.gross_premium,
-        net_premium:          d.net_premium,
-        tax_receivable:       d.tax_receivable,
-        deductions:           d.deductions,
+        limit_amount: d.limit_amount,
+        excess_amount: d.excess_amount,
+        sum_insured: d.sum_insured,
+        gross_premium: d.gross_premium,
+        net_premium: d.net_premium,
+        tax_receivable: d.tax_receivable,
+        deductions: d.deductions,
         annual_gross_premium: d.annual_gross_premium,
-        annual_net_premium:   d.annual_net_premium,
+        annual_net_premium: d.annual_net_premium,
       },
       previous: {
-        limit_amount:         d.prev_limit_amount,
-        excess_amount:        d.prev_excess_amount,
-        sum_insured:          d.prev_sum_insured,
-        gross_premium:        d.prev_gross_premium,
-        net_premium:          d.prev_net_premium,
-        tax_receivable:       d.prev_tax_receivable,
-        deductions:           d.prev_deductions,
+        limit_amount: d.prev_limit_amount,
+        excess_amount: d.prev_excess_amount,
+        sum_insured: d.prev_sum_insured,
+        gross_premium: d.prev_gross_premium,
+        net_premium: d.prev_net_premium,
+        tax_receivable: d.prev_tax_receivable,
+        deductions: d.prev_deductions,
         annual_gross_premium: d.prev_annual_gross_premium,
-        annual_net_premium:   d.prev_annual_net_premium,
+        annual_net_premium: d.prev_annual_net_premium,
       },
       movements: {
-        limit_amount:         d.limit_amount_mvmt,
-        excess_amount:        d.excess_amount_mvmt,
-        sum_insured:          d.sum_insured_mvmt,
-        gross_premium:        d.gross_premium_mvmt,
-        net_premium:          d.net_premium_mvmt,
-        tax_receivable:       d.tax_receivable_mvmt,
-        deductions:           d.deductions_mvmt,
+        limit_amount: d.limit_amount_mvmt,
+        excess_amount: d.excess_amount_mvmt,
+        sum_insured: d.sum_insured_mvmt,
+        gross_premium: d.gross_premium_mvmt,
+        net_premium: d.net_premium_mvmt,
+        tax_receivable: d.tax_receivable_mvmt,
+        deductions: d.deductions_mvmt,
         annual_gross_premium: d.annual_gross_premium_mvmt,
-        annual_net_premium:   d.annual_net_premium_mvmt,
+        annual_net_premium: d.annual_net_premium_mvmt,
       },
     }
   }

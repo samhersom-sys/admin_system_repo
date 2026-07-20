@@ -198,7 +198,7 @@ The API shall return a unified list of records that the **current user** has rec
 
 **Display rules:**
 - Show record type as a badge (colour-coded using `brandColors` tokens)
-- Show reference number, insured name, status, and relative time (e.g. "2 hours ago") formatted via `formatters.relativeTime`
+- Show reference number, insured name, status, and last-opened date/time formatted as a short date-time string (e.g. "05/03/2026, 10:00") — same format as the "Last Opened" column in Search Results
 - Each row is a link that navigates to the relevant page for that record type
 - Maximum 10 records shown; no pagination on the homepage — "View all" link navigates to the relevant list page
 - Scoped to the **current user** (`userId`) — shows the current user's own recently opened records, not the org's last-updated records (see OQ-QUO-FE-001 in `docs/Technical Documentation/08-Open-Questions.md`)
@@ -368,7 +368,7 @@ The `submissions` and `quotes` counts are total-count measures (`countAll`). The
 
 ### 10.6 RecentActivityWidget
 
-**REQ-HOME-F-013:** The `RecentActivityWidget` shall call `GET /api/activity/recent?limit=10` and shall display up to 10 records each containing: record type (as a colour-coded badge), reference number, insured name, status, and last-updated time formatted via `formatters.relativeTime`.
+**REQ-HOME-F-013:** The `RecentActivityWidget` shall call `GET /api/activity/recent?limit=10` and shall display up to 10 records each containing: record type (as a colour-coded badge), reference number, insured name, status, and last-opened date/time formatted as a short date-time string (e.g. "05/03/2026, 10:00") — same format as the "Last Opened" column in Search Results (`en-GB` locale, `dateStyle: 'short'`, `timeStyle: 'short'`). If no date is available the cell shall show `—`.
 
 **REQ-HOME-F-014:** Each row in the `RecentActivityWidget` shall be a navigation link that routes to the correct record detail page for that record type.
 
