@@ -50,7 +50,7 @@ import { ChatMessage, NotificationMessage, NotificationTemplate, UserNotificatio
 
 // Lookups
 import {
-  LookupSubmissionStatus, LookupQuoteStatus, LookupPolicyStatus, LookupBindingAuthorityStatus,
+  LookupSubmissionStatus, LookupQuoteStatus, LookupPolicyStatus, LookupPolicyVersionStatus, LookupBindingAuthorityStatus,
   LookupContractType, LookupMethodOfPlacement, LookupRenewalStatus, LookupTransactionType,
   LookupLossQualifier, LookupClaimStatus, LookupClassOfBusiness, LookupBasisForOrder,
   LookupAnalysisBasis, LookupDateBasis, LookupWorkflowStatus, LookupPartyRole,
@@ -135,7 +135,7 @@ export const typeOrmOptions: DataSourceOptions = {
     Notification, ChatMessage, NotificationMessage, NotificationTemplate, UserNotification,
 
     // Lookups (27 tables)
-    LookupSubmissionStatus, LookupQuoteStatus, LookupPolicyStatus, LookupBindingAuthorityStatus,
+    LookupSubmissionStatus, LookupQuoteStatus, LookupPolicyStatus, LookupPolicyVersionStatus, LookupBindingAuthorityStatus,
     LookupContractType, LookupMethodOfPlacement, LookupRenewalStatus, LookupTransactionType,
     LookupLossQualifier, LookupClaimStatus, LookupClassOfBusiness, LookupBasisForOrder,
     LookupAnalysisBasis, LookupDateBasis, LookupWorkflowStatus, LookupPartyRole,

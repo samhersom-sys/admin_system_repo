@@ -14,11 +14,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FiSave, FiTrash2 } from 'react-icons/fi'
 import { getSession } from '@/shared/lib/auth-session/auth-session'
-import { createQuote, defaultQuoteExpiry } from '@/quotes/quotes.service'
+import { createQuote, defaultQuoteExpiry, getQuoteProducts } from '@/quotes/quotes.service'
+import type { QuoteProduct } from '@/quotes/quotes.service'
 import { getSubmission } from '@/submissions/submissions.service'
 import type { Submission } from '@/submissions/submissions.service'
-import { getProducts } from '@/settings/settings.service'
-import type { Product } from '@/settings/settings.service'
 import InsuredSearch from '@/parties/InsuredSearch/InsuredSearch'
 import type { Party } from '@/parties/parties.service'
 import SubmissionSearch from '@/submissions/SubmissionSearch/SubmissionSearch'
@@ -26,6 +25,7 @@ import { useSidebarSection } from '@/shell/SidebarContext'
 import type { SidebarSection } from '@/shell/SidebarContext'
 import { useNotifications } from '@/shell/NotificationDock'
 import Card from '@/shared/Card/Card'
+import { logger } from '@/shared/lib/logger/logger'
 
 // ---------------------------------------------------------------------------
 // Sidebar section
@@ -64,7 +64,7 @@ export default function NewQuotePage() {
     const [quoteCurrency, setQuoteCurrency] = useState('USD')
     const [productId, setProductId] = useState<number | null>(null)
     const [productCategory, setProductCategory] = useState('')
-    const [products, setProducts] = useState<Product[]>([])
+    const [products, setProducts] = useState<QuoteProduct[]>([])
     const [saveError, setSaveError] = useState<string | null>(null)
     const [isSaving, setIsSaving] = useState(false)
 
@@ -72,10 +72,13 @@ export default function NewQuotePage() {
 
     // Load available products
     useEffect(() => {
-        getProducts()
-            .then((prods) => setProducts(prods))
+        getQuoteProducts()
+            // A lookup may legitimately return no rows while configuration is
+            // being loaded. Treat that as an empty catalogue so quote entry
+            // remains available rather than crashing.
+            .then((prods) => setProducts(Array.isArray(prods) ? prods : []))
             .catch((err: unknown) => {
-                console.warn('Failed to load products:', err instanceof Error ? err.message : String(err))
+                logger.warn('Failed to load products:', err instanceof Error ? err.message : String(err))
             })
     }, [])
 

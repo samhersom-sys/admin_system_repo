@@ -220,7 +220,7 @@ export default function ReportsListPage() {
                         disabled={!isOn}
                         onChange={(e) => handlePageOrderChange(t.id, e.target.value)}
                         onBlur={() => void handlePageOrderBlur(t.id)}
-                        className="w-14 text-sm border rounded px-1 py-0.5 disabled:bg-gray-50 disabled:text-gray-400"
+                        className="w-14 text-sm border rounded px-1 py-0.5 disabled:bg-slate-50 disabled:text-gray-400"
                     />
                     {err && (
                         <span className="text-xs text-red-600" role="alert">{err}</span>

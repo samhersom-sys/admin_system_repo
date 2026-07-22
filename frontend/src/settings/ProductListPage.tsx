@@ -10,11 +10,11 @@ import { useSidebarSection } from '@/shell/SidebarContext'
 import {
     getProductCategories,
     getProducts,
+    getLookupClassesOfBusiness,
     type ProductCategory,
     type Product,
     type NewProductForm,
 } from './settings.service'
-import { getClassesOfBusiness } from '@/quotes/quotes.service'
 
 export default function ProductListPage() {
     const navigate = useNavigate()
@@ -69,8 +69,8 @@ export default function ProductListPage() {
     }, [])
 
     useEffect(() => {
-        getClassesOfBusiness()
-            .then((data) => setClassOfBusinessOptions(Array.isArray(data) ? data : []))
+        getLookupClassesOfBusiness()
+            .then((data) => setClassOfBusinessOptions(Array.isArray(data) ? data.map((item) => item.name) : []))
             .catch(() => setClassOfBusinessOptions([]))
     }, [])
 

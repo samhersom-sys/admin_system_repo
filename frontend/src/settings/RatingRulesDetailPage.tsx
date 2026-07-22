@@ -638,27 +638,27 @@ export default function RatingRulesDetailPage() {
                             </div>
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs font-medium text-gray-700">Latest Version</label>
-                                <div className="border border-gray-200 bg-gray-50 rounded px-3 py-2 text-sm text-gray-700">
+                                <div className="rounded border border-gray-200 bg-slate-50 px-3 py-2 text-sm text-gray-700">
                                     {latestVersion ?? schedule?.version ?? '—'}
                                 </div>
                             </div>
                             {!openedFromAudit && (
                                 <div className="flex flex-col gap-1">
                                     <label className="text-xs font-medium text-gray-700">Creating Version</label>
-                                    <div className="border border-gray-200 bg-gray-50 rounded px-3 py-2 text-sm text-gray-700">
+                                    <div className="rounded border border-gray-200 bg-slate-50 px-3 py-2 text-sm text-gray-700">
                                         {latestVersion !== null ? latestVersion + 1 : '—'}
                                     </div>
                                 </div>
                             )}
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs font-medium text-gray-700">Currency</label>
-                                <div className="border border-gray-200 bg-gray-50 rounded px-3 py-2 text-sm text-gray-700">
+                                <div className="rounded border border-gray-200 bg-slate-50 px-3 py-2 text-sm text-gray-700">
                                     {schedule?.currency ?? '—'}
                                 </div>
                             </div>
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs font-medium text-gray-700">Organisation</label>
-                                <div className="border border-gray-200 bg-gray-50 rounded px-3 py-2 text-sm text-gray-700">
+                                <div className="rounded border border-gray-200 bg-slate-50 px-3 py-2 text-sm text-gray-700">
                                     {schedule?.org_name ?? schedule?.org_code ?? '—'}
                                 </div>
                             </div>

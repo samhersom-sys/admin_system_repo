@@ -13,6 +13,7 @@ import type { TabItem } from '@/shared/components/TabsNav/TabsNav'
 import ResizableGrid from '@/shared/components/ResizableGrid/ResizableGrid'
 import type { Column, SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
 import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
+import PolicySectionFinanceSummary from '@/policies/PolicySectionFinanceSummary'
 import { useNotifications } from '@/shell/NotificationDock'
 import { useSidebarSection } from '@/shell/SidebarContext'
 import type { SidebarSection } from '@/shell/SidebarContext'
@@ -35,6 +36,7 @@ const TABS: TabItem[] = [
     { key: 'riskCodes', label: 'Risk Codes' },
     { key: 'participations', label: 'Participations' },
     { key: 'section-financial-summary', label: 'Section Financial Summary' },
+    { key: 'finance-summary', label: 'Finance Summary' },
     { key: 'signings', label: 'Signings' },
 ]
 
@@ -299,6 +301,12 @@ export default function PolicySectionViewPage() {
             {activeTab === 'participations' && (
                 <Card title="Participations">
                     <p className="text-sm text-gray-400">No participations found.</p>
+                </Card>
+            )}
+
+            {activeTab === 'finance-summary' && sectionId && (
+                <Card title="Finance Summary">
+                    <PolicySectionFinanceSummary sectionId={sectionId} />
                 </Card>
             )}
 

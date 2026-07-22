@@ -15,11 +15,11 @@ import type { TabItem } from '@/shared/components/TabsNav/TabsNav'
 import AuditTable from '@/shared/components/AuditTable/AuditTable'
 import { useAudit } from '@/shared/lib/hooks/useAudit'
 import { useResizableColumns } from '@/shared/lib/hooks/useResizableColumns'
-import { getClassesOfBusiness } from '@/quotes/quotes.service'
 import {
     createProduct,
     getProductCategories,
     getProduct,
+    getLookupClassesOfBusiness,
     type ProductCategory,
     updateProduct as saveProduct,
     type Product,
@@ -196,8 +196,8 @@ export default function ProductConfigPage() {
             .then((data) => setProductCategories(Array.isArray(data) ? data : []))
             .catch(() => setProductCategories([]))
 
-        getClassesOfBusiness()
-            .then((data) => setClassOfBusinessOptions(Array.isArray(data) ? data : []))
+        getLookupClassesOfBusiness()
+            .then((data) => setClassOfBusinessOptions(Array.isArray(data) ? data.map((item) => item.name) : []))
             .catch(() => setClassOfBusinessOptions([]))
     }, [])
 

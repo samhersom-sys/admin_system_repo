@@ -136,7 +136,7 @@ function PointEditor({ pattern, onClose }: PointEditorProps) {
                     </button>
                 </div>
 
-                <div className="px-6 py-4 space-y-4">
+                <div className="flex flex-col gap-4 px-6 py-4">
                     {/* Running total banner */}
                     <div
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${isComplete
@@ -275,7 +275,7 @@ function RuleForm({ patterns, initial, onSave, onCancel }: RuleFormProps) {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             {/* Pattern */}
             <div>
                 <label htmlFor="rule-pattern-select" className="block text-xs text-gray-500 mb-1">Pattern *</label>
@@ -557,7 +557,7 @@ export default function EarningsConfigPage() {
             {/* Page header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-lg font-semibold text-gray-900">Earnings Configuration</h1>
+                    <h2 className="text-lg font-semibold text-gray-900">Earnings Configuration</h2>
                     <p className="text-sm text-gray-500 mt-0.5">
                         Define how written premium is earned over the policy period.
                     </p>
@@ -605,7 +605,7 @@ export default function EarningsConfigPage() {
                     {showCreatePattern && (
                         <form
                             onSubmit={handleCreatePattern}
-                            className="mb-4 p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3"
+                            className="mb-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-slate-50 p-4"
                         >
                             <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
                                 New Pattern
@@ -783,7 +783,7 @@ export default function EarningsConfigPage() {
 
                     {/* Rule form */}
                     {(showRuleForm || editingRule) && (
-                        <div className="mb-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                        <div className="mb-4 rounded-lg border border-gray-200 bg-slate-50 p-4">
                             <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
                                 {editingRule ? 'Edit Rule' : 'New Rule'}
                             </p>

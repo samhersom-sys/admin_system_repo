@@ -314,7 +314,7 @@ describe('T-settings-products-R04c: product category management page', () => {
       expect(apiClient.get).toHaveBeenCalledWith('/api/settings/product-categories')
     })
 
-    expect(screen.getByText('Property Catagory')).toBeInTheDocument()
+    expect(await screen.findByText('Property Catagory')).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /create product catagory/i }))

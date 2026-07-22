@@ -27,6 +27,21 @@ function normaliseLookupValues(items: LookupOption[] | null | undefined): string
 
 export type QuoteStatus = 'Draft' | 'Created' | 'Quoted' | 'Bound' | 'Declined'
 
+// Product data is a read-model used while composing a quote. Keeping this
+// adapter in the Quotes domain avoids a UI-to-UI dependency on Settings.
+export interface QuoteProduct {
+    id: number
+    name: string
+    code: string
+    product_type: string
+    productCategoryId: number | null
+    productCategoryName: string
+    line_of_business: string
+    underwriting_year: number
+    description: string
+    is_active: boolean
+}
+
 export interface Quote {
     id: number
     reference: string
@@ -497,6 +512,10 @@ export async function getCurrencies(): Promise<string[]> {
 export async function getClassesOfBusiness(): Promise<string[]> {
     const rows = await get<LookupOption[]>('/api/lookups/classesOfBusiness')
     return normaliseLookupValues(rows)
+}
+
+export async function getQuoteProducts(): Promise<QuoteProduct[]> {
+    return get<QuoteProduct[]>('/api/settings/products')
 }
 
 export async function getLossQualifiers(): Promise<string[]> {

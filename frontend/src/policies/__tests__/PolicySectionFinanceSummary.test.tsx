@@ -37,6 +37,9 @@ import EarningsConfigPage from '../../settings/EarningsConfigPage'
 // ---------------------------------------------------------------------------
 // api-client — named function exports (per copilot-instructions.md §API rule)
 // ---------------------------------------------------------------------------
+// API CONTRACT: GET earning-period endpoints and POST calculation endpoints are
+// mocked as verified service contracts; each returns the raw JSON shape used by
+// the Finance Summary UI.
 const mockApiGet = jest.fn()
 const mockApiPost = jest.fn()
 jest.mock('@/shared/lib/api-client/api-client', () => ({

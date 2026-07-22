@@ -692,13 +692,13 @@ export default function QuoteSectionViewPage() {
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Delegated Authority Reference</label>
                                 {editable ? (
-                                    <input type="text" className={CONTROL_CLASS} value={section.delegated_authority_ref ?? ''} onChange={(e) => setSection((s) => s ? { ...s, delegated_authority_ref: e.target.value } : s)} />
+                                    <input aria-label="Delegated Authority Reference" type="text" className={CONTROL_CLASS} value={section.delegated_authority_ref ?? ''} onChange={(e) => setSection((s) => s ? { ...s, delegated_authority_ref: e.target.value } : s)} />
                                 ) : <p className="text-sm text-gray-900">{section.delegated_authority_ref ?? '—'}</p>}
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Delegated Authority Section Reference</label>
                                 {editable ? (
-                                    <input type="text" className={CONTROL_CLASS} value={section.delegated_authority_section_ref ?? ''} onChange={(e) => setSection((s) => s ? { ...s, delegated_authority_section_ref: e.target.value } : s)} />
+                                    <input aria-label="Delegated Authority Section Reference" type="text" className={CONTROL_CLASS} value={section.delegated_authority_section_ref ?? ''} onChange={(e) => setSection((s) => s ? { ...s, delegated_authority_section_ref: e.target.value } : s)} />
                                 ) : <p className="text-sm text-gray-900">{section.delegated_authority_section_ref ?? '—'}</p>}
                             </div>
                         </div>
@@ -855,26 +855,26 @@ export default function QuoteSectionViewPage() {
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Time Basis</label>
                                 {editable ? (
-                                    <input type="text" className={CONTROL_CLASS} value={section.time_basis ?? ''} onChange={(e) => setSection((s) => s ? { ...s, time_basis: e.target.value } : s)} />
+                                    <input aria-label="Time Basis" type="text" className={CONTROL_CLASS} value={section.time_basis ?? ''} onChange={(e) => setSection((s) => s ? { ...s, time_basis: e.target.value } : s)} />
                                 ) : <p className="text-sm text-gray-900">{section.time_basis ?? '—'}</p>}
                             </div>
                             <div className="grid grid-cols-3 gap-2">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Written Order %</label>
                                     {editable ? (
-                                        <input type="number" step="0.01" min="0" max="100" className={CONTROL_CLASS} value={section.written_order ?? ''} onChange={(e) => setSection((s) => s ? { ...s, written_order: Number(e.target.value) } : s)} />
+                                        <input aria-label="Written Order %" type="number" step="0.01" min="0" max="100" className={CONTROL_CLASS} value={section.written_order ?? ''} onChange={(e) => setSection((s) => s ? { ...s, written_order: Number(e.target.value) } : s)} />
                                     ) : <p className="text-sm text-gray-900 text-right">{section.written_order != null ? `${section.written_order}%` : '—'}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Written Order Basis</label>
                                     {editable ? (
-                                        <input type="text" className={CONTROL_CLASS} value={section.written_order_basis ?? ''} onChange={(e) => setSection((s) => s ? { ...s, written_order_basis: e.target.value } : s)} />
+                                        <input aria-label="Written Order Basis" type="text" className={CONTROL_CLASS} value={section.written_order_basis ?? ''} onChange={(e) => setSection((s) => s ? { ...s, written_order_basis: e.target.value } : s)} />
                                     ) : <p className="text-sm text-gray-900">{section.written_order_basis ?? '—'}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Written Line Total</label>
                                     {editable ? (
-                                        <input type="number" step="0.01" className={CONTROL_CLASS} value={section.written_line_total ?? ''} onChange={(e) => setSection((s) => s ? { ...s, written_line_total: Number(e.target.value) } : s)} />
+                                        <input aria-label="Written Line Total" type="number" step="0.01" className={CONTROL_CLASS} value={section.written_line_total ?? ''} onChange={(e) => setSection((s) => s ? { ...s, written_line_total: Number(e.target.value) } : s)} />
                                     ) : <p className="text-sm text-gray-900 text-right">{section.written_line_total != null ? Number(section.written_line_total).toLocaleString() : '—'}</p>}
                                 </div>
                             </div>
@@ -882,19 +882,19 @@ export default function QuoteSectionViewPage() {
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Signed Order %</label>
                                     {editable ? (
-                                        <input type="number" step="0.01" min="0" max="100" className={CONTROL_CLASS} value={section.signed_order ?? ''} onChange={(e) => setSection((s) => s ? { ...s, signed_order: Number(e.target.value) } : s)} />
+                                        <input aria-label="Signed Order %" type="number" step="0.01" min="0" max="100" className={CONTROL_CLASS} value={section.signed_order ?? ''} onChange={(e) => setSection((s) => s ? { ...s, signed_order: Number(e.target.value) } : s)} />
                                     ) : <p className="text-sm text-gray-900 text-right">{section.signed_order != null ? `${section.signed_order}%` : '—'}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Signed Order Basis</label>
                                     {editable ? (
-                                        <input type="text" className={CONTROL_CLASS} value={section.signed_order_basis ?? ''} onChange={(e) => setSection((s) => s ? { ...s, signed_order_basis: e.target.value } : s)} />
+                                        <input aria-label="Signed Order Basis" type="text" className={CONTROL_CLASS} value={section.signed_order_basis ?? ''} onChange={(e) => setSection((s) => s ? { ...s, signed_order_basis: e.target.value } : s)} />
                                     ) : <p className="text-sm text-gray-900">{section.signed_order_basis ?? '—'}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Signed Line Total</label>
                                     {editable ? (
-                                        <input type="number" step="0.01" className={CONTROL_CLASS} value={section.signed_line_total ?? ''} onChange={(e) => setSection((s) => s ? { ...s, signed_line_total: Number(e.target.value) } : s)} />
+                                        <input aria-label="Signed Line Total" type="number" step="0.01" className={CONTROL_CLASS} value={section.signed_line_total ?? ''} onChange={(e) => setSection((s) => s ? { ...s, signed_line_total: Number(e.target.value) } : s)} />
                                     ) : <p className="text-sm text-gray-900 text-right">{section.signed_line_total != null ? Number(section.signed_line_total).toLocaleString() : '—'}</p>}
                                 </div>
                             </div>

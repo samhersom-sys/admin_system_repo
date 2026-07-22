@@ -44,6 +44,7 @@ import {
     getRenewalStatuses,
     getCurrencies,
     getClassesOfBusiness,
+    getQuoteProducts,
     listSections,
     createSection,
     updateSection,
@@ -63,8 +64,7 @@ import type { SidebarSection } from '@/shell/SidebarContext'
 import { useNotifications } from '@/shell/NotificationDock'
 import { getSession } from '@/shared/lib/auth-session/auth-session'
 import { post } from '@/shared/lib/api-client/api-client'
-import { getProducts } from '@/settings/settings.service'
-import type { Product } from '@/settings/settings.service'
+import type { QuoteProduct } from '@/quotes/quotes.service'
 import { buildAuditDiff } from '@/shared/lib/audit/buildAuditDiff'
 import Card from '@/shared/Card/Card'
 import TabsNav from '@/shared/components/TabsNav/TabsNav'
@@ -252,7 +252,7 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
     const [renewalStatuses, setRenewalStatuses] = useState<string[]>([])
     const [currencies, setCurrencies] = useState<string[]>([])
     const [classesOfBusiness, setClassesOfBusiness] = useState<string[]>([])
-    const [products, setProducts] = useState<Product[]>([])
+    const [products, setProducts] = useState<QuoteProduct[]>([])
     const [productCategory, setProductCategory] = useState('')
 
     // Save-attempt guard — validation errors only surface after first save attempt (F-025)
@@ -438,7 +438,7 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
         Promise.resolve(getRenewalStatuses()).then(setRenewalStatuses).catch(() => setRenewalStatuses([]))
         Promise.resolve(getCurrencies()).then((c) => setCurrencies(c ?? [])).catch(() => setCurrencies([]))
         Promise.resolve(getClassesOfBusiness()).then((items) => setClassesOfBusiness(items ?? [])).catch(() => setClassesOfBusiness([]))
-        Promise.resolve(getProducts()).then((items) => setProducts(items ?? [])).catch(() => setProducts([]))
+        Promise.resolve(getQuoteProducts()).then((items) => setProducts(items ?? [])).catch(() => setProducts([]))
     }, [])
 
     const productCategories = useMemo(

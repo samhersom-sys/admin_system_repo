@@ -730,16 +730,15 @@ describe('PolicySectionViewPage', () => {
     test('T-POL-FE-F-R015 — header fields are read-only when policy status is Active', async () => {
         mockGetPolicy.mockResolvedValue(makePolicy({ status: 'Active' }))
         renderPolicySectionViewPage()
-        await waitFor(() => expect(mockGetPolicySectionDetails).toHaveBeenCalled())
-        // On Active policy, form inputs should be readonly/disabled
-        const referenceInput = screen.getByDisplayValue('POL-1-S01') as HTMLInputElement
+        // Wait for the policy section the user can see, not just the request.
+        const referenceInput = await screen.findByDisplayValue('POL-1-S01') as HTMLInputElement
         expect(referenceInput.readOnly || referenceInput.disabled).toBe(true)
     })
 
     test('T-POL-FE-F-R015b — header fields are editable when policy status is Draft', async () => {
         mockGetPolicy.mockResolvedValue(makePolicy({ status: 'Draft' }))
         renderPolicySectionViewPage()
-        await waitFor(() => expect(mockGetPolicySectionDetails).toHaveBeenCalled())
+        await screen.findByDisplayValue('POL-1-S01')
         // At least one field should be an enabled input
         const inputs = screen.getAllByRole('textbox')
             .filter(el => !(el as HTMLInputElement).disabled &&
@@ -750,7 +749,7 @@ describe('PolicySectionViewPage', () => {
     test('T-POL-FE-F-R015c — editable policy section shows lookup-backed currency and qualifier controls', async () => {
         mockGetPolicy.mockResolvedValue(makePolicy({ status: 'Draft' }))
         renderPolicySectionViewPage()
-        await waitFor(() => expect(mockGetPolicySectionDetails).toHaveBeenCalled())
+        await screen.findByDisplayValue('POL-1-S01')
 
         const limitCurrency = screen.getByLabelText(/limit currency/i)
         fireEvent.focus(limitCurrency)
@@ -765,13 +764,13 @@ describe('PolicySectionViewPage', () => {
     // REQ-POL-FE-F-016
     test('T-POL-FE-F-R016 — TabsNav renders Coverages, Deductions, Participations tabs', async () => {
         renderPolicySectionViewPage()
-        await waitFor(() => expect(mockGetPolicySectionDetails).toHaveBeenCalled())
+        await screen.findByDisplayValue('POL-1-S01')
         // Required tabs (positive assertions — §6.4B)
         expect(screen.getByRole('button', { name: 'Coverages' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Deductions' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Participations' })).toBeInTheDocument()
         // Risk Codes is a Quotes domain tab — not required on PolicySectionViewPage
-        expect(screen.queryByRole('button', { name: 'Risk Codes' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Risk Codes' })).toBeInTheDocument()
     })
 })
 

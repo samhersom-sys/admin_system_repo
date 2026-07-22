@@ -47,7 +47,7 @@ export default function QuoteLocationsPage() {
             </div>
 
             <div>
-                <h1 className="text-lg font-semibold text-gray-900">Schedule of Values</h1>
+                <h2 className="text-lg font-semibold text-gray-900">Schedule of Values</h2>
                 <p className="text-sm text-gray-500">Manage schedules for this quote.</p>
             </div>
 

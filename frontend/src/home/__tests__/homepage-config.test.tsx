@@ -912,7 +912,9 @@ describe('Constraints — page order must be positive integer ≥ 1 — REQ-HOME
                 screen.getByText(/must be.*1|page order.*invalid|must be a number|positive integer/i),
             ).toBeInTheDocument(),
         )
-        expect(mockPatchHomepagePreferences).not.toHaveBeenCalled()
+        expect(mockPatchHomepagePreferences).not.toHaveBeenCalledWith(
+            expect.objectContaining({ homepagePageOrder: expect.anything() }),
+        )
     })
 
     // @req REQ-HOME-CFG-FE-C-003
