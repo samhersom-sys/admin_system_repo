@@ -1,7 +1,7 @@
 /**
- * BASectionViewPage — REQ-BA-FE-F-073 to F-086
+ * BASectionViewPage — REQ-BA-FE-F-073 to F-087
  *
- * 4-tab view: Coverage | Participations | Authorized Risk Codes | GPI Monitoring
+ * 5-tab view: Coverage | Participations | Authorized Risk Codes | GPI Monitoring | Rating Configuration
  * Participations: share % must total 100 ± 0.0001
  */
 
@@ -28,16 +28,18 @@ import {
     type Participation,
     type ClassOfBusiness,
 } from '../binding-authorities.service'
+import BASectionRatingConfiguration from './BASectionRatingConfiguration'
 
 const TIME_BASIS_OPTIONS = ['Claims-Made', 'Occurrence', 'Manifest']
 
-type Tab = 'coverage' | 'participations' | 'risk-codes' | 'gpi'
+type Tab = 'coverage' | 'participations' | 'risk-codes' | 'gpi' | 'rating'
 
 const TABS: { key: Tab; label: string }[] = [
     { key: 'coverage', label: 'Coverage' },
     { key: 'participations', label: 'Participations' },
     { key: 'risk-codes', label: 'Authorized Risk Codes' },
     { key: 'gpi', label: 'GPI Monitoring' },
+    { key: 'rating', label: 'Rating Configuration' },
 ]
 
 export default function BASectionViewPage() {
@@ -499,6 +501,11 @@ export default function BASectionViewPage() {
                         </div>
                     )}
                 </div>
+            )}
+
+            {/* Rating Configuration tab */}
+            {activeTab === 'rating' && (
+                <BASectionRatingConfiguration baId={baId} />
             )}
 
             <datalist id="ba-section-class-of-business-options">

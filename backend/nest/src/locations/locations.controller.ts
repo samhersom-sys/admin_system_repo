@@ -9,6 +9,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -83,5 +84,85 @@ export class LocationsScheduleController {
   @Get('imports/:id/historical')
   getHistorical(@Param('id', ParseIntPipe) id: number) {
     return this.locationsService.getHistorical(id)
+  }
+
+  // -----------------------------------------------------------------------
+  // Block 2 — Normalised CRUD for locations + location_coverages
+  // REQ-LOC-BE-NE-F-011 to F-017
+  // -----------------------------------------------------------------------
+
+  // POST /api/locations-schedule/quotes/:quoteId/locations/rows
+  @Post('quotes/:quoteId/locations/rows')
+  addLocation(
+    @Param('quoteId', ParseIntPipe) quoteId: number,
+    @Body() body: Record<string, unknown>,
+    @Req() req: any,
+  ) {
+    return this.locationsService.addLocation(quoteId, req.user.orgCode, body)
+  }
+
+  // PUT /api/locations-schedule/quotes/:quoteId/locations/rows/:locationId
+  @Put('quotes/:quoteId/locations/rows/:locationId')
+  updateLocation(
+    @Param('quoteId', ParseIntPipe) quoteId: number,
+    @Param('locationId', ParseIntPipe) locationId: number,
+    @Body() body: Record<string, unknown>,
+    @Req() req: any,
+  ) {
+    return this.locationsService.updateLocation(quoteId, locationId, req.user.orgCode, body)
+  }
+
+  // DELETE /api/locations-schedule/quotes/:quoteId/locations/rows/:locationId
+  @Delete('quotes/:quoteId/locations/rows/:locationId')
+  deleteLocation(
+    @Param('quoteId', ParseIntPipe) quoteId: number,
+    @Param('locationId', ParseIntPipe) locationId: number,
+    @Req() req: any,
+  ) {
+    return this.locationsService.deleteLocation(quoteId, locationId, req.user.orgCode)
+  }
+
+  // POST /api/locations-schedule/quotes/:quoteId/locations/rows/:locationId/coverages
+  @Post('quotes/:quoteId/locations/rows/:locationId/coverages')
+  addCoverage(
+    @Param('quoteId', ParseIntPipe) quoteId: number,
+    @Param('locationId', ParseIntPipe) locationId: number,
+    @Body() body: Record<string, unknown>,
+    @Req() req: any,
+  ) {
+    return this.locationsService.addCoverage(quoteId, locationId, req.user.orgCode, body)
+  }
+
+  // PUT /api/locations-schedule/quotes/:quoteId/locations/rows/:locationId/coverages/:coverageId
+  @Put('quotes/:quoteId/locations/rows/:locationId/coverages/:coverageId')
+  updateCoverage(
+    @Param('quoteId', ParseIntPipe) quoteId: number,
+    @Param('locationId', ParseIntPipe) locationId: number,
+    @Param('coverageId', ParseIntPipe) coverageId: number,
+    @Body() body: Record<string, unknown>,
+    @Req() req: any,
+  ) {
+    return this.locationsService.updateCoverage(quoteId, locationId, coverageId, req.user.orgCode, body)
+  }
+
+  // DELETE /api/locations-schedule/quotes/:quoteId/locations/rows/:locationId/coverages/:coverageId
+  @Delete('quotes/:quoteId/locations/rows/:locationId/coverages/:coverageId')
+  deleteCoverage(
+    @Param('quoteId', ParseIntPipe) quoteId: number,
+    @Param('locationId', ParseIntPipe) locationId: number,
+    @Param('coverageId', ParseIntPipe) coverageId: number,
+    @Req() req: any,
+  ) {
+    return this.locationsService.deleteCoverage(quoteId, locationId, coverageId, req.user.orgCode)
+  }
+
+  // POST /api/locations-schedule/imports/:quoteId/save-version
+  @Post('imports/:quoteId/save-version')
+  saveVersion(
+    @Param('quoteId', ParseIntPipe) quoteId: number,
+    @Req() req: any,
+  ) {
+    const createdBy = req.user.email ?? req.user.name ?? 'unknown'
+    return this.locationsService.saveVersion(quoteId, req.user.orgCode, createdBy)
   }
 }

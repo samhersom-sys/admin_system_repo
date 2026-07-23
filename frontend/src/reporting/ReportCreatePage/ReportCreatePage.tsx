@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { FiPlus, FiX, FiArrowUp, FiArrowDown, FiSearch, FiSave } from 'react-icons/fi'
 import { useNotifications } from '@/shell/NotificationDock'
 import { useSidebarSection } from '@/shell/SidebarContext'
@@ -274,10 +274,18 @@ function FilterValueInput({
 export default function ReportCreatePage() {
     const navigate = useNavigate()
     const { id } = useParams<{ id: string }>()
+    const location = useLocation()
     const isEdit = id !== undefined
     const { addNotification } = useNotifications()
 
-    const [form, setForm] = useState<CreateReportTemplateInput>(EMPTY_FORM)
+    const copyFrom = (location.state as { copyFrom?: { name?: string; description?: string } } | null)?.copyFrom
+
+    const [form, setForm] = useState<CreateReportTemplateInput>(() => ({
+        ...EMPTY_FORM,
+        ...(copyFrom && !isEdit
+            ? { name: copyFrom.name ?? '', description: copyFrom.description ?? '' }
+            : {}),
+    }))
     const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([])
     const [dateBasisOptions, setDateBasisOptions] = useState<string[]>([])
     const [loadingTemplate, setLoadingTemplate] = useState(isEdit)

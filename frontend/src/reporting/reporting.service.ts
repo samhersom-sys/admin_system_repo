@@ -5,7 +5,7 @@
  * REQ-RPT-FE-C-001 — all API calls via @/shared/lib/api-client/api-client
  */
 
-import { get, post, put, del } from '@/shared/lib/api-client/api-client'
+import { get, post, put, del, patch } from '@/shared/lib/api-client/api-client'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -265,4 +265,27 @@ export async function getDashboardWidgetData(
         widget,
         filters,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Homepage preference API adapters (REQ-HOME-CFG-FE-F-003 to F-006)
+// REQ-HOME-CFG-FE-C-001 — all calls via api-client patch helper, no direct fetch/axios
+// REQ-HOME-CFG-FE-S-001 — /users/me/ endpoints (no /:userId/ path param — IDOR-free)
+// ---------------------------------------------------------------------------
+
+export async function patchMasterHomepage(payload: {
+    masterHomepageTemplateId: number | null
+}): Promise<{ id: number; masterHomepageTemplateId: number | null }> {
+    return patch<{ id: number; masterHomepageTemplateId: number | null }>(
+        '/api/users/me/master-homepage',
+        payload,
+    )
+}
+
+export async function patchHomepagePreferences(payload: {
+    templateId: number
+    showOnHomepage?: boolean
+    homepagePageOrder?: number | null
+}): Promise<Record<string, unknown>> {
+    return patch<Record<string, unknown>>('/api/users/me/homepage-preferences', payload)
 }

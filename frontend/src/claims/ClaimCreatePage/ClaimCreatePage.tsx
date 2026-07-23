@@ -88,7 +88,8 @@ export default function ClaimCreatePage() {
                                     value={policyRef}
                                     onChange={(e) => setPolicyRef(e.target.value)}
                                     aria-label="Policy Reference"
-                                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                    className={`w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 ${errors.policyRef ? 'app-input-invalid' : ''}`}
+                                    aria-invalid={errors.policyRef ? 'true' : 'false'}
                                 />
                                 {errors.policyRef && (
                                     <p className="text-xs text-red-600 mt-1">{errors.policyRef}</p>
@@ -105,7 +106,8 @@ export default function ClaimCreatePage() {
                                     value={lossDate}
                                     onChange={(e) => setLossDate(e.target.value)}
                                     aria-label="Date of Loss"
-                                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                    className={`w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 ${errors.lossDate ? 'app-input-invalid' : ''}`}
+                                    aria-invalid={errors.lossDate ? 'true' : 'false'}
                                 />
                                 {errors.lossDate && (
                                     <p className="text-xs text-red-600 mt-1">{errors.lossDate}</p>

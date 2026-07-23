@@ -16,7 +16,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 // Mocks
 //
 // API CONTRACT ALIGNMENT (verified 2026-03-06 against real backend):
-//   POST /api/auth/login  ? { message: string, token: string, user: { id, username, email, fullName, orgCode, role } }
+//   POST /api/auth/login  ? { message: string, token: string, user: { id, username, email, fullName, orgCode, orgType, role } }
 //   No .data wrapper � backend returns the object directly at root level
 // ---------------------------------------------------------------------------
 
@@ -51,6 +51,7 @@ const MOCK_LOGIN_SUCCESS = {
         email: 'jane@example.com',
         fullName: 'Jane Smith',
         orgCode: 'ORG-001',
+        orgType: 'broker',
         role: 'underwriter',
     },
 }

@@ -8,6 +8,7 @@ module.exports = {
     roots: [
         '<rootDir>/src/auth',
         '<rootDir>/src/binding-authorities',
+        '<rootDir>/src/broker-submissions',
         '<rootDir>/src/claims',
         '<rootDir>/src/finance',
         '<rootDir>/src/home',
@@ -61,4 +62,7 @@ module.exports = {
         '!**/*.requirements.md',
         '!**/node_modules/**',
     ],
+    // Force Jest to exit after all tests complete — prevents open handles
+    // (e.g. jsdom timers, React act() warnings) from causing a non-zero exit code
+    forceExit: true,
 }

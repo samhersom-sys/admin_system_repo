@@ -57,6 +57,26 @@ export class BindingAuthoritiesController {
     return this.baService.listCurrencies()
   }
 
+  @Get('lookups/lossQualifiers')
+  listLossQualifiers() {
+    return this.baService.listLossQualifiers()
+  }
+
+  @Get('lookups/contractTypes')
+  listContractTypes() {
+    return this.baService.listContractTypes()
+  }
+
+  @Get('lookups/methodsOfPlacement')
+  listMethodsOfPlacement() {
+    return this.baService.listMethodsOfPlacement()
+  }
+
+  @Get('lookups/renewalStatuses')
+  listRenewalStatuses() {
+    return this.baService.listRenewalStatuses()
+  }
+
   @Post('binding-authorities')
   @HttpCode(201)
   create(@Req() req: any, @Body() body: Record<string, unknown>) {

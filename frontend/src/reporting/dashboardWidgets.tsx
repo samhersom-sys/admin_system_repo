@@ -34,6 +34,7 @@ export const DASHBOARD_DATA_SOURCES = [
     { key: 'submissions', label: 'Submissions' },
     { key: 'quotes', label: 'Quotes' },
     { key: 'policies', label: 'Policies' },
+    { key: 'policyUserSummary', label: 'Policy User Summary' },
     { key: 'policyTransactions', label: 'Policy Transactions' },
     { key: 'bindingAuthorities', label: 'Binding Authorities' },
     { key: 'parties', label: 'Parties' },
@@ -160,10 +161,7 @@ function LoadingWidgetView({ widget, getFieldLabel }: { widget: DashboardWidget;
     if (widget.type === 'table') {
         return (
             <div className="h-full rounded-lg border border-amber-100 bg-white p-3 flex flex-col gap-2">
-                <div>
-                    <p className="text-sm font-semibold text-gray-900">{widget.title}</p>
-                    <p className="text-[11px] text-gray-500">{(widget.attributes ?? []).map((value) => getFieldLabel(value)).join(', ')}</p>
-                </div>
+                <p className="text-sm font-semibold text-gray-900">{widget.title}</p>
                 <div className="flex-1 rounded-lg border border-dashed border-gray-300 bg-white/70 p-4 flex items-center justify-center text-sm text-gray-500">
                     Loading live data...
                 </div>
@@ -297,13 +295,184 @@ function TableWidgetView({ widget, data, getFieldLabel }: { widget: DashboardWid
     if (data.rows.length === 0) {
         return <div className="h-full rounded-lg border border-amber-100 bg-white p-3 flex items-center justify-center text-sm text-gray-500">No data available</div>
     }
+
+    const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set())
+
+    const hierarchyKeys = ['hierarchyLevel1', 'hierarchyLevel2', 'hierarchyLevel3', 'hierarchyLevel4', 'hierarchyLevel5']
+    const hasHierarchyTreeData = data.rows.some((row) => hierarchyKeys.some((key) => key in row))
+
     const headers = Object.keys(data.rows[0])
+
+    if (hasHierarchyTreeData) {
+        type HierarchyNode = {
+            key: string
+            label: string
+            depth: number
+            children: Map<string, HierarchyNode>
+            numericSums: Record<string, number>
+            ratioSums: Record<string, number>
+            ratioCounts: Record<string, number>
+        }
+
+        const isHierarchyHelper = (key: string) => hierarchyKeys.includes(key) || key === 'user' || key === 'hierarchy' || key === 'hierarchyPath'
+        const measureHeaders = headers.filter((key) => !isHierarchyHelper(key))
+        const numericHeaders = measureHeaders.filter((key) => data.rows.some((row) => Number.isFinite(Number(row[key]))))
+
+        const capPercent = (value: number) => Math.min(100, Math.max(0, value))
+
+        const root: HierarchyNode = {
+            key: '__root__',
+            label: 'Root',
+            depth: -1,
+            children: new Map(),
+            numericSums: {},
+            ratioSums: {},
+            ratioCounts: {},
+        }
+
+        for (const row of data.rows) {
+            const chain = [
+                String(row.hierarchyLevel1 ?? ''),
+                String(row.hierarchyLevel2 ?? ''),
+                String(row.hierarchyLevel3 ?? ''),
+                String(row.hierarchyLevel4 ?? ''),
+                String(row.hierarchyLevel5 ?? ''),
+                String(row.user ?? ''),
+            ].map((value) => value.trim()).filter((value) => value && value.toLowerCase() !== 'unassigned')
+
+            const levels = chain.length > 0 ? chain : [String(row.hierarchy ?? row.hierarchyPath ?? row.user ?? 'Unassigned')]
+
+            let cursor = root
+            levels.forEach((label, depth) => {
+                const nodeKey = `${cursor.key}/${label}`
+                if (!cursor.children.has(nodeKey)) {
+                    cursor.children.set(nodeKey, {
+                        key: nodeKey,
+                        label,
+                        depth,
+                        children: new Map(),
+                        numericSums: {},
+                        ratioSums: {},
+                        ratioCounts: {},
+                    })
+                }
+                const next = cursor.children.get(nodeKey)
+                if (!next) return
+
+                for (const header of numericHeaders) {
+                    const value = Number(row[header])
+                    if (!Number.isFinite(value)) continue
+                    if (/ratio/i.test(header)) {
+                        next.ratioSums[header] = (next.ratioSums[header] ?? 0) + value
+                        next.ratioCounts[header] = (next.ratioCounts[header] ?? 0) + 1
+                    } else {
+                        next.numericSums[header] = (next.numericSums[header] ?? 0) + value
+                    }
+                }
+                cursor = next
+            })
+        }
+        const flatRows: Array<{ node: HierarchyNode; values: Record<string, string> }> = []
+        const walk = (node: HierarchyNode) => {
+            const values: Record<string, string> = {}
+            for (const header of measureHeaders) {
+                if (header === 'retentionRatio') {
+                    const renewableCount = node.numericSums.renewablePolicyCount ?? 0
+                    const renewedCount = node.numericSums.renewedPolicyCount ?? 0
+                    if (renewableCount <= 0) {
+                        values[header] = ''
+                    } else {
+                        const ratio = capPercent((renewedCount / renewableCount) * 100)
+                        values[header] = `${ratio.toFixed(4)}%`
+                    }
+                } else if (header === 'retentionRatioGrossWrittenPremium') {
+                    const renewablePremium = node.numericSums.renewableGrossWrittenPremium ?? 0
+                    const renewedPremium = node.numericSums.renewedGrossWrittenPremium ?? 0
+                    if (renewablePremium <= 0) {
+                        values[header] = ''
+                    } else {
+                        const ratio = capPercent((renewedPremium / renewablePremium) * 100)
+                        values[header] = `${ratio.toFixed(4)}%`
+                    }
+                } else if (/ratio/i.test(header)) {
+                    const count = node.ratioCounts[header] ?? 0
+                    const avg = count > 0 ? capPercent((node.ratioSums[header] ?? 0) / count) : 0
+                    values[header] = count > 0 ? `${avg.toFixed(4)}%` : ''
+                } else if (header in node.numericSums) {
+                    values[header] = String(Number(node.numericSums[header].toFixed(4)))
+                } else {
+                    values[header] = ''
+                }
+            }
+
+            flatRows.push({ node, values })
+
+            if (!expandedKeys.has(node.key)) return
+            const children = Array.from(node.children.values()).sort((a, b) => a.label.localeCompare(b.label))
+            for (const child of children) walk(child)
+        }
+
+        const topNodes = Array.from(root.children.values()).sort((a, b) => a.label.localeCompare(b.label))
+        for (const node of topNodes) walk(node)
+
+        return (
+            <div className="h-full rounded-lg border border-amber-100 bg-white p-3 flex flex-col gap-2 overflow-hidden">
+                <p className="text-sm font-semibold text-gray-900">{widget.title}</p>
+                <div className="overflow-auto text-xs">
+                    <table className="min-w-full border-collapse">
+                        <thead>
+                            <tr>
+                                <th className="border-b border-amber-100 px-2 py-1 text-left font-medium text-gray-700">Hierarchy</th>
+                                {measureHeaders.map((header) => (
+                                    <th key={header} className="border-b border-amber-100 px-2 py-1 text-left font-medium text-gray-700">{titleFromKey(header)}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {flatRows.map(({ node, values }) => {
+                                const childrenCount = node.children.size
+                                const isExpanded = expandedKeys.has(node.key)
+                                const isTotalNode = childrenCount > 0
+                                return (
+                                    <tr key={`${widget.id}-${node.key}`}>
+                                        <td className={`border-b border-amber-50 px-2 py-1 text-gray-700 ${isTotalNode ? 'font-semibold' : 'font-medium'}`}>
+                                            <div className="flex items-center gap-1" style={{ paddingLeft: `${node.depth * 14}px` }}>
+                                                {childrenCount > 0 ? (
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${node.label}`}
+                                                        className="h-4 w-4 text-[10px] rounded border border-amber-200 text-amber-700 leading-none"
+                                                        onClick={() => {
+                                                            setExpandedKeys((prev) => {
+                                                                const next = new Set(prev)
+                                                                if (next.has(node.key)) next.delete(node.key)
+                                                                else next.add(node.key)
+                                                                return next
+                                                            })
+                                                        }}
+                                                    >
+                                                        {isExpanded ? '-' : '+'}
+                                                    </button>
+                                                ) : <span className="inline-block w-4" />}
+                                                <span>{node.label}</span>
+                                            </div>
+                                        </td>
+                                        {measureHeaders.map((header) => (
+                                            <td key={header} className={`border-b border-amber-50 px-2 py-1 text-gray-600 ${isTotalNode ? 'font-semibold' : ''}`}>{values[header] ?? ''}</td>
+                                        ))}
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="h-full rounded-lg border border-amber-100 bg-white p-3 flex flex-col gap-2 overflow-hidden">
-            <div>
-                <p className="text-sm font-semibold text-gray-900">{widget.title}</p>
-                <p className="text-[11px] text-gray-500">{(widget.attributes ?? []).map((value) => getFieldLabel(value)).join(', ')}</p>
-            </div>
+            <p className="text-sm font-semibold text-gray-900">{widget.title}</p>
             <div className="overflow-auto text-xs">
                 <table className="min-w-full border-collapse">
                     <thead>

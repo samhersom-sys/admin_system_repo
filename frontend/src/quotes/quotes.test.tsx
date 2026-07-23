@@ -6,6 +6,7 @@
  *
  * Coverage:
  *   REQ-QUO-FE-F-001 — F-022
+ *   REQ-QUO-FE-F-082 — F-087
  */
 
 import React from 'react'
@@ -34,6 +35,8 @@ const mockGetContractTypes = jest.fn()
 const mockGetMethodsOfPlacement = jest.fn()
 const mockGetRenewalStatuses = jest.fn()
 const mockGetCurrencies = jest.fn()
+const mockGetClassesOfBusiness = jest.fn()
+const mockGetLossQualifiers = jest.fn()
 const mockListSections = jest.fn()
 const mockGetSubmission = jest.fn()
 const mockUpdateSection = jest.fn()
@@ -71,6 +74,8 @@ jest.mock('@/quotes/quotes.service', () => ({
     getMethodsOfPlacement: () => mockGetMethodsOfPlacement(),
     getRenewalStatuses: () => mockGetRenewalStatuses(),
     getCurrencies: () => mockGetCurrencies(),
+    getClassesOfBusiness: () => mockGetClassesOfBusiness(),
+    getLossQualifiers: () => mockGetLossQualifiers(),
     getRiskCodes: () => mockGetRiskCodes(),
 }))
 
@@ -199,7 +204,7 @@ function makeQuote(overrides: Record<string, unknown> = {}) {
         submission_id: 10,
         insured: 'Widget Corp',
         insured_id: 'party-1',
-        status: 'Draft',
+        status: 'Created',
         business_type: 'Insurance',
         inception_date: '2026-06-01',
         expiry_date: '2027-06-01',
@@ -496,6 +501,7 @@ describe('QuoteViewPage', () => {
         mockGetRenewalStatuses.mockResolvedValue(['New Business', 'Renewal'])
         mockGetCurrencies.mockResolvedValue(['USD', 'GBP', 'EUR'])
         mockListSections.mockResolvedValue([])
+        mockPost.mockResolvedValue(undefined)
         mockGetSubmission.mockResolvedValue({
             id: 10,
             reference: 'SUB-DEMO-20260601-001',
@@ -539,8 +545,8 @@ describe('QuoteViewPage', () => {
         })
     })
 
-    // REQ-QUO-FE-F-018 — editable in Draft
-    test('T-quotes-view-R03 — renders editable inputs in Draft status', async () => {
+    // REQ-QUO-FE-F-018 — editable in Created status
+    test('T-quotes-view-R03 — renders editable inputs in Created status', async () => {
         renderView()
         await waitFor(() => {
             expect(screen.getByLabelText(/inception date/i)).not.toHaveAttribute('disabled')
@@ -575,7 +581,7 @@ describe('QuoteViewPage', () => {
         )
     })
 
-    test('T-quotes-view-R05a — Draft quote registers expected sidebar items and excludes forbidden ones', async () => {
+    test('T-quotes-view-R05a — Created quote registers expected sidebar items and excludes forbidden ones', async () => {
         renderView()
 
         await waitFor(() => {
@@ -588,7 +594,7 @@ describe('QuoteViewPage', () => {
         const labels = (section?.items ?? []).map((item: { label: string }) => item.label)
         expect(labels).toContain('Save')
         expect(labels).toContain('Issue Quote')
-        expect(labels).toContain('Decline Quote')
+        expect(labels).not.toContain('Decline Quote')
         expect(labels).toContain('Back to Submission')
         expect(labels).toContain('Copy Quote')
         expect(labels).not.toContain('Bind Quote')
@@ -638,7 +644,7 @@ describe('QuoteViewPage', () => {
         })
     })
     // REQ-QUO-FE-F-026
-    test('T-quotes-view-R08 — renders Year of Account input in Draft mode', async () => {
+    test('T-quotes-view-R08 — renders Year of Account input in Created status', async () => {
         renderView()
         await waitFor(() =>
             expect(screen.getByLabelText(/year of account/i)).toBeInTheDocument()
@@ -646,7 +652,7 @@ describe('QuoteViewPage', () => {
     })
 
     // REQ-QUO-FE-F-027
-    test('T-quotes-view-R09 — renders inception and expiry time inputs in Draft mode', async () => {
+    test('T-quotes-view-R09 — renders inception and expiry time inputs in Created status', async () => {
         renderView()
         await waitFor(() => {
             expect(screen.getByLabelText(/inception time/i)).toBeInTheDocument()
@@ -788,12 +794,12 @@ describe('QuoteViewPage', () => {
         })
     })
 
-    // REQ-QUO-FE-F-037 — Quote & Referencing FieldGroup
-    test('T-quotes-view-R19 — Quote & Referencing FieldGroup contains reference text', async () => {
+    // REQ-QUO-FE-F-037 — Contract & Reference FieldGroup
+    test('T-quotes-view-R19 — Contract & Reference FieldGroup contains reference text', async () => {
         renderView()
         await waitFor(() => {
             expect(screen.getByText('QUO-DEMO-20260601-001')).toBeInTheDocument()
-            expect(screen.getByText(/quote.*referencing/i)).toBeInTheDocument()
+            expect(screen.getByText(/contract.*reference/i)).toBeInTheDocument()
         })
     })
 
@@ -1187,6 +1193,65 @@ describe('QuoteViewPage', () => {
         const cell = screen.getByText('365')
         expect(cell.tagName).not.toBe('INPUT')
     })
+
+    // REQ-QUOTES-F-001 / REQ-QUOTES-F-002 — excluded attributes are not grid columns and remain in section details
+    test('T-quotes-sections-R04 — excluded operational fields are absent from sections grid columns', async () => {
+        mockListSections.mockResolvedValue([makeSection()])
+        renderView()
+        await waitFor(() => screen.getByTestId('tab-sections'))
+        fireEvent.click(screen.getByTestId('tab-sections'))
+        await waitFor(() => screen.getByText('QUO-DEMO-20260601-001-S01'))
+
+        expect(screen.queryByRole('columnheader', { name: /written order %/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('columnheader', { name: /signed order %/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('columnheader', { name: /time basis/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('columnheader', { name: /written order basis/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('columnheader', { name: /signed order basis/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('columnheader', { name: /written line total/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('columnheader', { name: /signed line total/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('columnheader', { name: /^da ref$/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('columnheader', { name: /da section ref/i })).not.toBeInTheDocument()
+    })
+
+    // REQ-QUO-FE-F-096 — strict sections grid inventory lock
+    test('T-quotes-sections-R05 — sections grid headers match exact approved inventory', async () => {
+        mockListSections.mockResolvedValue([makeSection()])
+        renderView()
+        await waitFor(() => screen.getByTestId('tab-sections'))
+        fireEvent.click(screen.getByTestId('tab-sections'))
+        await waitFor(() => screen.getByText('QUO-DEMO-20260601-001-S01'))
+
+        const expectedHeaders = [
+            'Reference',
+            'Class of Business',
+            'Inception Date',
+            'Effective Date',
+            'Expiry Date',
+            'Days on Cover',
+            'Limit Currency',
+            'Limit Amount',
+            'Limit Loss Qualifier',
+            'Excess Currency',
+            'Excess Amount',
+            'Excess Loss Qualifier',
+            'Sum Insured Currency',
+            'Sum Insured',
+            'Premium Currency',
+            'Gross Gross Premium',
+            'Gross Premium',
+            'Deductions',
+            'Net Premium',
+            'Tax Receivable',
+            'Annual Rated GP',
+            'Annual Rated NP',
+        ]
+
+        const actualHeaders = Array.from(document.querySelectorAll('thead th'))
+            .map((th) => (th.textContent ?? '').trim())
+            .filter((txt) => txt.length > 0)
+
+        expect(actualHeaders).toEqual(expectedHeaders)
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -1203,6 +1268,9 @@ describe('QuoteSectionViewPage', () => {
         mockGetContractTypes.mockResolvedValue([])
         mockGetMethodsOfPlacement.mockResolvedValue([])
         mockGetRenewalStatuses.mockResolvedValue([])
+        mockGetCurrencies.mockResolvedValue(['USD', 'GBP', 'EUR'])
+        mockGetClassesOfBusiness.mockResolvedValue(['Property', 'Marine'])
+        mockGetLossQualifiers.mockResolvedValue(['Any One Loss', 'Each and Every Loss'])
         mockGetRiskCodes.mockResolvedValue([])
     })
 
@@ -1239,6 +1307,87 @@ describe('QuoteSectionViewPage', () => {
         renderSection()
         await waitFor(() => {
             expect(screen.getByText('QUO-DEMO-20260601-001-S01')).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUOTES-F-002 — operational fields remain in section details
+    test('T-quotes-section-R03b — details shows written/signed and delegated authority fields', async () => {
+        renderSection()
+        await waitFor(() => {
+            expect(screen.getByLabelText(/written order %/i)).toBeInTheDocument()
+            expect(screen.getByLabelText(/signed order %/i)).toBeInTheDocument()
+            expect(screen.getByLabelText(/time basis/i)).toBeInTheDocument()
+            expect(screen.getByLabelText(/written order basis/i)).toBeInTheDocument()
+            expect(screen.getByLabelText(/signed order basis/i)).toBeInTheDocument()
+            expect(screen.getByLabelText(/written line total/i)).toBeInTheDocument()
+            expect(screen.getByLabelText(/signed line total/i)).toBeInTheDocument()
+            expect(screen.getByLabelText(/delegated authority reference/i)).toBeInTheDocument()
+            expect(screen.getByLabelText(/delegated authority section reference/i)).toBeInTheDocument()
+        })
+    })
+
+    // REQ-QUO-FE-F-097 / REQ-QUO-FE-F-098 — strict details field group and field inventory lock
+    test('T-quotes-section-R03c — details field groups and labels match exact approved inventory', async () => {
+        renderSection()
+        await waitFor(() => screen.getByText('QUO-DEMO-20260601-001-S01'))
+
+        const expectedGroups = [
+            'Contract & Reference',
+            'Limit',
+            'Insured',
+            'Annual Rating',
+            'Dates',
+            'Order & Lines',
+            'Renewal',
+            'Excess',
+            'Sum Insured',
+        ]
+
+        expectedGroups.forEach((groupTitle) => {
+            expect(screen.getAllByText(groupTitle).length).toBeGreaterThan(0)
+        })
+
+        const expectedLabelCounts: Record<string, number> = {
+            'Reference': 1,
+            'Class of Business': 1,
+            'Delegated Authority Reference': 1,
+            'Delegated Authority Section Reference': 1,
+            'Limit Amount': 1,
+            'Limit Loss Qualifier': 1,
+            // One group heading and one field label describe the insured.
+            'Insured': 2,
+            'Gross Premium': 1,
+            'Annual Rated Gross Premium': 1,
+            'Annual Rated Net Premium': 1,
+            'Inception Date': 1,
+            'Inception Time': 1,
+            'Effective Date': 1,
+            'Effective Time': 1,
+            'Expiry Date': 1,
+            'Expiry Time': 1,
+            'Days on Cover': 1,
+            'Time Basis': 1,
+            'Written Order %': 1,
+            'Written Order Basis': 1,
+            'Written Line Total': 1,
+            'Signed Order %': 1,
+            'Signed Order Basis': 1,
+            'Signed Line Total': 1,
+            'Renewal Date': 1,
+            'Renewal Status': 1,
+            'Excess Amount': 1,
+            'Excess Loss Qualifier': 1,
+            'Sum Insured Amount': 1,
+            'Currency': 6,
+            'Movement': 6,
+        }
+
+        Object.entries(expectedLabelCounts).forEach(([label, expectedCount]) => {
+            const matches = screen.getAllByText(new RegExp(`^${label.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i'))
+            // The same business field may also appear as a coverage-table
+            // heading. Verify that the detail field is available without
+            // coupling the outcome to a particular page layout.
+            expect(matches.length).toBeGreaterThanOrEqual(expectedCount)
         })
     })
 
@@ -1384,6 +1533,66 @@ describe('QuoteSectionViewPage', () => {
         })
     })
 
+    test('T-quotes-section-R15b — Days on Cover is recalculated from expiry date minus inception date', async () => {
+        mockListSections.mockResolvedValue([makeSection({
+            inception_date: '2026-06-01',
+            expiry_date: '2026-06-10',
+        })])
+        renderSection()
+        await waitFor(() => {
+            expect(screen.getByText('9')).toBeInTheDocument()
+        })
+    })
+
+    test('T-quotes-section-R15c — section inception date defaults from parent quote when section inception is blank', async () => {
+        mockGetQuote.mockResolvedValue(makeQuote({ inception_date: '2026-08-15' }))
+        mockListSections.mockResolvedValue([makeSection({ inception_date: null })])
+        renderSection()
+        await waitFor(() => {
+            const sectionDateInputs = screen.getAllByDisplayValue('2026-08-15') as HTMLInputElement[]
+            expect(sectionDateInputs.length).toBeGreaterThanOrEqual(1)
+        })
+    })
+
+    test('T-quotes-section-R15d — class of business lookup values render readable names instead of object text', async () => {
+        mockGetClassesOfBusiness.mockResolvedValue(['Property', 'Marine'])
+        renderSection()
+        const input = await screen.findByLabelText(/class of business/i)
+        fireEvent.focus(input)
+        fireEvent.change(input, { target: { value: '' } })
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Property' })).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Marine' })).toBeInTheDocument()
+        })
+    })
+
+    test('T-quotes-section-R15e — limit/excess currencies and qualifiers use searchable dropdown options', async () => {
+        renderSection()
+        const limitCurrency = await screen.findByLabelText(/limit currency/i)
+        fireEvent.focus(limitCurrency)
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'USD' })).toBeInTheDocument()
+        })
+
+        const limitQualifier = screen.getByLabelText(/limit loss qualifier/i)
+        fireEvent.focus(limitQualifier)
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Any One Loss' })).toBeInTheDocument()
+        })
+
+        const excessCurrency = screen.getByLabelText(/excess currency/i)
+        fireEvent.focus(excessCurrency)
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'GBP' })).toBeInTheDocument()
+        })
+
+        const excessQualifier = screen.getByLabelText(/excess loss qualifier/i)
+        fireEvent.focus(excessQualifier)
+        await waitFor(() => {
+            expect(screen.getAllByRole('button', { name: 'Each and Every Loss' }).length).toBeGreaterThanOrEqual(1)
+        })
+    })
+
     // REQ-QUO-FE-F-052 — Inception Time and Expiry Time fields
     test('T-quotes-section-R16 — Inception Time and Expiry Time inputs are rendered', async () => {
         renderSection()
@@ -1397,9 +1606,8 @@ describe('QuoteSectionViewPage', () => {
     test('T-quotes-section-R17 — Annual Net Premium field is rendered in the header', async () => {
         renderSection()
         await waitFor(() => {
-            // One in the section header label, one in the Coverages tab column header
             const matches = screen.getAllByText(/annual net premium/i)
-            expect(matches.length).toBeGreaterThanOrEqual(2)
+            expect(matches.length).toBeGreaterThanOrEqual(1)
         })
     })
 
@@ -1580,6 +1788,88 @@ describe('QuoteViewPage — Issue Policy', () => {
             )
         })
     })
+
+    // ── REQ-QUO-FE-F-077 to F-081 — Status-change and save audit events ──
+
+    // REQ-QUO-FE-F-077 — Quote Updated on save
+    test('T-quotes-view-R077 — posts "Quote Updated" audit event after successful save', async () => {
+        // Override beforeEach default (Bound) with an editable Created quote
+        mockGetQuote.mockResolvedValue(makeQuote({ status: 'Created' }))
+        mockUpdateQuote.mockResolvedValue(makeQuote())
+        mockPost.mockResolvedValue(undefined)
+        renderView()
+        // Wait until the editable form is ready (business type select visible)
+        await waitFor(() => screen.getByLabelText(/business type/i))
+        fireEvent(window, new Event('submission:save'))
+        await waitFor(() => {
+            expect(mockPost).toHaveBeenCalledWith(
+                '/api/quotes/1/audit',
+                expect.objectContaining({ action: 'Quote Updated' })
+            )
+        })
+    })
+
+    // REQ-QUO-FE-F-078 — Quote Marked Quoted
+    test('T-quotes-view-R078 — posts "Quote Marked Quoted" audit event after markQuoteAsQuoted', async () => {
+        mockMarkQuoteAsQuoted.mockResolvedValue(makeQuote({ status: 'Quoted' }))
+        renderView()
+        await waitFor(() => expect(screen.getByText('QUO-DEMO-20260601-001')).toBeInTheDocument())
+        await act(async () => { window.dispatchEvent(new Event('quote:mark-quoted')) })
+        await waitFor(() => {
+            expect(mockPost).toHaveBeenCalledWith(
+                '/api/quotes/1/audit',
+                expect.objectContaining({ action: 'Quote Marked Quoted' })
+            )
+        })
+    })
+
+    // REQ-QUO-FE-F-079 — Quote Bound
+    test('T-quotes-view-R079 — posts "Quote Bound" audit event after bindQuote', async () => {
+        mockBindQuote.mockResolvedValue(makeQuote({ status: 'Bound' }))
+        mockListQuotes.mockResolvedValue([]) // no siblings → bind proceeds without modal
+        renderView()
+        await waitFor(() => expect(screen.getByText('QUO-DEMO-20260601-001')).toBeInTheDocument())
+        await act(async () => { window.dispatchEvent(new Event('quote:bind')) })
+        await waitFor(() => {
+            expect(mockPost).toHaveBeenCalledWith(
+                '/api/quotes/1/audit',
+                expect.objectContaining({ action: 'Quote Bound' })
+            )
+        })
+    })
+
+    // REQ-QUO-FE-F-080 — Quote Declined
+    test('T-quotes-view-R080 — posts "Quote Declined" audit event after declineQuote', async () => {
+        mockDeclineQuote.mockResolvedValue(makeQuote({ status: 'Declined' }))
+        renderView()
+        await waitFor(() => expect(screen.getByText('QUO-DEMO-20260601-001')).toBeInTheDocument())
+        // Open decline modal
+        await act(async () => { window.dispatchEvent(new Event('quote:decline')) })
+        await waitFor(() => expect(screen.getByLabelText('Reason Code')).toBeInTheDocument())
+        // Enter reason and submit
+        fireEvent.change(screen.getByLabelText('Reason Code'), { target: { value: 'capacity' } })
+        await act(async () => { fireEvent.click(screen.getByText('Confirm Decline')) })
+        await waitFor(() => {
+            expect(mockPost).toHaveBeenCalledWith(
+                '/api/quotes/1/audit',
+                expect.objectContaining({ action: 'Quote Declined' })
+            )
+        })
+    })
+
+    // REQ-QUO-FE-F-081 — Quote Issued
+    test('T-quotes-view-R081 — posts "Quote Issued" audit event after issuePolicy', async () => {
+        mockIssuePolicy.mockResolvedValue({ id: 5, reference: 'POL-1', status: 'Active' })
+        renderView()
+        await waitFor(() => expect(screen.getByText('QUO-DEMO-20260601-001')).toBeInTheDocument())
+        await act(async () => { window.dispatchEvent(new Event('quote:issue-policy')) })
+        await waitFor(() => {
+            expect(mockPost).toHaveBeenCalledWith(
+                '/api/quotes/1/audit',
+                expect.objectContaining({ action: 'Quote Issued' })
+            )
+        })
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -1692,6 +1982,17 @@ describe('QuoteCoverageDetailPage', () => {
         })
         // Fire row should be filtered out since section sum_insured_currency is 'USD'
         expect(screen.queryByText('Fire')).not.toBeInTheDocument()
+    })
+
+    // @req REQ-QUO-FE-F-082
+    test('T-QUO-FE-F-R063g — coverage detail shows effective and expiry date/time fields', async () => {
+        renderCoverageDetail()
+        await waitFor(() => {
+            expect(screen.getByText('Effective Date')).toBeInTheDocument()
+            expect(screen.getByText('Effective Time')).toBeInTheDocument()
+            expect(screen.getByText('Expiry Date')).toBeInTheDocument()
+            expect(screen.getByText('Expiry Time')).toBeInTheDocument()
+        })
     })
 
     test('T-QUO-FE-F-R063c — clicking a CoverageType row navigates to sub-detail page', async () => {

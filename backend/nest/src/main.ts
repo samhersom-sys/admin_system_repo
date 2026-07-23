@@ -1,4 +1,11 @@
 import 'reflect-metadata'
+
+// Polyfill global crypto for Node.js < 19 (required by @nestjs/schedule)
+import { webcrypto } from 'crypto'
+if (typeof (globalThis as any).crypto === 'undefined') {
+  ;(globalThis as any).crypto = webcrypto
+}
+
 import * as dotenv from 'dotenv'
 import * as path from 'path'
 

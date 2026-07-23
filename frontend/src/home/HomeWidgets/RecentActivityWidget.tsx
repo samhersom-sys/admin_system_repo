@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { get } from '@/shared/lib/api-client/api-client'
-import { relativeTime } from '@/shared/lib/formatters/formatters'
+// (relativeTime removed — Audit Time Stamp now uses a short date-time format matching Search Results)
 import { FiSearch } from 'react-icons/fi'
 import Card from '@/shared/Card/Card'
 import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
@@ -16,6 +16,14 @@ import { brandClasses } from '@/shared/lib/design-tokens/brandClasses'
  * All columns are sortable.  Shows at most 50 records.
  * Architecture rules: no hex literals, no direct fetch, no domains/ imports.
  */
+
+// Formats an ISO string as 'DD/MM/YYYY, HH:MM' (en-GB short date-time) — same as Search Results "Last Opened"
+function fmtDatetime(iso: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  return d.toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })
+}
 
 const TYPE_ROUTES = {
   submission: '/submissions',
@@ -33,7 +41,7 @@ const COLUMNS = [
   { key: 'recordStatus', label: 'Record Status', sortable: true, defaultWidth: 120 },
   { key: 'insured', label: 'Insured', sortable: true, defaultWidth: 160 },
   { key: 'broker', label: 'Broker', sortable: true, defaultWidth: 150 },
-  { key: 'auditTimestamp', label: 'Audit Time Stamp', sortable: true, defaultWidth: 150 },
+  { key: 'auditTimestamp', label: 'Last Opened', sortable: true, defaultWidth: 150 },
   { key: 'user', label: 'User', sortable: true, defaultWidth: 140 },
   { key: 'action', label: 'Action', sortable: false, defaultWidth: 70 },
 ]
@@ -60,7 +68,7 @@ function formatRecordStatus(item: ActivityItem) {
   switch (item.type) {
     case 'submission': return item.status || 'Open'
     case 'binding-authority': return item.status || 'Draft'
-    case 'quote': return item.status === 'Quote Created' ? 'Draft' : (item.status || 'Draft')
+    case 'quote': return item.status || 'Created'
     case 'policy': return item.status || 'Active'
     default: return item.status || '—'
   }
@@ -218,7 +226,7 @@ export default function RecentActivityWidget({ orgCode }: { orgCode: string }) {
               )
               if (key === 'insured') return item.insuredName || '—'
               if (key === 'broker') return <span className="text-gray-600">{item.broker || '—'}</span>
-              if (key === 'auditTimestamp') return <span className="text-gray-500">{relativeTime(item.auditTimestamp ?? '')}</span>
+              if (key === 'auditTimestamp') return <span className="text-gray-500">{fmtDatetime(item.auditTimestamp)}</span>
               if (key === 'user') return <span className="text-gray-600">{item.auditUser || '—'}</span>
               if (key === 'action') return (
                 <a

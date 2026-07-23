@@ -39,6 +39,7 @@ import { useSidebarSection } from '@/shell/SidebarContext'
 import type { SidebarSection } from '@/shell/SidebarContext'
 import { useNotifications } from '@/shell/NotificationDock'
 import { getSession } from '@/shared/lib/auth-session/auth-session'
+import { buildAuditDiff } from '@/shared/lib/audit/buildAuditDiff'
 import AuditTable from '@/shared/components/AuditTable/AuditTable'
 import Card from '@/shared/Card/Card'
 import TabsNav from '@/shared/components/TabsNav/TabsNav'
@@ -91,6 +92,20 @@ const SIDEBAR_SECTION: SidebarSection = {
         { label: 'Save', icon: FiSave, event: 'party:save' },
         { label: 'Cancel', icon: FiX, event: 'party:cancel' },
     ],
+}
+
+// REQ-PAR-DOM-F-078 — field labels for Party Updated audit diff
+const PARTY_FIELD_LABELS: Record<string, string> = {
+    name: 'Name',
+    type: 'Type',
+    email: 'Email',
+    phone: 'Phone',
+    addressLine1: 'Address Line 1',
+    city: 'City',
+    state: 'State',
+    postcode: 'Postcode',
+    country: 'Country',
+    region: 'Region',
 }
 
 // ---------------------------------------------------------------------------
@@ -294,6 +309,7 @@ export default function PartyViewPage() {
             addNotification('Please fix validation errors before saving.', 'error')
             return
         }
+        const prevForm: Record<string, unknown> = { ...form }
         try {
             const updated = await updateParty(id, {
                 name: form.name,
@@ -316,10 +332,21 @@ export default function PartyViewPage() {
                 sicDescription: form.sicDescription || undefined,
             })
             setParty(updated)
-            setForm(partyToForm(updated))
+            const newForm = partyToForm(updated)
+            setForm(newForm)
             setIsEditing(false)
             setValidationErrors({})
             addNotification('Party updated successfully', 'success')
+            // REQ-PAR-DOM-F-078 — best-effort audit event on save with field diff
+            const session = getSession()
+            const _diffDesc = buildAuditDiff(prevForm, newForm as Record<string, unknown>, PARTY_FIELD_LABELS)
+            postPartyAudit(Number(id), {
+                action: 'Party Updated',
+                entityType: 'Party',
+                entityId: Number(id),
+                performedBy: session?.user?.name,
+                details: _diffDesc ? { description: _diffDesc } : {},
+            }).catch(() => undefined)
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Save failed'
             addNotification(`Failed to save: ${msg}`, 'error')

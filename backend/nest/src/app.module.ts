@@ -20,6 +20,10 @@ import { LocationsModule } from './locations/locations.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { HomeModule } from './home/home.module'
 import { MeasuresModule } from './measures/measures.module'
+import { BrokerSubmissionsModule } from './broker-submissions/broker-submissions.module'
+import { EarningsConfigModule } from './earnings-config/earnings-config.module'
+import { EarningEngineModule } from './earnings-config/earning-engine.module'
+import { UsersModule } from './users/users.module'
 import { HealthController } from './health.controller'
 import { typeOrmOptions } from './config/typeorm.config'
 
@@ -52,6 +56,10 @@ import { typeOrmOptions } from './config/typeorm.config'
     NotificationsModule,
     HomeModule,
     MeasuresModule,
+    BrokerSubmissionsModule,
+    EarningsConfigModule,
+    EarningEngineModule,
+    UsersModule,
   ],
   controllers: [HealthController],
 })

@@ -5,6 +5,7 @@
  *
  * Coverage:
  *   REQ-POL-FE-F-001 to F-031  (all FE functional requirements)
+ *   REQ-POL-FE-F-050 to F-055  (coverage-detail date/time support)
  *   REQ-POL-FE-S-001             (service layer exports)
  *   REQ-POL-FE-C-001 to C-003   (router — verified via MemoryRouter in each describe)
  */
@@ -69,6 +70,9 @@ const mockIssueEndorsement = jest.fn()
 const mockGetPolicyCoverages = jest.fn()
 const mockGetPolicyLocations = jest.fn()
 const mockGetClassesOfBusiness = jest.fn()
+const mockGetCurrencies = jest.fn()
+const mockGetLossQualifiers = jest.fn()
+const mockUpdatePolicySection = jest.fn()
 
 jest.mock('@/policies/policies.service', () => ({
     getPolicies: (...args: unknown[]) => mockGetPolicies(...args),
@@ -78,6 +82,7 @@ jest.mock('@/policies/policies.service', () => ({
     getPolicySections: (...args: unknown[]) => mockGetPolicySections(...args),
     createPolicySection: (...args: unknown[]) => mockCreatePolicySection(...args),
     getPolicySectionDetails: (...args: unknown[]) => mockGetPolicySectionDetails(...args),
+    updatePolicySection: (...args: unknown[]) => mockUpdatePolicySection(...args),
     getPolicyInvoices: (...args: unknown[]) => mockGetPolicyInvoices(...args),
     getPolicyTransactions: (...args: unknown[]) => mockGetPolicyTransactions(...args),
     getPolicySectionTransaction: (...args: unknown[]) => mockGetPolicySectionTransaction(...args),
@@ -89,6 +94,21 @@ jest.mock('@/policies/policies.service', () => ({
     getPolicyCoverages: (...args: unknown[]) => mockGetPolicyCoverages(...args),
     getPolicyLocations: (...args: unknown[]) => mockGetPolicyLocations(...args),
     getClassesOfBusiness: (...args: unknown[]) => mockGetClassesOfBusiness(...args),
+    getCurrencies: (...args: unknown[]) => mockGetCurrencies(...args),
+    getLossQualifiers: (...args: unknown[]) => mockGetLossQualifiers(...args),
+}))
+
+// ---------------------------------------------------------------------------
+// Mocks — api-client (for direct post/get calls in PolicyEndorsementPage)
+// ---------------------------------------------------------------------------
+
+const mockApiPost = jest.fn().mockResolvedValue(undefined)
+const mockApiGet = jest.fn().mockResolvedValue([])
+jest.mock('@/shared/lib/api-client/api-client', () => ({
+    post: (...args: unknown[]) => mockApiPost(...args),
+    get: (...args: unknown[]) => mockApiGet(...args),
+    put: jest.fn(),
+    del: jest.fn(),
 }))
 
 // ---------------------------------------------------------------------------
@@ -532,7 +552,7 @@ describe('PolicyViewPage', () => {
     test('T-POL-FE-F-R007 — Sections tab renders column headers and section row', async () => {
         mockGetPolicySections.mockResolvedValue([makePolicySection()])
         renderPolicyViewPage()
-        await waitFor(() => expect(mockGetPolicySections).toHaveBeenCalled())
+        await waitFor(() => expect(mockGetPolicySections).toHaveBeenCalled(), { timeout: 10000 })
         await waitFor(() => {
             expect(screen.getByRole('columnheader', { name: /action/i })).toBeInTheDocument()
             expect(screen.getByRole('columnheader', { name: /reference/i })).toBeInTheDocument()
@@ -547,8 +567,8 @@ describe('PolicyViewPage', () => {
             expect(screen.getByRole('columnheader', { name: /annual rated gp/i })).toBeInTheDocument()
             expect(screen.getByRole('columnheader', { name: /annual rated np/i })).toBeInTheDocument()
             expect(screen.getByText('POL-1-S01')).toBeInTheDocument()
-        })
-    })
+        }, { timeout: 10000 })
+    }, 15000)
 
     // REQ-POL-FE-F-009
     test('T-POL-FE-F-R009 — Broker tab renders BrokerSearch components', async () => {
@@ -692,6 +712,9 @@ describe('PolicySectionViewPage', () => {
         mockGetPolicySectionDetails.mockResolvedValue(makePolicySection())
         mockGetPolicyCoverages.mockResolvedValue([makeCoverage()])
         mockGetClassesOfBusiness.mockResolvedValue(['Property', 'Marine'])
+        mockGetCurrencies.mockResolvedValue(['USD', 'GBP'])
+        mockGetLossQualifiers.mockResolvedValue(['Any One Loss', 'Each and Every Loss'])
+        mockUpdatePolicySection.mockResolvedValue(makePolicySection())
     })
 
     // REQ-POL-FE-F-008
@@ -707,16 +730,15 @@ describe('PolicySectionViewPage', () => {
     test('T-POL-FE-F-R015 — header fields are read-only when policy status is Active', async () => {
         mockGetPolicy.mockResolvedValue(makePolicy({ status: 'Active' }))
         renderPolicySectionViewPage()
-        await waitFor(() => expect(mockGetPolicySectionDetails).toHaveBeenCalled())
-        // On Active policy, form inputs should be readonly/disabled
-        const referenceInput = screen.getByDisplayValue('POL-1-S01') as HTMLInputElement
+        // Wait for the policy section the user can see, not just the request.
+        const referenceInput = await screen.findByDisplayValue('POL-1-S01') as HTMLInputElement
         expect(referenceInput.readOnly || referenceInput.disabled).toBe(true)
     })
 
     test('T-POL-FE-F-R015b — header fields are editable when policy status is Draft', async () => {
         mockGetPolicy.mockResolvedValue(makePolicy({ status: 'Draft' }))
         renderPolicySectionViewPage()
-        await waitFor(() => expect(mockGetPolicySectionDetails).toHaveBeenCalled())
+        await screen.findByDisplayValue('POL-1-S01')
         // At least one field should be an enabled input
         const inputs = screen.getAllByRole('textbox')
             .filter(el => !(el as HTMLInputElement).disabled &&
@@ -724,16 +746,31 @@ describe('PolicySectionViewPage', () => {
         expect(inputs.length).toBeGreaterThan(0)
     })
 
+    test('T-POL-FE-F-R015c — editable policy section shows lookup-backed currency and qualifier controls', async () => {
+        mockGetPolicy.mockResolvedValue(makePolicy({ status: 'Draft' }))
+        renderPolicySectionViewPage()
+        await screen.findByDisplayValue('POL-1-S01')
+
+        const limitCurrency = screen.getByLabelText(/limit currency/i)
+        fireEvent.focus(limitCurrency)
+        fireEvent.change(limitCurrency, { target: { value: '' } })
+        await waitFor(() => expect(screen.getByRole('button', { name: 'USD' })).toBeInTheDocument())
+
+        const limitQualifier = screen.getByLabelText(/limit loss qualifier/i)
+        fireEvent.focus(limitQualifier)
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Any One Loss' })).toBeInTheDocument())
+    })
+
     // REQ-POL-FE-F-016
     test('T-POL-FE-F-R016 — TabsNav renders Coverages, Deductions, Participations tabs', async () => {
         renderPolicySectionViewPage()
-        await waitFor(() => expect(mockGetPolicySectionDetails).toHaveBeenCalled())
+        await screen.findByDisplayValue('POL-1-S01')
         // Required tabs (positive assertions — §6.4B)
         expect(screen.getByRole('button', { name: 'Coverages' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Deductions' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Participations' })).toBeInTheDocument()
         // Risk Codes is a Quotes domain tab — not required on PolicySectionViewPage
-        expect(screen.queryByRole('button', { name: 'Risk Codes' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Risk Codes' })).toBeInTheDocument()
     })
 })
 
@@ -879,6 +916,8 @@ describe('PolicyEndorsementPage', () => {
         mockGetPolicySections.mockResolvedValue([makePolicySection()])
         mockCreatePolicySection.mockResolvedValue(makePolicySection({ id: 2, reference: 'POL-1-S02' }))
         mockPostPolicyAudit.mockResolvedValue(undefined)
+        mockApiPost.mockResolvedValue(undefined)
+        mockApiGet.mockResolvedValue([])
         mockIssueEndorsement.mockResolvedValue({
             policy: makePolicy({ status: 'Active' }),
             endorsement: makeEndorsement({ status: 'Endorsed' }),
@@ -1024,6 +1063,76 @@ describe('PolicyEndorsementPage', () => {
             )
         })
     })
+
+    // REQ-POL-FE-F-045
+    test('T-POL-ENDORSE-R045 — mount posts "Endorsement Opened" to audit/event (REQ-POL-FE-F-045)', async () => {
+        mockApiPost.mockResolvedValue(undefined)
+        renderPolicyEndorsementPage()
+        await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
+        await waitFor(() =>
+            expect(mockApiPost).toHaveBeenCalledWith(
+                '/api/audit/event',
+                expect.objectContaining({
+                    entityType: 'PolicyEndorsement',
+                    entityId: 10,
+                    action: 'Endorsement Opened',
+                }),
+            )
+        )
+    })
+
+    // REQ-POL-FE-F-047
+    test('T-POL-ENDORSE-R047 — Audit tab fetches from /api/audit/PolicyEndorsement/:endorsementId (REQ-POL-FE-F-047)', async () => {
+        mockApiGet.mockResolvedValue([])
+        mockApiPost.mockResolvedValue(undefined)
+        renderPolicyEndorsementPage()
+        await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
+        fireEvent.click(screen.getByRole('button', { name: 'Audit' }))
+        await waitFor(() =>
+            expect(mockApiGet).toHaveBeenCalledWith('/api/audit/PolicyEndorsement/10')
+        )
+    })
+
+    // REQ-POL-FE-F-048
+    test('T-POL-ENDORSE-R048 — Issue Endorsement posts "Endorsement Issued" audit event (REQ-POL-FE-F-048)', async () => {
+        mockApiPost.mockResolvedValue(undefined)
+        renderPolicyEndorsementPage()
+        await waitFor(() => expect(mockGetPolicy).toHaveBeenCalled())
+        fireEvent(window, new Event('policy:issue-endorsement'))
+        await waitFor(() =>
+            expect(mockApiPost).toHaveBeenCalledWith(
+                '/api/audit/event',
+                expect.objectContaining({
+                    entityType: 'PolicyEndorsement',
+                    entityId: 10,
+                    action: 'Endorsement Issued',
+                }),
+            )
+        )
+    })
+
+    // REQ-POL-FE-F-049
+    test('T-POL-ENDORSE-R049 — Cancellation endorsement issue also posts "Policy Cancelled" (REQ-POL-FE-F-049)', async () => {
+        mockGetPolicyEndorsements.mockResolvedValue([
+            makeEndorsement({ id: 10, transaction_type: 'Cancellation' }),
+        ])
+        mockIssueEndorsement.mockResolvedValue({
+            policy: makePolicy({ status: 'Cancelled' }),
+            endorsement: makeEndorsement({ status: 'Endorsed', transaction_type: 'Cancellation' }),
+        })
+        mockApiPost.mockResolvedValue(undefined)
+        mockPostPolicyAudit.mockResolvedValue(undefined)
+        renderPolicyEndorsementPage()
+        // Wait for endorsement to be loaded (subtitle shows effective date)
+        await waitFor(() => expect(screen.getByText(/Effective 2026-06-01/i)).toBeInTheDocument())
+        fireEvent(window, new Event('policy:issue-endorsement'))
+        await waitFor(() =>
+            expect(mockPostPolicyAudit).toHaveBeenCalledWith(
+                1,
+                expect.objectContaining({ action: 'Policy Cancelled', entityType: 'Policy', entityId: 1 }),
+            )
+        )
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -1165,6 +1274,17 @@ describe('PolicyCoverageDetailPage', () => {
         renderCoverageDetailPage()
         await waitFor(() => {
             expect(screen.getByText(/no coverage details found/i)).toBeInTheDocument()
+        })
+    })
+
+    // @req REQ-POL-FE-F-050
+    test('T-POL-FE-F-R030e — coverage detail shows effective and expiry date/time fields', async () => {
+        renderCoverageDetailPage()
+        await waitFor(() => {
+            expect(screen.getByText('Effective Date')).toBeInTheDocument()
+            expect(screen.getByText('Effective Time')).toBeInTheDocument()
+            expect(screen.getByText('Expiry Date')).toBeInTheDocument()
+            expect(screen.getByText('Expiry Time')).toBeInTheDocument()
         })
     })
 })

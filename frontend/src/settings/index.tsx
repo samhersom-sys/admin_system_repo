@@ -8,6 +8,7 @@ import {
   FiAlertTriangle,
   FiLayers,
   FiBarChart2,
+  FiTrendingUp,
   FiChevronRight,
 } from 'react-icons/fi'
 import { getSession } from '@/shared/lib/auth-session/auth-session'
@@ -76,6 +77,13 @@ const ALL_TILES: Tile[] = [
     description: 'Manage custom measures and reporting configuration for your organisation.',
     icon: FiBarChart2,
     path: '/settings/dashboard-reporting',
+    roles: ['client_admin', 'internal_admin'],
+  },
+  {
+    title: 'Earnings Configuration',
+    description: 'Configure earned and unearned premium patterns for policies and sections.',
+    icon: FiTrendingUp,
+    path: '/settings/earnings-config',
     roles: ['client_admin', 'internal_admin'],
   },
 ]

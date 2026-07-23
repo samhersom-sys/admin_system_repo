@@ -294,13 +294,17 @@ describe('RecentActivityWidget', () => {
         expect(screen.getByTestId('loading-spinner')).toBeInTheDocument()
     })
 
-    test('T-HOME-RECENT-R2: renders each record with reference, insured name, status, and relative time', async () => {
+    test('T-HOME-RECENT-R2: renders each record with reference, insured name, status, and formatted date-time (REQ-HOME-F-013)', async () => {
         const { default: RecentActivityWidget } = require('./HomeWidgets/RecentActivityWidget')
         render(<RecentActivityWidget orgCode="ORG-001" />)
         await waitFor(() => {
             expect(screen.getByText('SUB-2026-001')).toBeInTheDocument()
             expect(screen.getByText('Acme Corp')).toBeInTheDocument()
-            expect(screen.getAllByText('2 hours ago').length).toBeGreaterThan(0)
+            // Audit Time Stamp shows a short date-time string, not relative time
+            expect(screen.queryByText('2 hours ago')).not.toBeInTheDocument()
+            // A date-like string should appear (en-GB format: DD/MM/YYYY, HH:MM)
+            const dateCells = screen.getAllByText(/\d{2}\/\d{2}\/\d{4}/)
+            expect(dateCells.length).toBeGreaterThan(0)
         })
     })
 
@@ -536,34 +540,28 @@ describe('HomePage — navigation reset (REQ-HOME-F-018)', () => {
         )
     }
 
-    it('T-HOME-PAGE-R18a: renders with Overview tab selected by default', async () => {
+    it('T-HOME-PAGE-R18a: renders HomeDashboard directly (no tabs — REQ-HOME-CFG-FE-F-007)', async () => {
         renderHomePage()
         await waitFor(() => {
-            const overviewTab = screen.getByRole('tab', { name: 'Overview' })
-            expect(overviewTab).toHaveAttribute('aria-selected', 'true')
+            // No tab structure — HomeDashboard renders directly
+            expect(screen.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument()
         })
     })
 
-    it('T-HOME-PAGE-R18b: renders both Overview and Dashboard tabs', async () => {
+    it('T-HOME-PAGE-R18b: renders without tab chrome (REQ-HOME-CFG-FE-F-007)', async () => {
         renderHomePage()
         await waitFor(() => {
-            expect(screen.getByRole('tab', { name: 'Overview' })).toBeInTheDocument()
-            expect(screen.getByRole('tab', { name: 'Dashboard' })).toBeInTheDocument()
+            expect(screen.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument()
+            expect(screen.queryByRole('tab', { name: 'Dashboard' })).not.toBeInTheDocument()
         })
     })
 
-    it('T-HOME-PAGE-R18c: clicking Dashboard tab switches away from Overview', async () => {
+    it('T-HOME-PAGE-R18c: home page renders without tab switching controls (REQ-HOME-CFG-FE-F-007)', async () => {
         renderHomePage()
-        const user = userEvent.setup()
-
+        // Tab switching is removed — verify no tablist exists
         await waitFor(() => {
-            expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+            expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
         })
-
-        await user.click(screen.getByRole('tab', { name: 'Dashboard' }))
-
-        expect(screen.getByRole('tab', { name: 'Dashboard' })).toHaveAttribute('aria-selected', 'true')
-        expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'false')
     })
 })
 

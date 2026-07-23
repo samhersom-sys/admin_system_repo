@@ -103,8 +103,19 @@ Created `AI Guidelines/11-Conversation-Log-Standards.md` defining the log format
 ## 11.7  Enforcement
 
 - The AI must not close a qualifying session without appending a log entry.
+- **The log entry must be written and committed before any `git push` is requested.** The push confirmation step (§1.4) must not be reached until the log entry exists in the commit that will be pushed.
 - If the AI is interrupted before writing the log, it must write the entry at the start of the next session as a retrospective entry, marked `[RETROSPECTIVE]` in the title.
 - The log file must not be reformatted, sorted, or summarised — only appended to.
+
+---
+
+## 11.9  Multi-Agent Session Log Format
+
+When a session involves more than one specialist agent (Orchestrator, BA, TA, SA, DBA, Developer, QG), the standard entry format in §11.3 must be extended with additional fields.
+
+Use the format defined in `docs/AI Guidelines/17-Agent-Collaboration-Standards.md §17.9`.
+
+Single-agent sessions continue to use the standard format in §11.3 unchanged.
 
 ---
 

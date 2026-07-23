@@ -26,7 +26,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { FiSave, FiArrowLeft, FiCheckCircle, FiXCircle, FiCopy, FiPlus, FiSearch, FiTrash2 } from 'react-icons/fi'
+import { FiSave, FiArrowLeft, FiCheckCircle, FiXCircle, FiCopy, FiPlus, FiSearch, FiTrash2, FiMapPin } from 'react-icons/fi'
 import ResizableGrid from '@/shared/components/ResizableGrid/ResizableGrid'
 import type { SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
 import { useResizableColumns } from '@/shared/lib/hooks/useResizableColumns'
@@ -44,11 +44,13 @@ import {
     getRenewalStatuses,
     getCurrencies,
     getClassesOfBusiness,
+    getQuoteProducts,
     listSections,
     createSection,
     updateSection,
     deleteSection,
     issuePolicy,
+    listQuotes,
 } from '@/quotes/quotes.service'
 import type { Quote, QuoteSection, QuoteSectionPatch } from '@/quotes/quotes.service'
 import { getSubmission } from '@/submissions/submissions.service'
@@ -61,6 +63,9 @@ import { useSidebarSection } from '@/shell/SidebarContext'
 import type { SidebarSection } from '@/shell/SidebarContext'
 import { useNotifications } from '@/shell/NotificationDock'
 import { getSession } from '@/shared/lib/auth-session/auth-session'
+import { post } from '@/shared/lib/api-client/api-client'
+import type { QuoteProduct } from '@/quotes/quotes.service'
+import { buildAuditDiff } from '@/shared/lib/audit/buildAuditDiff'
 import Card from '@/shared/Card/Card'
 import TabsNav from '@/shared/components/TabsNav/TabsNav'
 import type { TabItem } from '@/shared/components/TabsNav/TabsNav'
@@ -71,6 +76,29 @@ import { useAudit } from '@/shared/lib/hooks/useAudit'
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
+
+// REQ-QUO-FE-F-082 — field labels for audit diff
+const QUOTE_FIELD_LABELS: Record<string, string> = {
+    insured: 'Insured',
+    product_id: 'Product',
+    business_type: 'Business Type',
+    inception_date: 'Inception Date',
+    inception_time: 'Inception Time',
+    expiry_date: 'Expiry Date',
+    expiry_time: 'Expiry Time',
+    quote_currency: 'Currency',
+    year_of_account: 'Year of Account',
+    lta_applicable: 'LTA Applicable',
+    lta_start_date: 'LTA Start Date',
+    lta_expiry_date: 'LTA Expiry Date',
+    contract_type: 'Contract Type',
+    method_of_placement: 'Method of Placement',
+    unique_market_reference: 'Unique Market Reference',
+    renewable_indicator: 'Renewable',
+    renewal_date: 'Renewal Date',
+    renewal_status: 'Renewal Status',
+    new_or_renewal: 'New or Renewal',
+}
 
 const STATUS_CLASSES: Record<string, string> = {
     Draft: 'bg-gray-100 text-gray-700',
@@ -115,6 +143,7 @@ interface FormValues {
     insured: string
     insured_id: number | null
     submission_id: number | null
+    product_id: number | null
     year_of_account: string
     business_type: string
     inception_date: string
@@ -143,6 +172,7 @@ function quoteToForm(q: Quote): FormValues {
         insured: q.insured ?? '',
         insured_id: q.insured_id ? Number(q.insured_id) : null,
         submission_id: q.submission_id ?? null,
+        product_id: q.product_id ?? null,
         year_of_account: yoa,
         business_type: q.business_type ?? '',
         inception_date: q.inception_date ?? '',
@@ -196,7 +226,7 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
     const [loadError, setLoadError] = useState<string | null>(null)
 
     const [formValues, setFormValues] = useState<FormValues>({
-        insured: '', insured_id: null, submission_id: null,
+        insured: '', insured_id: null, submission_id: null, product_id: null,
         year_of_account: '', business_type: '',
         inception_date: '', inception_time: '00:00:00',
         expiry_date: '', expiry_time: '23:59:59',
@@ -222,6 +252,8 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
     const [renewalStatuses, setRenewalStatuses] = useState<string[]>([])
     const [currencies, setCurrencies] = useState<string[]>([])
     const [classesOfBusiness, setClassesOfBusiness] = useState<string[]>([])
+    const [products, setProducts] = useState<QuoteProduct[]>([])
+    const [productCategory, setProductCategory] = useState('')
 
     // Save-attempt guard — validation errors only surface after first save attempt (F-025)
     const [saveAttempted, setSaveAttempted] = useState(false)
@@ -234,6 +266,10 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
     const [declineReasonCode, setDeclineReasonCode] = useState('')
     const [declineReasonText, setDeclineReasonText] = useState('')
     const [declineError, setDeclineError] = useState<string | null>(null)
+
+    // Bind confirmation modal (shown when sibling Created/Quoted quotes exist)
+    const [showBindConfirmModal, setShowBindConfirmModal] = useState(false)
+    const [activeSiblingCount, setActiveSiblingCount] = useState(0)
 
     // YOA mismatch confirmation modal
     const [showYoaWarning, setShowYoaWarning] = useState(false)
@@ -402,7 +438,36 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
         Promise.resolve(getRenewalStatuses()).then(setRenewalStatuses).catch(() => setRenewalStatuses([]))
         Promise.resolve(getCurrencies()).then((c) => setCurrencies(c ?? [])).catch(() => setCurrencies([]))
         Promise.resolve(getClassesOfBusiness()).then((items) => setClassesOfBusiness(items ?? [])).catch(() => setClassesOfBusiness([]))
+        Promise.resolve(getQuoteProducts()).then((items) => setProducts(items ?? [])).catch(() => setProducts([]))
     }, [])
+
+    const productCategories = useMemo(
+        () => [...new Set(products.map((product) => product.product_type).filter(Boolean))].sort(),
+        [products],
+    )
+    const selectedProduct = useMemo(
+        () => products.find((product) => product.id === formValues.product_id) ?? null,
+        [products, formValues.product_id],
+    )
+    const filteredProducts = useMemo(
+        () => (productCategory ? products.filter((product) => product.product_type === productCategory) : products),
+        [products, productCategory],
+    )
+    const policyProductRecord = useMemo(() => {
+        const payload = (quote?.payload ?? {}) as Record<string, unknown>
+        return (payload.product as Record<string, unknown> | undefined) ?? undefined
+    }, [quote])
+    const policyProductCategory = selectedProduct?.product_type ?? (typeof policyProductRecord?.category === 'string' ? policyProductRecord.category : '—')
+    const policyProductName = selectedProduct?.name ?? (typeof policyProductRecord?.name === 'string' ? policyProductRecord.name : '—')
+
+    useEffect(() => {
+        if (!formValues.product_id) {
+            setProductCategory('')
+            return
+        }
+        const current = products.find((product) => product.id === formValues.product_id)
+        if (current) setProductCategory(current.product_type)
+    }, [formValues.product_id, products])
 
     const isDirty = isCreate
         ? (!!formValues.insured || !!formValues.submission_id)
@@ -478,13 +543,16 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
             items.push({ label: 'Save', icon: FiSave, event: 'submission:save' })
         }
         if (!isCreate) {
-            if (quote?.status === 'Draft') {
+            if (quote) {
+                items.push({ label: 'Schedule of Values', icon: FiMapPin, to: `/quotes/${quote.id}/locations` })
+            }
+            if (quote?.status === 'Created') {
                 items.push({ label: 'Issue Quote', icon: FiCheckCircle, event: 'quote:mark-quoted' })
             }
             if (quote?.status === 'Quoted') {
                 items.push({ label: 'Bind Quote', icon: FiCheckCircle, event: 'quote:bind' })
             }
-            if (quote && !['Bound', 'Declined'].includes(quote.status)) {
+            if (quote && !['Created', 'Bound', 'Declined'].includes(quote.status)) {
                 items.push({ label: 'Decline Quote', icon: FiXCircle, event: 'quote:decline' })
             }
             if (quote?.status === 'Bound') {
@@ -514,6 +582,7 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
                     insured: formValues.insured || insuredParty?.name || '',
                     insured_id: formValues.insured_id ?? undefined,
                     submission_id: formValues.submission_id ?? undefined,
+                    product_id: formValues.product_id ?? undefined,
                     business_type: formValues.business_type,
                     inception_date: formValues.inception_date,
                     expiry_date: formValues.expiry_date,
@@ -555,12 +624,22 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
                     commission: financials.commission || null,
                 },
             }
+            const prevForm = { ...formValues }
             const updated = await updateQuote(quoteId, { ...formValues, payload: updatedPayload })
             setQuote(updated)
             const next = quoteToForm(updated)
             setFormValues(next)
             setSavedSnapshot(serialise(next))
             addNotification('Quote saved successfully.', 'success')
+            // REQ-QUO-FE-F-077/082 — best-effort audit event on save with field diff
+            const _session = getSession()
+            const _diffDesc = buildAuditDiff(prevForm as Record<string, unknown>, next as Record<string, unknown>, QUOTE_FIELD_LABELS)
+            post(`/api/quotes/${quoteId}/audit`, {
+                action: 'Quote Updated',
+                user: _session?.user?.name ?? _session?.user?.email ?? 'Unknown',
+                userId: _session?.user?.id ?? null,
+                details: _diffDesc ? { description: _diffDesc } : {},
+            }).catch(() => { })
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to save.'
             addNotification(`Quote save failed: ${msg}`, 'error')
@@ -598,23 +677,64 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
         try {
             const updated = await markQuoteAsQuoted(quoteId)
             setQuote(updated)
+            // REQ-QUO-FE-F-078 — best-effort audit event
+            const _session = getSession()
+            post(`/api/quotes/${quoteId}/audit`, {
+                action: 'Quote Marked Quoted',
+                user: _session?.user?.name ?? _session?.user?.email ?? 'Unknown',
+                userId: _session?.user?.id ?? null,
+            }).catch(() => { })
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to mark as Quoted.'
             addNotification(`Failed to mark as Quoted: ${msg}`, 'error')
         }
     }, [quote, quoteId, formValues.submission_id, addNotification])
 
-    const handleBind = useCallback(async () => {
+    const handleBindConfirm = useCallback(async (declineSiblings: boolean) => {
+        setShowBindConfirmModal(false)
         if (!quote) return
         try {
-            const updated = await bindQuote(quoteId)
+            const updated = await bindQuote(quoteId, declineSiblings)
             setQuote(updated)
-            addNotification('Quote bound. Any other quotes on this submission have been declined.', 'success')
+            addNotification(
+                declineSiblings
+                    ? 'Quote bound. Other active quotes on this submission have been declined.'
+                    : 'Quote bound.',
+                'success'
+            )
+            // REQ-QUO-FE-F-079 — best-effort audit event
+            const _session = getSession()
+            post(`/api/quotes/${quoteId}/audit`, {
+                action: 'Quote Bound',
+                user: _session?.user?.name ?? _session?.user?.email ?? 'Unknown',
+                userId: _session?.user?.id ?? null,
+            }).catch(() => { })
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to bind.'
             addNotification(`Bind failed: ${msg}`, 'error')
         }
     }, [quote, quoteId, addNotification])
+
+    const handleBind = useCallback(async () => {
+        if (!quote) return
+        const subId = formValues.submission_id
+        if (subId) {
+            try {
+                const siblings = await listQuotes({ submission_id: subId })
+                const activeCount = siblings.filter(
+                    q => q.id !== quoteId && (q.status === 'Created' || q.status === 'Quoted')
+                ).length
+                if (activeCount > 0) {
+                    setActiveSiblingCount(activeCount)
+                    setShowBindConfirmModal(true)
+                    return
+                }
+            } catch {
+                // Sibling check failed — proceed with bind
+            }
+        }
+        await handleBindConfirm(true)
+    }, [quote, quoteId, formValues.submission_id, handleBindConfirm])
 
     const handleCopyQuote = useCallback(async () => {
         if (!quote) return
@@ -632,6 +752,13 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
         if (!quote) return
         try {
             const policy = await issuePolicy(quoteId)
+            // REQ-QUO-FE-F-081 — best-effort audit event before navigation
+            const _session = getSession()
+            post(`/api/quotes/${quoteId}/audit`, {
+                action: 'Quote Issued',
+                user: _session?.user?.name ?? _session?.user?.email ?? 'Unknown',
+                userId: _session?.user?.id ?? null,
+            }).catch(() => { })
             addNotification(`Policy created: ${policy.reference}`, 'success')
             navigate(`/policies/${policy.id}`)
         } catch (err: unknown) {
@@ -650,6 +777,13 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
             const updated = await declineQuote(quoteId, declineReasonCode, declineReasonText)
             setQuote(updated)
             setShowDeclineModal(false)
+            // REQ-QUO-FE-F-080 — best-effort audit event
+            const _session = getSession()
+            post(`/api/quotes/${quoteId}/audit`, {
+                action: 'Quote Declined',
+                user: _session?.user?.name ?? _session?.user?.email ?? 'Unknown',
+                userId: _session?.user?.id ?? null,
+            }).catch(() => { })
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Failed to decline.'
             setDeclineError(msg)
@@ -895,6 +1029,24 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
                                 )}
                             </div>
 
+                            {field('Product',
+                                editable
+                                    ? <select
+                                        aria-label="Product"
+                                        value={formValues.product_id ?? ''}
+                                        onChange={(e) => setFormValues((v) => ({ ...v, product_id: e.target.value ? Number(e.target.value) : null }))}
+                                        className={inputCls}
+                                    >
+                                        <option value="">— Select —</option>
+                                        {products.map((product) => (
+                                            <option key={product.id} value={product.id}>
+                                                {product.name}{product.code ? ` (${product.code})` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    : readText(products.find((product) => product.id === formValues.product_id)?.name ?? null)
+                            )}
+
                             {/* F-026 — Year of Account (defaults from inception year, editable) */}
                             {field('Year of Account',
                                 editable
@@ -935,7 +1087,59 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
                         </div>
                     </FieldGroup>
 
-                    {/* F-038 / F-024 — Insured */}
+                            {/* Product */}
+                            <FieldGroup title="Product">
+                                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-0.5">Product Category</p>
+                                        {editable ? (
+                                            <select
+                                                aria-label="Product Category"
+                                                value={productCategory}
+                                                onChange={(e) => {
+                                                    setProductCategory(e.target.value)
+                                                    setFormValues((v) => ({ ...v, product_id: null }))
+                                                }}
+                                                className={inputCls}
+                                            >
+                                                <option value="">— Select —</option>
+                                                {productCategories.map((category) => (
+                                                    <option key={category} value={category}>{category}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <p className="text-sm text-gray-900">{policyProductCategory}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-0.5">Product</p>
+                                        {editable ? (
+                                            <select
+                                                aria-label="Product"
+                                                value={formValues.product_id ?? ''}
+                                                onChange={(e) => {
+                                                    const nextProductId = e.target.value ? Number(e.target.value) : null
+                                                    setFormValues((v) => ({ ...v, product_id: nextProductId }))
+                                                    const nextProduct = filteredProducts.find((product) => product.id === nextProductId)
+                                                    if (nextProduct) setProductCategory(nextProduct.product_type)
+                                                }}
+                                                className={inputCls}
+                                            >
+                                                <option value="">— Select —</option>
+                                                {filteredProducts.map((product) => (
+                                                    <option key={product.id} value={product.id}>
+                                                        {product.name}{product.code ? ` (${product.code})` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <p className="text-sm text-gray-900">{policyProductName}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </FieldGroup>
+
+                            {/* F-038 / F-024 — Insured */}
                     <FieldGroup title="Insured">
                         {editable ? (
                             insuredParty ? (
@@ -1202,15 +1406,6 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
                                     { key: 'tax_receivable', label: 'Tax Receivable', defaultWidth: 140 },
                                     { key: 'annual_gross_premium', label: 'Annual Rated GP', defaultWidth: 180 },
                                     { key: 'annual_net_premium', label: 'Annual Rated NP', defaultWidth: 180 },
-                                    { key: 'written_order', label: 'Written Order %', defaultWidth: 130 },
-                                    { key: 'signed_order', label: 'Signed Order %', defaultWidth: 130 },
-                                    { key: 'time_basis', label: 'Time Basis', defaultWidth: 140 },
-                                    { key: 'written_order_basis', label: 'Written Order Basis', defaultWidth: 170 },
-                                    { key: 'signed_order_basis', label: 'Signed Order Basis', defaultWidth: 170 },
-                                    { key: 'written_line_total', label: 'Written Line Total', defaultWidth: 160 },
-                                    { key: 'signed_line_total', label: 'Signed Line Total', defaultWidth: 160 },
-                                    { key: 'delegated_authority_ref', label: 'DA Ref', defaultWidth: 130 },
-                                    { key: 'delegated_authority_section_ref', label: 'DA Section Ref', defaultWidth: 160 },
                                 ]}
                                 rows={[...sections].sort((a, b) => {
                                     const dir = sectionSort.direction === 'asc' ? 1 : -1
@@ -1332,15 +1527,6 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
                                     if (key === 'tax_receivable') return numCell('tax_receivable')
                                     if (key === 'annual_gross_premium') return numCell('annual_gross_premium')
                                     if (key === 'annual_net_premium') return numCell('annual_net_premium')
-                                    if (key === 'written_order') return numCell('written_order', (v) => `${v}%`)
-                                    if (key === 'signed_order') return numCell('signed_order', (v) => `${v}%`)
-                                    if (key === 'time_basis') return textCell('time_basis')
-                                    if (key === 'written_order_basis') return textCell('written_order_basis')
-                                    if (key === 'signed_order_basis') return textCell('signed_order_basis')
-                                    if (key === 'written_line_total') return numCell('written_line_total')
-                                    if (key === 'signed_line_total') return numCell('signed_line_total')
-                                    if (key === 'delegated_authority_ref') return textCell('delegated_authority_ref')
-                                    if (key === 'delegated_authority_section_ref') return textCell('delegated_authority_section_ref')
                                     return null
                                 }}
                             />
@@ -1622,6 +1808,53 @@ function ExistingQuoteViewPage({ quoteId, isCreate = false }: { quoteId: number,
                                 {sectionSaving ? 'Adding…' : 'Add Section'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Bind confirmation modal — shown when sibling Created/Quoted quotes exist */}
+            {showBindConfirmModal && (
+                <div className="fixed inset-y-0 left-14 right-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md flex flex-col gap-4">
+                        <h2 className="text-base font-semibold text-gray-900">Bind Quote</h2>
+                        <p className="text-sm text-gray-700">
+                            There {activeSiblingCount === 1 ? 'is' : 'are'}{' '}
+                            <strong>{activeSiblingCount} other active quote{activeSiblingCount === 1 ? '' : 's'}</strong>{' '}
+                            on this submission. Would you like to decline {activeSiblingCount === 1 ? 'it' : 'them'} as well?
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowBindConfirmModal(false)}
+                                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-100"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleBindConfirm(false)}
+                                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-100"
+                            >
+                                Bind Only
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleBindConfirm(true)}
+                                className="px-4 py-2 text-sm font-medium bg-brand-600 text-white rounded hover:bg-brand-700"
+                            >
+                                Decline Others
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Editable status badge */}
+            {quote && (
+                <div className="fixed bottom-20 right-4 z-40">
+                    <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium shadow-sm ${editable ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                        <span className={`h-2.5 w-2.5 rounded-full ${editable ? 'bg-green-500' : 'bg-amber-400'}`} aria-hidden="true" />
+                        <span>{editable ? 'Editable' : 'Read-only'}</span>
                     </div>
                 </div>
             )}

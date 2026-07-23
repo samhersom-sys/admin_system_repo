@@ -16,6 +16,7 @@ import { PolicySectionCoverage, QuoteSectionCoverage } from '../entities/policy-
 // Reporting and finance
 import { ReportTemplate } from '../entities/report-template.entity'
 import { ReportExecutionHistory } from '../entities/report-execution-history.entity'
+import { UserHomepagePreference } from '../entities/user-homepage-preference.entity'
 import { FinanceCashBatch } from '../entities/finance-cash-batch.entity'
 import { FinanceInvoice } from '../entities/finance-invoice.entity'
 import { FinancePayment } from '../entities/finance-payment.entity'
@@ -24,7 +25,7 @@ import { PolicySectionTransaction, BASectionTransaction } from '../entities/fina
 // Workflow, clearance, data quality
 import { ClearanceSubmission } from '../entities/clearance-submission.entity'
 import { DataQualityIssue } from '../entities/data-quality-issue.entity'
-import { ClearanceQueue, OrganisationHierarchy, OrganisationEntity, OrganisationHierarchyConfig, OrganisationHierarchyLink } from '../entities/organisation.entity'
+import { Organisation, ClearanceQueue, OrganisationHierarchy, OrganisationEntity, OrganisationHierarchyConfig, OrganisationHierarchyLink } from '../entities/organisation.entity'
 
 // Binding authorities
 import { BindingAuthority } from '../entities/binding-authority.entity'
@@ -49,13 +50,14 @@ import { ChatMessage, NotificationMessage, NotificationTemplate, UserNotificatio
 
 // Lookups
 import {
-  LookupSubmissionStatus, LookupQuoteStatus, LookupPolicyStatus, LookupBindingAuthorityStatus,
+  LookupSubmissionStatus, LookupQuoteStatus, LookupPolicyStatus, LookupPolicyVersionStatus, LookupBindingAuthorityStatus,
   LookupContractType, LookupMethodOfPlacement, LookupRenewalStatus, LookupTransactionType,
   LookupLossQualifier, LookupClaimStatus, LookupClassOfBusiness, LookupBasisForOrder,
   LookupAnalysisBasis, LookupDateBasis, LookupWorkflowStatus, LookupPartyRole,
   LookupCoverage, LookupCoverageDetailType, LookupCoverageDetailSubType,
   LookupCurrency, LookupCountry, LookupRegion, LookupSubdivision,
   LookupSicCode, LookupRiskCode, LookupClassRiskCode, LookupTaxRule,
+  SystemErrorCatalog,
 } from '../entities/lookup.entity'
 
 // Auth and security
@@ -74,8 +76,14 @@ import { QuoteSectionRiskCode } from '../entities/quote-section-risk-code.entity
 import { MeasureDefinition } from '../measures/measure-definition.entity'
 import { MeasureDefinitionHistory } from '../entities/measure-definition-history.entity'
 
+// Login history
+import { LoginHistory } from '../entities/login-history.entity'
+
 // Claims
 import { Claim } from '../entities/claim.entity'
+
+// Settings
+import { ProductGrainDefault } from '../entities/product-grain-default.entity'
 
 // Resolve .env.local from workspace root (4 levels up from backend/nest/src/config/)
 dotenv.config({ path: path.resolve(__dirname, '../../../../.env.local') })
@@ -98,11 +106,13 @@ export const typeOrmOptions: DataSourceOptions = {
 
     // Reporting and finance
     ReportTemplate, ReportExecutionHistory,
+    UserHomepagePreference,
     FinanceCashBatch, FinanceInvoice, FinancePayment,
     PolicySectionTransaction, BASectionTransaction,
 
     // Workflow and org
     ClearanceSubmission, DataQualityIssue,
+    Organisation,
     ClearanceQueue,
     OrganisationHierarchy, OrganisationEntity, OrganisationHierarchyConfig, OrganisationHierarchyLink,
 
@@ -125,13 +135,14 @@ export const typeOrmOptions: DataSourceOptions = {
     Notification, ChatMessage, NotificationMessage, NotificationTemplate, UserNotification,
 
     // Lookups (27 tables)
-    LookupSubmissionStatus, LookupQuoteStatus, LookupPolicyStatus, LookupBindingAuthorityStatus,
+    LookupSubmissionStatus, LookupQuoteStatus, LookupPolicyStatus, LookupPolicyVersionStatus, LookupBindingAuthorityStatus,
     LookupContractType, LookupMethodOfPlacement, LookupRenewalStatus, LookupTransactionType,
     LookupLossQualifier, LookupClaimStatus, LookupClassOfBusiness, LookupBasisForOrder,
     LookupAnalysisBasis, LookupDateBasis, LookupWorkflowStatus, LookupPartyRole,
     LookupCoverage, LookupCoverageDetailType, LookupCoverageDetailSubType,
     LookupCurrency, LookupCountry, LookupRegion, LookupSubdivision,
     LookupSicCode, LookupRiskCode, LookupClassRiskCode, LookupTaxRule,
+    SystemErrorCatalog,
 
     // Auth and security
     PasswordResetToken, PasswordAuditLog, ErrorLog,
@@ -147,14 +158,24 @@ export const typeOrmOptions: DataSourceOptions = {
 
     // Measures
     MeasureDefinition, MeasureDefinitionHistory,
+
+    // Login history
+    LoginHistory,
+
+    // Settings
+    ProductGrainDefault,
   ],
 
-  // NEVER synchronize in production — use db-sync.ts for fresh installs only
+  // NEVER synchronize automatically — use db-sync.ts for fresh installs only
   synchronize: false,
 
-  // No automatic migrations on startup — schema is managed via db-sync.ts (fresh install)
-  // or explicit TypeORM migrations (production releases)
-  migrationsRun: false,
+  // Migration files live in src/migrations/ — one file per release for production schema changes
+  // ts-node (dev/CLI) handles .ts; compiled dist handles .js
+  migrations: [path.join(__dirname, '../migrations/*{.ts,.js}')],
+
+  // Run any pending migrations automatically on server startup
+  // Migrations use CREATE TABLE IF NOT EXISTS / ALTER TABLE IF NOT EXISTS so re-runs are safe
+  migrationsRun: true,
 
   ssl: shouldUseDatabaseSsl ? { rejectUnauthorized: false } : false,
 

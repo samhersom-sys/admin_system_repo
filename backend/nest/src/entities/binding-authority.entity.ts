@@ -51,4 +51,7 @@ export class BindingAuthority {
 
   @Column({ name: 'created_by_org_code', type: 'varchar', length: 50, nullable: true })
   createdByOrgCode: string | null
+
+  @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+  deletedAt: Date | null
 }

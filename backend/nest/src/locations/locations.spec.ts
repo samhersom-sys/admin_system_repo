@@ -207,4 +207,199 @@ describe('LocationsScheduleService', () => {
       expect(result).toEqual([])
     })
   })
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-011 — addLocation
+  // -------------------------------------------------------------------------
+  describe('addLocation', () => {
+    it('T-LOC-BE-NE-R11a: inserts location row and returns it', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Created' }
+      const locationRow = { id: 5, quote_id: 1, country: 'UK', address1: '10 Test St' }
+      mockDataSource.query
+        .mockResolvedValueOnce([quoteRow]) // findQuote
+        .mockResolvedValueOnce([locationRow]) // INSERT RETURNING
+
+      const result = await service.addLocation(1, 'TST', { country: 'UK', address1: '10 Test St' })
+      expect(result).toEqual(locationRow)
+      const sql = mockDataSource.query.mock.calls[1][0] as string
+      expect(sql).toContain('INSERT INTO locations')
+    })
+
+    it('T-LOC-BE-NE-R11b: throws BadRequestException when quote status is Bound', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Bound' }
+      mockDataSource.query.mockResolvedValueOnce([quoteRow])
+      await expect(service.addLocation(1, 'TST', {})).rejects.toThrow(BadRequestException)
+    })
+
+    it('T-LOC-BE-NE-R11c: throws NotFoundException when quote not found', async () => {
+      mockDataSource.query.mockResolvedValueOnce([])
+      await expect(service.addLocation(99, 'TST', {})).rejects.toThrow(NotFoundException)
+    })
+
+    it('T-LOC-BE-NE-R11d: throws ForbiddenException when org does not own quote', async () => {
+      mockDataSource.query.mockResolvedValueOnce([{ id: 1, created_by_org_code: 'OTHER', status: 'Created' }])
+      await expect(service.addLocation(1, 'TST', {})).rejects.toThrow(ForbiddenException)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-012 — updateLocation
+  // -------------------------------------------------------------------------
+  describe('updateLocation', () => {
+    it('T-LOC-BE-NE-R12a: updates and returns location row', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Quoted' }
+      const updatedRow = { id: 5, quote_id: 1, city: 'London' }
+      mockDataSource.query
+        .mockResolvedValueOnce([quoteRow]) // findQuote
+        .mockResolvedValueOnce([updatedRow]) // UPDATE RETURNING
+
+      const result = await service.updateLocation(1, 5, 'TST', { city: 'London' })
+      expect(result).toEqual(updatedRow)
+      const sql = mockDataSource.query.mock.calls[1][0] as string
+      expect(sql).toContain('UPDATE locations')
+    })
+
+    it('T-LOC-BE-NE-R12b: throws NotFoundException when location not found', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Created' }
+      mockDataSource.query
+        .mockResolvedValueOnce([quoteRow])
+        .mockResolvedValueOnce([]) // location not found
+
+      await expect(service.updateLocation(1, 99, 'TST', {})).rejects.toThrow(NotFoundException)
+    })
+
+    it('T-LOC-BE-NE-R12c: throws BadRequestException when quote is Issued', async () => {
+      mockDataSource.query.mockResolvedValueOnce([{ id: 1, created_by_org_code: 'TST', status: 'Issued' }])
+      await expect(service.updateLocation(1, 5, 'TST', {})).rejects.toThrow(BadRequestException)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-013 — deleteLocation
+  // -------------------------------------------------------------------------
+  describe('deleteLocation', () => {
+    it('T-LOC-BE-NE-R13a: deletes coverages then location, returns message', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Created' }
+      const locationRow = { id: 5, quote_id: 1 }
+      mockDataSource.query
+        .mockResolvedValueOnce([quoteRow])       // findQuote
+        .mockResolvedValueOnce([locationRow])    // findLocation
+        .mockResolvedValueOnce([])               // DELETE coverages
+        .mockResolvedValueOnce([])               // DELETE location
+
+      const result = await service.deleteLocation(1, 5, 'TST')
+      expect(result).toEqual({ message: 'Location deleted' })
+      const delCovSql = mockDataSource.query.mock.calls[2][0] as string
+      expect(delCovSql).toContain('DELETE FROM location_coverages')
+    })
+
+    it('T-LOC-BE-NE-R13b: throws NotFoundException when location does not exist', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Created' }
+      mockDataSource.query
+        .mockResolvedValueOnce([quoteRow])
+        .mockResolvedValueOnce([]) // location not found
+
+      await expect(service.deleteLocation(1, 99, 'TST')).rejects.toThrow(NotFoundException)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-014 — addCoverage
+  // -------------------------------------------------------------------------
+  describe('addCoverage', () => {
+    it('T-LOC-BE-NE-R14a: inserts coverage row and returns it', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Created' }
+      const coverageRow = { id: 20, location_id: 5, coverage_type: 'Property Damage' }
+      mockDataSource.query
+        .mockResolvedValueOnce([quoteRow])   // assertQuoteEditable
+        .mockResolvedValueOnce([coverageRow]) // INSERT RETURNING
+
+      const result = await service.addCoverage(1, 5, 'TST', { coverage_type: 'Property Damage' })
+      expect(result).toEqual(coverageRow)
+      const sql = mockDataSource.query.mock.calls[1][0] as string
+      expect(sql).toContain('INSERT INTO location_coverages')
+    })
+
+    it('T-LOC-BE-NE-R14b: throws BadRequestException when quote status is Bound', async () => {
+      mockDataSource.query.mockResolvedValueOnce([{ id: 1, created_by_org_code: 'TST', status: 'Bound' }])
+      await expect(service.addCoverage(1, 5, 'TST', {})).rejects.toThrow(BadRequestException)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-015 — updateCoverage
+  // -------------------------------------------------------------------------
+  describe('updateCoverage', () => {
+    it('T-LOC-BE-NE-R15a: updates and returns coverage row', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Quoted' }
+      const updatedRow = { id: 20, sum_insured: '500000' }
+      mockDataSource.query
+        .mockResolvedValueOnce([quoteRow])
+        .mockResolvedValueOnce([updatedRow])
+
+      const result = await service.updateCoverage(1, 5, 20, 'TST', { sum_insured: '500000' })
+      expect(result).toEqual(updatedRow)
+      const sql = mockDataSource.query.mock.calls[1][0] as string
+      expect(sql).toContain('UPDATE location_coverages')
+    })
+
+    it('T-LOC-BE-NE-R15b: throws NotFoundException when coverage row not found', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Created' }
+      mockDataSource.query
+        .mockResolvedValueOnce([quoteRow])
+        .mockResolvedValueOnce([]) // not found
+
+      await expect(service.updateCoverage(1, 5, 99, 'TST', {})).rejects.toThrow(NotFoundException)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-016 — deleteCoverage
+  // -------------------------------------------------------------------------
+  describe('deleteCoverage', () => {
+    it('T-LOC-BE-NE-R16a: deletes coverage row and returns message', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Created' }
+      mockDataSource.query
+        .mockResolvedValueOnce([quoteRow])
+        .mockResolvedValueOnce([{ id: 20 }]) // DELETE RETURNING
+
+      const result = await service.deleteCoverage(1, 5, 20, 'TST')
+      expect(result).toEqual({ message: 'Coverage row deleted' })
+    })
+
+    it('T-LOC-BE-NE-R16b: throws NotFoundException when coverage row not found', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Created' }
+      mockDataSource.query
+        .mockResolvedValueOnce([quoteRow])
+        .mockResolvedValueOnce([]) // DELETE RETURNING empty
+
+      await expect(service.deleteCoverage(1, 5, 99, 'TST')).rejects.toThrow(NotFoundException)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // REQ-LOC-BE-NE-F-017 — saveVersion
+  // -------------------------------------------------------------------------
+  describe('saveVersion', () => {
+    it('T-LOC-BE-NE-R17a: reads current rows and inserts JSONB snapshot', async () => {
+      const quoteRow = { id: 1, created_by_org_code: 'TST', status: 'Quoted' }
+      const locationRows = [{ id: 1, quote_id: 1, country: 'UK', address1: '1 Test St' }]
+      mockDataSource.query
+        .mockResolvedValueOnce([quoteRow])                // findQuote (access check)
+        .mockResolvedValueOnce(locationRows)              // read quote_location_rows
+        .mockResolvedValueOnce([{ max_version: '2' }])   // count versions
+        .mockResolvedValueOnce([])                        // deactivate previous
+        .mockResolvedValueOnce([{ id: 10, version_number: 3, created_at: new Date() }]) // INSERT
+
+      const result = await service.saveVersion(1, 'TST', 'alice')
+      expect(result).toHaveProperty('version_number', 3)
+      const snapshotSql = mockDataSource.query.mock.calls[4][0] as string
+      expect(snapshotSql).toContain('INSERT INTO locations_schedule_versions')
+    })
+
+    it('T-LOC-BE-NE-R17b: throws ForbiddenException for wrong org', async () => {
+      mockDataSource.query.mockResolvedValueOnce([{ id: 1, created_by_org_code: 'OTHER', status: 'Created' }])
+      await expect(service.saveVersion(1, 'TST', 'alice')).rejects.toThrow(ForbiddenException)
+    })
+  })
 })

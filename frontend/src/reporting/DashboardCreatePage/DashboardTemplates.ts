@@ -39,6 +39,16 @@ export const DASHBOARD_TEMPLATES: Record<string, DashboardTemplate> = {
             { id: 2, col: 2, row: 0, colSpan: 2, rowSpan: 3 },
         ],
     },
+    twoRow: {
+        id: 'twoRow',
+        name: 'Two Rows',
+        description: 'Two full-width widgets stacked vertically',
+        icon: '▢\n▢',
+        slots: [
+            { id: 1, col: 0, row: 0, colSpan: 4, rowSpan: 2 },
+            { id: 2, col: 0, row: 2, colSpan: 4, rowSpan: 2 },
+        ],
+    },
     threeColumn: {
         id: 'threeColumn',
         name: 'Three Columns',

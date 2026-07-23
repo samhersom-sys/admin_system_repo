@@ -264,6 +264,19 @@ describe('SubmissionsService', () => {
       const createArg = mockSubmissionRepo.create.mock.calls[0][0]
       expect(createArg.expiryDate).toBe('2028-06-30')
     })
+
+    // REQ-SUB-BE-NE-F-002 (D2 update) — explicit isActive=true
+    it('T-SUB-BE-NE-R02f: passes isActive=true explicitly when creating a submission', async () => {
+      const repoQb = buildRepoQbMock(null)
+      mockSubmissionRepo.createQueryBuilder.mockReturnValue(repoQb)
+      const newSub = makeSubmission()
+      mockSubmissionRepo.create.mockReturnValue(newSub)
+      mockSubmissionRepo.save.mockResolvedValue(newSub)
+
+      await service.create('TST', { insured: 'Test Ltd', inceptionDate: '2026-01-01' })
+      const createArg = mockSubmissionRepo.create.mock.calls[0][0]
+      expect(createArg.isActive).toBe(true)
+    })
   })
 
   // -------------------------------------------------------------------------
@@ -657,6 +670,35 @@ describe('SubmissionsService', () => {
       mockSubmissionRepo.findOne.mockResolvedValue(null)
 
       await expect(service.findBindingAuthorities('TST', 99)).rejects.toThrow(NotFoundException)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // REQ-SUB-BE-NE-F-C03 — updateStatusFromQuote
+  // -------------------------------------------------------------------------
+  describe('updateStatusFromQuote', () => {
+    it('T-SUB-BE-NE-R13a: updates status and isActive when submission found', async () => {
+      const s = makeSubmission({ status: 'Quoted' })
+      mockSubmissionRepo.findOne.mockResolvedValue(s)
+      mockSubmissionRepo.save.mockResolvedValue({ ...s, status: 'Bound', isActive: true })
+
+      await service.updateStatusFromQuote(1, 'Bound', true, 'TST')
+
+      expect(mockSubmissionRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'Bound', isActive: true }),
+      )
+    })
+
+    it('T-SUB-BE-NE-R13b: returns without error when submissionId is null (no-op)', async () => {
+      await expect(service.updateStatusFromQuote(null, 'Bound', true, 'TST')).resolves.toBeUndefined()
+      expect(mockSubmissionRepo.findOne).not.toHaveBeenCalled()
+      expect(mockSubmissionRepo.save).not.toHaveBeenCalled()
+    })
+
+    it('T-SUB-BE-NE-R13c: throws NotFoundException when submission not found', async () => {
+      mockSubmissionRepo.findOne.mockResolvedValue(null)
+
+      await expect(service.updateStatusFromQuote(99, 'Bound', true, 'TST')).rejects.toThrow(NotFoundException)
     })
   })
 })

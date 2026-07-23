@@ -3,7 +3,26 @@
 This document tracks the gaps between the Backup (`policy-forge-chat (BackUp)`) and the Cleaned rebuild.  
 It is a living document — update it as gaps are closed.
 
-**Last updated:** 2026-03-16
+**Last updated:** 2026-07-10
+
+---
+
+## HOME-CFG Delivery (2026-07-10)
+
+| Item | Delivered |
+|---|---|
+| `users` module | `backend/nest/src/users/` — UsersController, UsersService, UsersModule |
+| PATCH /api/users/me/master-homepage | ✅ — sets/clears `master_homepage_template_id` on the calling user; cross-tenant template validation via orgCode |
+| PATCH /api/users/me/homepage-preferences | ✅ — upserts `user_homepage_preferences` row; cross-tenant validation |
+| GET /api/auth/me | ✅ — now returns `masterHomepageTemplateId` |
+| GET /api/recent-records (alias) | ✅ — canonical alias added to DashboardController alongside legacy `/api/recent-records-data` |
+| Migration: `master_homepage_template_id` on `users` | ✅ `1747400000000-AddMasterHomepageToUsers.ts` |
+| Migration: `user_homepage_preferences` table | ✅ `1747500000000-CreateUserHomepagePreferencesTable.ts` |
+| `UserHomepagePreference` entity | ✅ `entities/user-homepage-preference.entity.ts` |
+| Frontend: `home/index.tsx` | ✅ tabless — renders DashboardViewPage or HomeDashboard based on session |
+| Frontend: `ReportsListPage` | ✅ 4 sections with Homepage/Dashboard/No columns; Recent Records + My Tasks core rows |
+| Frontend: `DashboardConfigurePage` | ✅ `recent-records` + `tasks` in DATA_SOURCES; Data Source combobox with live preview |
+| Frontend: `reporting.service.ts` | ✅ `patchMasterHomepage` + `patchHomepagePreferences` |
 
 ---
 

@@ -12,6 +12,7 @@ import * as bcryptjs from 'bcryptjs'
 import * as crypto from 'crypto'
 import * as jwt from 'jsonwebtoken'
 import { User } from '../entities/user.entity'
+import { Organisation } from '../entities/organisation.entity'
 import { logError } from '../shared/log-error'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
@@ -24,6 +25,8 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(Organisation)
+    private readonly orgRepo: Repository<Organisation>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) { }
@@ -108,12 +111,19 @@ export class AuthService {
     user.tokenVersion = newVersion
     await this.userRepo.save(user)
 
+    // REQ-AUTH-F-033, REQ-AUTH-F-034 — resolve orgType from organisations table
+    const org = user.orgCode
+      ? await this.orgRepo.findOne({ where: { orgCode: user.orgCode }, select: { orgType: true } })
+      : null
+    const orgType = org?.orgType ?? 'insurer'
+
     const token = jwt.sign(
       {
         id: user.id,
         username: user.username,
         email: user.email,
         orgCode: user.orgCode,
+        orgType,
         role: user.role,
         tokenVersion: newVersion,
       },
@@ -130,6 +140,7 @@ export class AuthService {
         email: user.email,
         fullName: user.fullName,
         orgCode: user.orgCode,
+        orgType,
         role: user.role,
       },
     }
@@ -138,7 +149,7 @@ export class AuthService {
   async getMe(userId: number) {
     const user = await this.userRepo.findOne({
       where: { id: userId },
-      select: { id: true, username: true, email: true, fullName: true, orgCode: true, role: true },
+      select: { id: true, username: true, email: true, fullName: true, orgCode: true, role: true, masterHomepageTemplateId: true },
     })
     if (!user) {
       await logError(this.dataSource, null, String(userId), 'GET /api/auth/me', 'ERR_AUTH_USER_NOT_FOUND', 'User not found', { userId })
@@ -157,7 +168,7 @@ export class AuthService {
     return { message: 'Logged out successfully' }
   }
 
-  async refresh(user: { id: number; username: string; email: string; orgCode: string; role: string }) {
+  async refresh(user: { id: number; username: string; email: string; orgCode: string; orgType?: string; role: string }) {
     const dbUser = await this.userRepo.findOne({
       where: { id: user.id },
       select: { id: true, isActive: true },
@@ -177,6 +188,7 @@ export class AuthService {
         username: user.username,
         email: user.email,
         orgCode: user.orgCode,
+        ...(user.orgType !== undefined ? { orgType: user.orgType } : {}),
         role: user.role,
       },
       JWT_SECRET,

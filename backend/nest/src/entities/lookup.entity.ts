@@ -43,6 +43,17 @@ export class LookupPolicyStatus {
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt: Date
 }
 
+@Entity('lookup_policy_version_statuses')
+export class LookupPolicyVersionStatus {
+  @PrimaryGeneratedColumn() id: number
+  @Column({ type: 'varchar', length: 50, unique: true }) code: string
+  @Column({ type: 'varchar', length: 100 }) name: string
+  @Column({ type: 'text', nullable: true }) description: string | null
+  @Column({ name: 'order_index', type: 'int', default: 0 }) orderIndex: number
+  @Column({ name: 'is_active', type: 'boolean', default: true }) isActive: boolean
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt: Date
+}
+
 @Entity('lookup_binding_authority_statuses')
 export class LookupBindingAuthorityStatus {
   @PrimaryGeneratedColumn() id: number
@@ -300,5 +311,19 @@ export class LookupTaxRule {
   @Column({ name: 'effective_to', type: 'date', nullable: true }) effectiveTo: string | null
   @Column({ type: 'text', nullable: true }) notes: string | null
   @Column({ name: 'is_active', type: 'boolean', default: true }) isActive: boolean
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt: Date
+}
+
+// System error catalog — static reference table for standard error codes
+// Schema source: db/seeds/023-system-error-catalog.js
+
+@Entity('system_error_catalog')
+export class SystemErrorCatalog {
+  @PrimaryGeneratedColumn() id: number
+  @Column({ name: 'error_code', type: 'varchar', length: 50, unique: true }) errorCode: string
+  @Column({ type: 'varchar', length: 50, nullable: true }) category: string | null
+  @Column({ type: 'varchar', length: 20, nullable: true }) severity: string | null
+  @Column({ name: 'message_template', type: 'text', nullable: true }) messageTemplate: string | null
+  @Column({ name: 'resolution_hint', type: 'text', nullable: true }) resolutionHint: string | null
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt: Date
 }

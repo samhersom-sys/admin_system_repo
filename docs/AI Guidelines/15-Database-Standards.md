@@ -196,6 +196,16 @@ When requirements change:
 - Do not create a TypeORM migration to represent a development schema change — edit the entity directly.
 - For production releases only: generate one TypeORM migration per release to apply the diff safely to live data.
 
+### RULE 3a — Run db:sync after every entity change in development
+
+After editing an entity file, apply the change to the local development database immediately by running:
+
+    npm run db:sync
+
+`db:sync` calls `DataSource.synchronize()` which adds missing columns, tables, and indexes without dropping existing data. Do not write ad-hoc `ALTER TABLE` statements; `db:sync` is the only permitted method for applying schema changes in a development environment.
+
+If a column was added to an entity but `db:sync` was not run, the application will throw a runtime error the first time code writes to that column. The correct fix is always to run `db:sync` — never to write a manual `ALTER TABLE`.
+
 ---
 
 ## 15.11  Seed Data Rules
@@ -233,6 +243,20 @@ A seed script must not depend on another seed script running first. Each script 
 Seed data must include a meaningful variety of records so that the development environment reflects realistic usage. This means including records that cover different roles, states, and data shapes — without encoding any specific business rule into this document.
 
 The specific statuses, roles, or types that must be covered are defined in the requirements documents for each domain. The seed file must be updated whenever the requirements change.
+
+### RULE 6a — Correct stale seed data immediately after every domain value change
+
+When a domain value is renamed or replaced (for example, a status label changes from `'Draft'` to `'Created'`), all affected seed files and all existing rows in the development database must be corrected in the same change set. The two steps are mandatory and must happen together:
+
+1. **Update seed files** — edit every record in the relevant seed file that uses the old value, replacing it with the new value.
+2. **Correct existing rows** — run a one-time SQL correction directly against the development database. Document the SQL used in the commit message or in the relevant Open Question item.
+
+Failure to do both steps creates a divergence: fresh-install environments (correct) and long-running environments (stale) will behave differently. Both must always be consistent.
+
+```sql
+-- Example correction SQL after renaming 'Draft' → 'Created':
+UPDATE quotes SET status = 'Created' WHERE status = 'Draft';
+```
 
 ### RULE 7 — All seed inserts must be idempotent
 

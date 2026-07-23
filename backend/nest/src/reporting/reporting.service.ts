@@ -371,31 +371,52 @@ export class ReportingService {
     // -------------------------------------------------------------------------
     // R10 — GET /api/login-activity  (core report datasource)
     // -------------------------------------------------------------------------
-    async getLoginActivity(orgCode: string | null | undefined): Promise<Array<Record<string, unknown>>> {
-        const rows: Array<{ user: string; loggedInDate: Date | string | null; durationSeconds: number | string | null }> =
-            await this.dataSource.query(
-                `SELECT
-                    COALESCE(NULLIF(full_name, ''), username) AS "user",
-                    last_login AS "loggedInDate",
-                    EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_login))::bigint AS "durationSeconds"
-                 FROM users
-                 WHERE last_login IS NOT NULL
-                   AND org_code IS NOT DISTINCT FROM $1
-                 ORDER BY last_login DESC`,
-                [orgCode ?? null],
-            )
+    async getLoginActivity(
+        orgCode: string | null | undefined,
+        role: string,
+    ): Promise<Array<Record<string, unknown>>> {
+        const isAdmin = role === 'internal_admin'
+
+        let sql: string
+        let params: unknown[]
+
+        if (isAdmin) {
+            sql = `
+                SELECT
+                    user_name  AS "user",
+                    org_code   AS "orgCode",
+                    logged_in_at AS "loggedInAt"
+                FROM login_history
+                ORDER BY logged_in_at DESC
+            `
+            params = []
+        } else {
+            sql = `
+                SELECT
+                    user_name  AS "user",
+                    org_code   AS "orgCode",
+                    logged_in_at AS "loggedInAt"
+                FROM login_history
+                WHERE org_code = $1
+                ORDER BY logged_in_at DESC
+            `
+            params = [orgCode ?? null]
+        }
+
+        const rows: Array<{ user: string; orgCode: string | null; loggedInAt: Date | string | null }> =
+            await this.dataSource.query(sql, params)
 
         return rows.map((row) => {
-            const loginDate = row.loggedInDate
-                ? row.loggedInDate instanceof Date
-                    ? row.loggedInDate.toISOString()
-                    : String(row.loggedInDate)
+            const loggedInAt = row.loggedInAt
+                ? row.loggedInAt instanceof Date
+                    ? row.loggedInAt.toISOString()
+                    : String(row.loggedInAt)
                 : null
 
             return {
                 user: row.user,
-                loggedInDate: loginDate,
-                durationOfLogin: formatDuration(Number(row.durationSeconds ?? 0)),
+                orgCode: row.orgCode ?? null,
+                loggedInAt,
             }
         })
     }
@@ -404,6 +425,8 @@ export class ReportingService {
         orgCode: string,
         widget: DashboardWidgetRequest | undefined,
         filters?: DashboardFilterRequest,
+        _userId?: number,
+        _username?: string,
     ): Promise<Record<string, unknown>> {
         if (!widget || !widget.type) {
             throw new BadRequestException('widget is required')
@@ -449,6 +472,17 @@ export class ReportingService {
         await this.historyRepo.save(h)
     }
 
+    private resolveSourceKey(source: string | null | undefined): string | null {
+        if (!source) {
+            return null
+        }
+        if (DATA_SOURCES[source]) {
+            return source
+        }
+        const match = Object.keys(DATA_SOURCES).find((key) => key.toLowerCase() === source.toLowerCase())
+        return match ?? null
+    }
+
     private resolveWidgetSources(widget: DashboardWidgetRequest): string[] {
         const values = [
             widget.metric,
@@ -459,16 +493,18 @@ export class ReportingService {
             ...(widget.attributes ?? []),
         ].filter(Boolean) as string[]
 
-        const sources = unique(values.map((value) => parseCompositeField(value)?.source).filter(Boolean) as string[])
+        const parsedSources = values.map((value) => this.resolveSourceKey(parseCompositeField(value)?.source ?? null))
+        const unsupportedSource = parsedSources.find((source) => !source)
+        if (unsupportedSource === null) {
+            throw new BadRequestException('Unsupported widget data source')
+        }
+        const sources = unique(parsedSources.filter(Boolean) as string[])
         if (sources.length === 0) {
-            if (widget.source && DATA_SOURCES[widget.source]) {
-                return [widget.source]
+            const resolvedWidgetSource = this.resolveSourceKey(widget.source)
+            if (resolvedWidgetSource) {
+                return [resolvedWidgetSource]
             }
             throw new BadRequestException('Widget has no live data fields configured')
-        }
-        const unsupportedSource = sources.find((source) => !DATA_SOURCES[source])
-        if (unsupportedSource) {
-            throw new BadRequestException('Unsupported widget data source')
         }
         return sources
     }
@@ -486,11 +522,15 @@ export class ReportingService {
         if (!parsed) {
             throw new BadRequestException('Widget field is required')
         }
+        const parsedSource = this.resolveSourceKey(parsed.source)
+        if (!parsedSource) {
+            throw new BadRequestException('Unsupported widget data source')
+        }
         const sourceConfig = aug[source] ?? DATA_SOURCES[source]
         if (!sourceConfig) {
             throw new BadRequestException('Unsupported widget data source')
         }
-        if (!allowEquivalentKey && parsed.source !== source) {
+        if (!allowEquivalentKey && parsedSource !== source) {
             throw new BadRequestException('Widget field source does not match widget source')
         }
         const fieldDef = sourceConfig.fields.find((field) => field.key === parsed.key)
@@ -664,7 +704,7 @@ export class ReportingService {
             }
             const legend = widget.legendAttribute ? this.resolveEquivalentFieldRef(source, widget.legendAttribute, aug) : null
             const sourceMeasures = rawMeasures
-                .filter((measure) => parseCompositeField(measure)?.source === source)
+                .filter((measure) => this.resolveSourceKey(parseCompositeField(measure)?.source ?? null) === source)
                 .map((measure) => this.resolveFieldRef(source, measure, aug))
 
             if (sourceMeasures.length === 0 && (widget.aggregation ?? 'count') !== 'count') {
@@ -720,9 +760,13 @@ export class ReportingService {
             if (!parsed) {
                 throw new BadRequestException(`Unsupported widget field: ${attribute}`)
             }
-            const bucket = groupedAttributes.get(parsed.source) ?? []
+            const parsedSource = this.resolveSourceKey(parsed.source)
+            if (!parsedSource) {
+                throw new BadRequestException('Unsupported widget data source')
+            }
+            const bucket = groupedAttributes.get(parsedSource) ?? []
             bucket.push(attribute)
-            groupedAttributes.set(parsed.source, bucket)
+            groupedAttributes.set(parsedSource, bucket)
         }
 
         if (groupedAttributes.size === 1) {

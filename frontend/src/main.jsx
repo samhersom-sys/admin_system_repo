@@ -12,10 +12,12 @@ import NewSubmissionPage from '@/submissions/NewSubmissionPage'
 import SubmissionViewPage from '@/submissions/SubmissionViewPage'
 import QuotesPage from '@/quotes/index'
 import QuoteViewPage from '@/quotes/QuoteViewPage/QuoteViewPage'
+import QuoteLocationsPage from '@/quotes/QuoteLocationsPage/QuoteLocationsPage'
 import QuoteSectionViewPage from '@/quotes/QuoteSectionViewPage/QuoteSectionViewPage'
 import PoliciesPage from '@/policies/index'
 import PoliciesListPage from '@/policies/PoliciesListPage/PoliciesListPage'
 import PolicyViewPage from '@/policies/PolicyViewPage/PolicyViewPage'
+import PolicyLocationsPage from '@/policies/PolicyLocationsPage/PolicyLocationsPage'
 import PolicySectionViewPage from '@/policies/PolicySectionViewPage/PolicySectionViewPage'
 import PolicyEndorsePage from '@/policies/PolicyEndorsePage/PolicyEndorsePage'
 import PolicyEndorsementPage from '@/policies/PolicyEndorsementPage/PolicyEndorsementPage'
@@ -55,9 +57,15 @@ import RatingRulesPage from '@/settings/RatingRulesPage'
 import RatingRulesDetailPage from '@/settings/RatingRulesDetailPage'
 import ProductListPage from '@/settings/ProductListPage'
 import ProductConfigPage from '@/settings/ProductConfigPage'
+import ProductCategoriesPage from '@/settings/ProductCategoriesPage'
+import ProductPolicyGrainDefaultsPage from '@/settings/ProductPolicyGrainDefaultsPage'
 import DashboardReportingSettingsPage from '@/settings/DashboardReportingSettingsPage'
 import DataQualitySettingsPage from '@/settings/DataQualitySettingsPage'
+import EarningsConfigPage from '@/settings/EarningsConfigPage'
 import OrganisationDetailPage from '@/settings/OrganisationDetailPage'
+import AccountAdministrationPage from '@/settings/AccountAdministrationPage'
+import AccountDetailPage from '@/settings/AccountDetailPage'
+import AccountCreatePage from '@/settings/AccountCreatePage'
 import PartyListPage from '@/parties/PartyListPage/PartyListPage'
 import CreatePartyPage from '@/parties/CreatePartyPage/CreatePartyPage'
 import PartyViewPage from '@/parties/PartyViewPage/PartyViewPage'
@@ -75,6 +83,8 @@ import DataQualityPage from './workflow/DataQualityPage/DataQualityPage'
 import SearchPage from './search/index'
 import ProfilePage from './profile/ProfilePage'
 import NotFound from './not-found/index'
+import BrokerSubmissionsPage from '@/broker-submissions/BrokerSubmissionsPage'
+import NewBrokerSubmissionPage from '@/broker-submissions/NewBrokerSubmissionPage'
 import InstallBanner from './pwa/InstallBanner'
 import { registerServiceWorker } from './pwa/registerServiceWorker'
 
@@ -117,12 +127,14 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/quotes"                element={<QuotesPage />} />
           <Route path="/quotes/new"           element={<QuoteViewPage />} />
           <Route path="/quotes/:id"           element={<QuoteViewPage />} />
+          <Route path="/quotes/:id/locations" element={<QuoteLocationsPage />} />
           <Route path="/quotes/:id/sections/:sectionId" element={<QuoteSectionViewPage />} />
           <Route path="/quotes/:id/sections/:sectionId/coverages/:coverageId" element={<QuoteCoverageDetailPage />} />
           <Route path="/quotes/:id/sections/:sectionId/coverages/:coverageId/details/:detailName" element={<QuoteCoverageSubDetailPage />} />
           <Route path="/policies"              element={<PoliciesListPage />} />
           <Route path="/policies/endorse/:id"  element={<PolicyEndorsePage />} />
           <Route path="/policies/:id"          element={<PolicyViewPage />} />
+          <Route path="/policies/:id/locations" element={<PolicyLocationsPage />} />
           <Route path="/policies/:id/endorsements/:endorsementId/edit" element={<PolicyEndorsementPage />} />
           <Route path="/policies/:id/transactions/:transactionId" element={<PolicyTransactionViewPage />} />
           <Route path="/policies/:policyId/sections/:sectionId" element={<PolicySectionViewPage />} />
@@ -162,9 +174,14 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/settings"              element={<SettingsPage />} />
           <Route path="/settings/module-licensing"           element={<CompanyListPage />} />
           <Route path="/settings/module-licensing/:orgCode"  element={<CompanyConfigPage />} />
-          <Route path="/settings/account"      element={<NotFound />} />
+          <Route path="/settings/account"      element={<AccountAdministrationPage />} />
+          <Route path="/settings/account/new"   element={<AccountCreatePage />} />
+          <Route path="/settings/account/:id"   element={<AccountDetailPage />} />
           <Route path="/settings/products"     element={<ProductListPage />} />
+          <Route path="/settings/products/new"  element={<ProductConfigPage />} />
           <Route path="/settings/products/:id" element={<ProductConfigPage />} />
+          <Route path="/settings/product-catagories" element={<ProductCategoriesPage />} />
+          <Route path="/settings/products/:id/policy-grain/:grain/:rowId/defaults" element={<ProductPolicyGrainDefaultsPage />} />
           <Route path="/settings/organisation" element={<OrganisationDetailPage />} />
           <Route path="/settings/organisation/new" element={<OrganisationDetailPage />} />
           <Route path="/settings/organisations" element={<OrganisationDetailPage />} />
@@ -172,6 +189,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/settings/rating-rules/:id" element={<RatingRulesDetailPage />} />
           <Route path="/settings/data-quality" element={<DataQualitySettingsPage />} />
           <Route path="/settings/dashboard-reporting" element={<DashboardReportingSettingsPage />} />
+          <Route path="/settings/earnings-config" element={<EarningsConfigPage />} />
           <Route path="/parties"               element={<PartyListPage />} />
           <Route path="/parties/new"           element={<CreatePartyPage />} />
           <Route path="/parties/:id"           element={<PartyViewPage />} />
@@ -179,6 +197,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/claims"                element={<ClaimsListPage />} />
           <Route path="/claims/create"         element={<ClaimCreatePage />} />
           <Route path="/claims/:id"            element={<ClaimViewPage />} />
+          {/* Broker Submissions */}
+          <Route path="/broker-submissions"     element={<Navigate to="/workflow/submissions" replace />} />
+          <Route path="/broker-submissions/new" element={<NewBrokerSubmissionPage />} />
+          <Route path="/broker-submissions/:id" element={<BrokerSubmissionsPage />} />
           <Route path="/search"               element={<SearchPage />} />
           <Route path="/profile"              element={<ProfilePage />} />
         </Route>

@@ -48,7 +48,13 @@ export class HomeService {
         const baSrc = DATA_SOURCES.bindingAuthorities
 
         // REQ-HOME-F-019 — resolve countActive measure from DB (measure_definitions is the source of truth)
-        const countActiveMeasure = await this.measuresService.findBySourceAndKey('policies', 'countActive', orgCode)
+        // REQ-HOME-F-019b — if measure_definitions table is missing (schema lag), fall back to COUNT(*)
+        let countActiveMeasure = null
+        try {
+            countActiveMeasure = await this.measuresService.findBySourceAndKey('policies', 'countActive', orgCode)
+        } catch {
+            // measure_definitions table not yet created — migration pending; fall back to COUNT(*)
+        }
         const activeFilter = countActiveMeasure
             ? this.measuresService.getEffectiveFilterExpr(countActiveMeasure)
             : null

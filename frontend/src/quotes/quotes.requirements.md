@@ -318,6 +318,49 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 
 ---
 
+### 4.11 QuoteViewPage — Status-Change and Save Audit Events
+
+**REQ-QUO-FE-F-077:** After a successful save (`PUT /api/quotes/:id`), `QuoteViewPage` shall post a best-effort audit event to `POST /api/quotes/:id/audit` with `action: 'Quote Updated'`. The call shall be fire-and-forget (`.catch(() => {})`) so that an audit failure never surfaces to the user or blocks the save workflow.
+
+**REQ-QUO-FE-F-078:** After a successful Mark Quoted action (`markQuoteAsQuoted`), `QuoteViewPage` shall post a best-effort audit event to `POST /api/quotes/:id/audit` with `action: 'Quote Marked Quoted'`. The call shall be fire-and-forget.
+
+**REQ-QUO-FE-F-079:** After a successful Bind Quote action (`bindQuote`), `QuoteViewPage` shall post a best-effort audit event to `POST /api/quotes/:id/audit` with `action: 'Quote Bound'`. The call shall be fire-and-forget.
+
+**REQ-QUO-FE-F-080:** After a successful Decline Quote action (`declineQuote`), `QuoteViewPage` shall post a best-effort audit event to `POST /api/quotes/:id/audit` with `action: 'Quote Declined'`. The call shall be fire-and-forget.
+
+**REQ-QUO-FE-F-081:** After a successful Issue Policy action (`issuePolicy`), `QuoteViewPage` shall post a best-effort audit event to `POST /api/quotes/:id/audit` with `action: 'Quote Issued'`. The call shall be fire-and-forget.
+
+All five audit events (F-077 to F-081) shall include `user` (from `getSession()`) and `userId` in the payload. They SHALL NOT be posted on failure paths.
+
+---
+
+### 4.12 Coverage and Coverage-Detail Date/Time Delta (2026-07-10)
+
+1. **REQ-QUO-FE-F-082:** The quotes UI shall expose `Effective Date`, `Effective Time`, `Expiry Date`, and `Expiry Time` at both coverage-grid edit cells and coverage-detail screens, using the same labels and formats on each surface. Acceptance criteria: the four fields are visible and editable in Draft state on both surfaces and hidden/read-only in non-editable states per existing lock rules.
+2. **REQ-QUO-FE-F-083:** Client-side default behavior shall apply when creating coverage or coverage-detail rows: `effective_date` inherits from parent section/coverage date, `expiry_date` defaults to parent inception plus one year where parent expiry is not set, `effective_time` defaults to parent time when supplied otherwise `00:00:00`, and `expiry_time` defaults to parent time when supplied otherwise `23:59:59`. Acceptance criteria: adding a new row without manual date/time entry pre-populates all four values using the defined precedence.
+3. **REQ-QUO-FE-F-084:** Grid and detail surfaces shall remain synchronized using canonical API values; after any successful save from either surface, the other surface shall display the same persisted values after reload without client-side transformation drift. Acceptance criteria: editing one surface and reloading the other shows identical date/time values.
+4. **REQ-QUO-FE-F-085:** API contract updates in `quotes.service.ts` shall include optional `effectiveDate`, `effectiveTime`, `expiryDate`, and `expiryTime` fields for coverage and coverage-detail DTO types, and payload builders shall omit undefined fields to preserve backward compatibility with endpoints that default server-side. Acceptance criteria: TypeScript compiles with new optional fields and save calls succeed when fields are present or omitted.
+5. **REQ-QUO-FE-F-086:** The Quote `Issue Policy` flow shall pass coverage and coverage-detail date/time values through existing API pathways so that policy issuance can preserve explicit quote overrides; the frontend shall not overwrite server-returned values during navigation to policy. Acceptance criteria: after issue, the first policy load shows the same non-null coverage date/time values that were present on quote.
+6. **REQ-QUO-FE-F-087:** Non-functional constraints for this UI delta shall include tenant-safe rendering (show only API-returned tenant data), compatibility support for legacy records missing new fields, and rollback-safe behavior where absent values render as defaults rather than runtime errors. Acceptance criteria: legacy records render without crashes and tenant scoping behavior remains unchanged.
+
+---
+
+### 4.13 Quote Section Grid and Details Gap Constraints (2026-07-14)
+
+1. **REQ-QUO-FE-F-088 (Gap Constraint on REQ-QUO-FE-F-046):** The Quote Sections grid on `QuoteViewPage` shall not include these attributes as columns: Written Order %, Signed Order %, Time Basis, Written Order Basis, Signed Order Basis, Written Line Total, Signed Line Total, DA Ref, DA Section Ref. Acceptance criteria: each excluded label appears zero times as a grid header on Draft and locked quotes.
+2. **REQ-QUO-FE-F-089 (Gap Constraint on REQ-QUO-FE-F-052):** Excluding attributes from REQ-QUO-FE-F-088 shall not remove them from `QuoteSectionViewPage` details workflows. Acceptance criteria: opening section details from the grid shows all retained fields in the details form.
+3. **REQ-QUO-FE-F-090 (Delta Behavior Lock):** Movement fields in `QuoteSectionViewPage` shall not become editable as part of this delta and shall remain display-only in details while absent from sections-grid editing interactions. Acceptance criteria: no editable Movement controls in sections grid; details Movement values render read-only.
+
+---
+
+### 4.14 Quote Sections and Details Field Inventory Lock (2026-07-14)
+
+1. **REQ-QUO-FE-F-096 (Quote Sections Grid Inventory):** The Sections grid in `QuoteViewPage` shall render exactly this header inventory (excluding the actions column icon header): Reference, Class of Business, Inception Date, Effective Date, Expiry Date, Days on Cover, Limit Currency, Limit Amount, Limit Loss Qualifier, Excess Currency, Excess Amount, Excess Loss Qualifier, Sum Insured Currency, Sum Insured, Premium Currency, Gross Gross Premium, Gross Premium, Deductions, Net Premium, Tax Receivable, Annual Rated GP, Annual Rated NP. Acceptance criteria: any additional or missing header fails automated tests until requirements and tests are explicitly updated.
+2. **REQ-QUO-FE-F-097 (Quote Section Detail FieldGroup Inventory):** `QuoteSectionViewPage` shall render exactly these field groups in details header: Contract & Reference, Limit, Insured, Annual Rating, Dates, Order & Lines, Renewal, Excess, Sum Insured. Acceptance criteria: any additional or missing field group fails automated tests until requirements and tests are explicitly updated.
+3. **REQ-QUO-FE-F-098 (Quote Section Detail Field Inventory):** Field labels in `QuoteSectionViewPage` details shall match the currently implemented inventory by group: Contract & Reference {Reference, Class of Business, Delegated Authority Reference, Delegated Authority Section Reference}; Limit {Currency, Limit Amount, Movement, Limit Loss Qualifier}; Insured {Insured}; Annual Rating {Currency, Gross Premium, Movement, Currency, Annual Rated Gross Premium, Movement, Currency, Annual Rated Net Premium, Movement}; Dates {Inception Date, Inception Time, Effective Date, Effective Time, Expiry Date, Expiry Time, Days on Cover}; Order & Lines {Time Basis, Written Order %, Written Order Basis, Written Line Total, Signed Order %, Signed Order Basis, Signed Line Total}; Renewal {Renewal Date, Renewal Status}; Excess {Currency, Excess Amount, Movement, Excess Loss Qualifier}; Sum Insured {Currency, Sum Insured Amount, Movement}. Acceptance criteria: inventory mismatch fails automated tests until requirements/tests are explicitly updated.
+
+---
+
 ## 5. Traceability
 
 | Requirement ID | Test file | Test ID(s) |
@@ -391,6 +434,12 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | REQ-QUO-FE-F-062 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending |
 | REQ-QUO-FE-F-063 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R062, R062b, R063, R063b, R063c, R063d, R063e, R063f |
 | REQ-QUO-FE-F-064 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R064, R064b, R064c, R064d, R064e, R064f, R065 |
+| REQ-QUO-FE-F-088 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-sections-R04 |
+| REQ-QUO-FE-F-089 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-section-R03b |
+| REQ-QUO-FE-F-090 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-sections-R04 (partial), T-quotes-section-R03b (read-only details context) |
+| REQ-QUO-FE-F-096 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-sections-R05 |
+| REQ-QUO-FE-F-097 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-section-R03c (field groups) |
+| REQ-QUO-FE-F-098 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-section-R03c (field inventory) |
 | REQ-QUO-FE-F-065 | code review | — |
 | REQ-QUO-FE-F-066 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R066 |
 | REQ-QUO-FE-F-067 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R067 |
@@ -402,6 +451,17 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | REQ-QUO-FE-F-073 | `frontend/src/quotes/__tests__/quotes.test.tsx` | R073 |
 | REQ-QUO-FE-F-074 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-section-types-R01, R02 |
 | REQ-QUO-FE-F-075 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-section-types-R03 |
+| REQ-QUO-FE-F-077 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-view-R077 |
+| REQ-QUO-FE-F-078 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-view-R078 |
+| REQ-QUO-FE-F-079 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-view-R079 |
+| REQ-QUO-FE-F-080 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-view-R080 |
+| REQ-QUO-FE-F-081 | `frontend/src/quotes/quotes.test.tsx` | T-quotes-view-R081 |
+| REQ-QUO-FE-F-082 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending — Stage coverage-datetime |
+| REQ-QUO-FE-F-083 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending — Stage coverage-datetime |
+| REQ-QUO-FE-F-084 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending — Stage coverage-datetime |
+| REQ-QUO-FE-F-085 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending — Stage coverage-datetime |
+| REQ-QUO-FE-F-086 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending — Stage coverage-datetime |
+| REQ-QUO-FE-F-087 | `frontend/src/quotes/__tests__/quotes.test.tsx` | pending — Stage coverage-datetime |
 
 ---
 
@@ -439,6 +499,8 @@ The Locations tab shall display an `app-table` with columns: Coverage Sub-Detail
 | 2026-04-07 | Block 4: REQ-QUO-FE-F-052 implemented — Days on Cover (computed), Inception Time, Expiry Time, Annual Net Premium added to section header. F-057 — Risk Code uses `<select>` from `GET /api/lookups/riskCodes` with free-text fallback. F-058 — Participations inline editing, Save Participations button, 100% validation for Written/Signed Line %. Tests R15–R23 added. `getRiskCodes` added to quotes.service.ts. |
 | 2026-04-07 | Block 5: REQ-QUO-FE-F-063 — QuoteCoverageDetailPage updated with currency filter, "Coverage Sub-Details" and "Number of Locations" columns. F-064 — QuoteCoverageSubDetailPage updated with currency filter and "Number of Locations" column. Tests R063d–R063f, R064e–R064f added. Traceability updated. |
 | 2026-04-07 | Block 6: REQ-QUO-FE-F-066 to F-073 implemented — QuoteSearchModal component at `frontend/src/quotes/QuoteSearchModal/QuoteSearchModal.tsx`. Tests R066–R073 added (8 tests). All 111 quotes tests pass. |
+| today | Section 4.11 added: REQ-QUO-FE-F-077 to F-081 — status-change and save audit events for QuoteViewPage (Quote Updated, Quote Marked Quoted, Quote Bound, Quote Declined, Quote Issued). Traceability rows added. Implementation and tests added. |
+| 2026-07-10 | Section 4.12 added: REQ-QUO-FE-F-082 to F-087 — coverage and coverage-detail date/time UI fields, defaults, grid/detail alignment, service contract updates, issue-to-policy pass-through, and non-functional compatibility constraints. |
 
 ---
 

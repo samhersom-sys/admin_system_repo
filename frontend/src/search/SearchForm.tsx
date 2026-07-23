@@ -24,6 +24,24 @@ const ALL_RECORD_TYPES: { value: RecordType; label: string }[] = [
   { value: 'Claim', label: 'Claim' },
 ]
 
+// Union of all record lifecycle status values across Submissions, Quotes, Policies and BAs.
+// Sourced from db/seeds/004–007-lookup-*-statuses.js
+const STATUS_OPTIONS: string[] = [
+  'Active',
+  'Bound',
+  'Cancelled',
+  'Closed',
+  'Created',
+  'Declined',
+  'Disbanded',
+  'Expired',
+  'Issued',
+  'Lapsed',
+  'Open',
+  'Quoted',
+  'Renewed',
+]
+
 export interface SearchFilters {
   types: RecordType[]        // REQ-SEARCH-FE-F-008 — multi-select
   reference: string
@@ -41,6 +59,7 @@ export interface SearchFilters {
   createdFrom: string        // REQ-SEARCH-FE-F-020
   createdTo: string
   createdBy: string          // REQ-SEARCH-FE-F-021
+  submissionType: string  // REQ-SEARCH-FE-F-023 — broker/admin only
 }
 
 export const EMPTY_FILTERS: SearchFilters = {
@@ -60,17 +79,21 @@ export const EMPTY_FILTERS: SearchFilters = {
   createdFrom: '',
   createdTo: '',
   createdBy: '',
+  submissionType: '',
 }
 
 interface SearchFormProps {
   filters: SearchFilters
   createdByOptions: string[]
   onChange: (filters: SearchFilters) => void
+  /** REQ-SEARCH-FE-F-022 — when provided, a Submission Type sub-filter is shown.
+   *  The caller is responsible for only passing this for broker/admin sessions. */
+  availableSubmissionTypes?: { value: string; label: string }[]
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function SearchForm({ filters, createdByOptions, onChange }: SearchFormProps) {
+export default function SearchForm({ filters, createdByOptions, onChange, availableSubmissionTypes }: SearchFormProps) {
   const [isTypeOpen, setIsTypeOpen] = useState(false)
   const [typeSearch, setTypeSearch] = useState('')
   const typeDropdownRef = useRef<HTMLDivElement>(null)
@@ -178,6 +201,25 @@ export default function SearchForm({ filters, createdByOptions, onChange }: Sear
         </div>
       </div>
 
+      {/* Row 0b — Submission Type sub-filter (REQ-SEARCH-FE-F-022, broker/admin only) */}
+      {availableSubmissionTypes && availableSubmissionTypes.length > 0 && (
+        <div className="max-w-xs">
+          <label htmlFor="sf-submission-type" className={labelCls}>Submission Type</label>
+          <select
+            id="sf-submission-type"
+            aria-label="Submission Type"
+            value={filters.submissionType}
+            onChange={set('submissionType')}
+            className={inputCls}
+          >
+            <option value="">All submission types</option>
+            {availableSubmissionTypes.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Row 1 — text filters */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
 
@@ -198,14 +240,13 @@ export default function SearchForm({ filters, createdByOptions, onChange }: Sear
         {/* Status */}
         <div>
           <label htmlFor="sf-status" className={labelCls}>Status</label>
-          <input
+          <SearchableSelect
             id="sf-status"
-            aria-label="Status"
-            type="text"
-            className={inputCls}
+            ariaLabel="Status"
             value={filters.status}
-            onChange={set('status')}
-            placeholder="Created, Quoted…"
+            options={STATUS_OPTIONS}
+            placeholder="Select status…"
+            onChange={(nextValue) => onChange({ ...filters, status: nextValue })}
           />
         </div>
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TESTS â€” Binding Authorities Domain
  * Second artifact. Requirements: binding-authorities.requirements.md
  * Test ID format: T-BA-FE-F-R{NNN}
@@ -64,6 +64,11 @@ const mockDeleteBordereauConfig = jest.fn()
 const mockGetCoverholderParty = jest.fn()
 const mockGetClassesOfBusiness = jest.fn()
 const mockGetCurrencies = jest.fn()
+const mockGetRatingSchedules = jest.fn()
+
+jest.mock('@/settings/settings.service', () => ({
+    getRatingSchedules: (...a: unknown[]) => mockGetRatingSchedules(...a),
+}))
 
 jest.mock('../binding-authorities.service', () => ({
     getBindingAuthorities: (...a: unknown[]) => mockGetBindingAuthorities(...a),
@@ -90,6 +95,14 @@ jest.mock('../binding-authorities.service', () => ({
     getCoverholderParty: (...a: unknown[]) => mockGetCoverholderParty(...a),
     getClassesOfBusiness: (...a: unknown[]) => mockGetClassesOfBusiness(...a),
     getCurrencies: (...a: unknown[]) => mockGetCurrencies(...a),
+}))
+
+const mockPost = jest.fn()
+jest.mock('@/shared/lib/api-client/api-client', () => ({
+    post: (...args: unknown[]) => mockPost(...args),
+    get: jest.fn().mockResolvedValue([]),
+    put: jest.fn(),
+    del: jest.fn(),
 }))
 
 const mockAddNotification = jest.fn()
@@ -714,6 +727,51 @@ describe('BAViewPage â€” /binding-authorities/:id (header & loading)', () =
     })
 })
 
+
+// ---------------------------------------------------------------------------
+// BAViewPage - Audit Events - REQ-BA-FE-F-148, REQ-BA-FE-F-149
+// ---------------------------------------------------------------------------
+
+describe('BAViewPage - Audit Events', () => {
+    beforeEach(() => {
+        mockGetBindingAuthority.mockResolvedValue(SAMPLE_BA)
+        mockGetBASections.mockResolvedValue([SAMPLE_SECTION])
+        mockGetBATransactions.mockResolvedValue([])
+        mockGetPoliciesForBA.mockResolvedValue([])
+        mockUpdateBindingAuthority.mockResolvedValue(SAMPLE_BA)
+        mockPost.mockResolvedValue(undefined)
+    })
+    afterEach(() => jest.clearAllMocks())
+
+    // REQ-BA-FE-F-148
+    it('T-BA-FE-F-R148 - ba:save posts "BA Updated" audit event (REQ-BA-FE-F-148)', async () => {
+        renderBAViewPage('1')
+        await screen.findByRole('heading', { name: /ba-2026-001/i })
+        window.dispatchEvent(new Event('ba:save'))
+        await waitFor(() =>
+            expect(mockPost).toHaveBeenCalledWith(
+                '/api/binding-authorities/1/audit',
+                expect.objectContaining({ action: 'BA Updated' }),
+            )
+        )
+    })
+
+    // REQ-BA-FE-F-149
+    it('T-BA-FE-F-R149 - Issue BA posts "BA Status Changed" audit event (REQ-BA-FE-F-149)', async () => {
+        renderBAViewPage('1')
+        await screen.findByRole('heading', { name: /ba-2026-001/i })
+        window.dispatchEvent(new Event('ba:issue'))
+        await waitFor(() =>
+            expect(mockPost).toHaveBeenCalledWith(
+                '/api/binding-authorities/1/audit',
+                expect.objectContaining({
+                    action: 'BA Status Changed',
+                    details: expect.objectContaining({ description: expect.stringContaining('Status:') }),
+                }),
+            )
+        )
+    })
+})
 // ---------------------------------------------------------------------------
 // BAViewPage â€” Sections Tab â€” REQ-BA-FE-F-031 to F-033
 // ---------------------------------------------------------------------------
@@ -1400,6 +1458,79 @@ describe('BASectionViewPage â€” /binding-authorities/:id/sections/:sectionI
         expect(await screen.findByText(/gpi limit monitoring/i)).toBeInTheDocument()
         expect(await screen.findByText('500,000')).toBeInTheDocument()
     })
+
+    // REQ-BA-FE-F-087 -- Rating Configuration tab
+    const SAMPLE_RATING_SCHEDULES = [
+        { id: 5, name: 'UK Property 2026', effective_date: '2026-01-01', expiry_date: '2026-12-31', is_active: true, rules_count: 3 },
+        { id: 6, name: 'Marine Basic', effective_date: '2025-06-01', expiry_date: null, is_active: false, rules_count: 0 },
+    ]
+
+    it('T-BA-FE-F-R087a -- Rating Configuration tab is in the tab list', async () => {
+        mockGetRatingSchedules.mockResolvedValue(SAMPLE_RATING_SCHEDULES)
+        renderBASectionViewPage('1', '10')
+        await screen.findByRole('heading', { name: 'SEC-001' })
+        expect(screen.getByRole('button', { name: /rating configuration/i })).toBeInTheDocument()
+    })
+
+    it('T-BA-FE-F-R087b -- clicking the tab fetches schedules for the binding authority', async () => {
+        mockGetRatingSchedules.mockResolvedValue(SAMPLE_RATING_SCHEDULES)
+        renderBASectionViewPage('1', '10')
+        await screen.findByRole('heading', { name: 'SEC-001' })
+        await userEvent.click(screen.getByRole('button', { name: /rating configuration/i }))
+        await waitFor(() =>
+            expect(mockGetRatingSchedules).toHaveBeenCalledWith(
+                expect.objectContaining({ binding_authority_id: 1 })
+            )
+        )
+    })
+
+    it('T-BA-FE-F-R087c -- tab displays schedule name, status badge, and rules count', async () => {
+        mockGetRatingSchedules.mockResolvedValue(SAMPLE_RATING_SCHEDULES)
+        renderBASectionViewPage('1', '10')
+        await screen.findByRole('heading', { name: 'SEC-001' })
+        await userEvent.click(screen.getByRole('button', { name: /rating configuration/i }))
+        expect(await screen.findByText('UK Property 2026')).toBeInTheDocument()
+        expect(await screen.findByText('Marine Basic')).toBeInTheDocument()
+        expect(await screen.findByText(/3 rules/i)).toBeInTheDocument()
+        expect(await screen.findByText(/\bactive\b/i)).toBeInTheDocument()
+    })
+
+    it('T-BA-FE-F-R087d -- each row has a View Schedule link to /settings/rating-rules/:id', async () => {
+        mockGetRatingSchedules.mockResolvedValue(SAMPLE_RATING_SCHEDULES)
+        renderBASectionViewPage('1', '10')
+        await screen.findByRole('heading', { name: 'SEC-001' })
+        await userEvent.click(screen.getByRole('button', { name: /rating configuration/i }))
+        const links = await screen.findAllByRole('link', { name: /view schedule/i })
+        expect(links[0]).toHaveAttribute('href', '/settings/rating-rules/5')
+        expect(links[1]).toHaveAttribute('href', '/settings/rating-rules/6')
+    })
+
+    it('T-BA-FE-F-R087e -- empty state message when no schedules returned', async () => {
+        mockGetRatingSchedules.mockResolvedValue([])
+        renderBASectionViewPage('1', '10')
+        await screen.findByRole('heading', { name: 'SEC-001' })
+        await userEvent.click(screen.getByRole('button', { name: /rating configuration/i }))
+        expect(await screen.findByText(/no rating schedules configured/i)).toBeInTheDocument()
+    })
+
+    it('T-BA-FE-F-R087f -- error notification shown on API failure', async () => {
+        mockGetRatingSchedules.mockRejectedValue(new Error('Network error'))
+        renderBASectionViewPage('1', '10')
+        await screen.findByRole('heading', { name: 'SEC-001' })
+        await userEvent.click(screen.getByRole('button', { name: /rating configuration/i }))
+        await waitFor(() =>
+            expect(mockAddNotification).toHaveBeenCalledWith(
+                expect.stringMatching(/could not load rating schedules/i), 'error'
+            )
+        )
+    })
+
+    it('T-BA-FE-F-R087g -- tab content is loaded lazily (not on mount)', async () => {
+        mockGetRatingSchedules.mockResolvedValue(SAMPLE_RATING_SCHEDULES)
+        renderBASectionViewPage('1', '10')
+        await screen.findByRole('heading', { name: 'SEC-001' })
+        expect(mockGetRatingSchedules).not.toHaveBeenCalled()
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -2019,6 +2150,7 @@ describe('BAEndorsePage – REQ-BA-FE-F-123 to F-127', () => {
     it('T-BA-FE-F-R125a – shows error notification when Effective Date is missing (REQ-BA-FE-F-125)', async () => {
         renderBAEndorsePage('2')
         await screen.findByRole('heading', { name: /create endorsement/i })
+        await screen.findByText(/BA-2026-002/)  // wait for BA fetch to resolve before dispatching
         window.dispatchEvent(new Event('ba:endorse-save'))
         await waitFor(() =>
             expect(mockAddNotification).toHaveBeenCalledWith(expect.stringMatching(/effective date/i), 'error')
@@ -2028,6 +2160,7 @@ describe('BAEndorsePage – REQ-BA-FE-F-123 to F-127', () => {
     it('T-BA-FE-F-R125b – shows error notification when date is outside BA period (REQ-BA-FE-F-125)', async () => {
         renderBAEndorsePage('2')
         await screen.findByRole('heading', { name: /create endorsement/i })
+        await screen.findByText(/BA-2026-002/)  // wait for BA fetch to resolve before dispatching
         const dateInput = screen.getByLabelText(/effective date/i)
         await userEvent.type(dateInput, '2030-01-01') // outside BA period 2026-01-01 to 2027-01-01
         window.dispatchEvent(new Event('ba:endorse-save'))
@@ -2042,6 +2175,7 @@ describe('BAEndorsePage – REQ-BA-FE-F-123 to F-127', () => {
         ])
         renderBAEndorsePage('2')
         await screen.findByRole('heading', { name: /create endorsement/i })
+        await screen.findByText(/BA-2026-002/)  // wait for BA fetch to resolve before dispatching
         const dateInput = screen.getByLabelText(/effective date/i)
         await userEvent.type(dateInput, '2026-06-01')
         window.dispatchEvent(new Event('ba:endorse-save'))

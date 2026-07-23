@@ -31,6 +31,7 @@ export interface UseAuditOptions {
     entityId: number | null
     apiBase: string
     trackVisits?: boolean
+    historyPathBuilder?: (entityId: number) => string
 }
 
 export function useAudit({
@@ -38,6 +39,7 @@ export function useAudit({
     entityId,
     apiBase,
     trackVisits = false,
+    historyPathBuilder,
 }: UseAuditOptions) {
     const [audit, setAudit] = useState<AuditEvent[]>([])
     const [loading, setLoading] = useState(false)
@@ -54,14 +56,17 @@ export function useAudit({
         setLoading(true)
         setError(null)
         try {
-            const data = await get<AuditEvent[]>(`${apiBase}/${entityIdRef.current}/audit`)
+            const auditUrl = historyPathBuilder
+                ? historyPathBuilder(entityIdRef.current)
+                : `${apiBase}/${entityIdRef.current}/audit`
+            const data = await get<AuditEvent[]>(auditUrl)
             setAudit(data)
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Failed to load audit history.')
         } finally {
             setLoading(false)
         }
-    }, [apiBase])
+    }, [apiBase, historyPathBuilder])
 
     // Post lifecycle events (Opened on mount, Closed on unmount)
     useEffect(() => {

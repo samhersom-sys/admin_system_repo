@@ -153,4 +153,17 @@ export class Submission {
 
   @Column({ name: 'auto_clearance_checked', type: 'boolean', default: false })
   autoClearanceChecked: boolean
+
+  // Added — OQ-STAT-001: activity status boolean, synced by events/jobs
+  @Column({ name: 'is_active', type: 'boolean', nullable: true, default: true })
+  isActive: boolean | null
+
+  // Added — OQ-STAT-005: renewal submission links (bidirectional)
+  // On expiring submission: ID of the new renewal submission
+  @Column({ name: 'renewed_submission_id', type: 'int', nullable: true })
+  renewedSubmissionId: number | null
+
+  // On new renewal submission: ID of the expiring/previous submission
+  @Column({ name: 'renewed_from_submission_id', type: 'int', nullable: true })
+  renewedFromSubmissionId: number | null
 }

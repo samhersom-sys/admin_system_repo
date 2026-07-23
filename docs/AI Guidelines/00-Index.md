@@ -30,10 +30,11 @@ When starting a new session or responding to a request that references the guide
 4. **`AI Guidelines/04-Architectural-Boundaries.md`** — domain, workflow, db, and component rules
 5. **`AI Guidelines/12-Folder-Structure.md`** — where every file lives (mandatory reference before creating any file)
 6. **`AI Guidelines/13-Requirements-Standards.md`** — how requirements must be written (mandatory before writing or reviewing any `.requirements.md` file)
-7. **`Project Documentation/01-Architectural-Overview.md`** — system design intent
-7. **`Project Documentation/02-Domain-Definitions.md`** — what each domain owns
-8. **Other AI Guideline sections** — as relevant to the specific task (auth, testing, branding, etc.)
-9. **Technical Documentation** — as relevant (open questions, migration notes, rebuild plan)
+7. **`AI Guidelines/17-Agent-Collaboration-Standards.md`** — agent roster, delivery modes, handoff contracts, and tool restrictions (mandatory when a session involves more than one agent)
+8. **`Project Documentation/01-Architectural-Overview.md`** — system design intent
+8. **`Project Documentation/02-Domain-Definitions.md`** — what each domain owns
+9. **Other AI Guideline sections** — as relevant to the specific task (auth, testing, branding, etc.)
+10. **Technical Documentation** — as relevant (open questions, migration notes, rebuild plan)
 
 ---
 
@@ -57,6 +58,8 @@ When starting a new session or responding to a request that references the guide
 | `13-Requirements-Standards.md` | Requirements writing standard: SMART, `REQ-{DOMAIN}-{TYPE}-{NNN}` IDs, Actor+shall+Action format |
 | `14-UI-Component-Standards.md` | Page layout rules: standard padding (`p-6`), Card component usage, sidebar section requirements, common violations |
 | `15-Database-Standards.md` | Migration rules (schema only, idempotent, numbered), one-seed-file rule, npm script requirements, adding a new table checklist |
+| `16-Error-Handling-Standards.md` | Error handling patterns, user-facing error messages, empty catch block prohibition |
+| `17-Agent-Collaboration-Standards.md` | Agent roster, delivery modes, handoff artifact contracts, open question ownership, gap analysis obligation, tool restriction policy, checkpoint gate protocol, multi-agent log format, agent file locations |
 | `conversation-log.md` | Live log of all sessions (append only) |
 
 ---

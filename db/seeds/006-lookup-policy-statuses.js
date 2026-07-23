@@ -14,14 +14,14 @@ async function run() {
             { code: 'EXPIRED',   name: 'Expired',   description: 'Policy term has expired',       order_index: 2 },
             { code: 'CANCELLED', name: 'Cancelled', description: 'Policy has been cancelled',     order_index: 3 },
             { code: 'LAPSED',    name: 'Lapsed',    description: 'Policy has lapsed',             order_index: 4 },
-            { code: 'DISBANDED', name: 'Disbanded', description: 'Policy has been disbanded',     order_index: 5 },
+            { code: 'DISBANDED', name: 'Disbanded', description: 'Policy has been disbanded',     order_index: 5, is_active: false },
             { code: 'RENEWED',   name: 'Renewed',   description: 'Policy has been renewed',       order_index: 6 },
         ]
         for (const r of rows) {
             await client.query(
                 `INSERT INTO lookup_policy_statuses (code, name, description, order_index, is_active)
-                 VALUES ($1, $2, $3, $4, TRUE) ON CONFLICT (code) DO NOTHING`,
-                [r.code, r.name, r.description, r.order_index]
+                 VALUES ($1, $2, $3, $4, $5) ON CONFLICT (code) DO UPDATE SET is_active = EXCLUDED.is_active`,
+                [r.code, r.name, r.description, r.order_index, r.is_active !== undefined ? r.is_active : true]
             )
         }
         console.log('[seed-006] Done.')

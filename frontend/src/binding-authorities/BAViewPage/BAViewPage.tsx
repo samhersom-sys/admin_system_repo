@@ -15,6 +15,8 @@ import { FiPlus, FiX, FiSearch, FiSave, FiCheckCircle, FiEdit2, FiArrowLeft, FiF
 import { useNotifications } from '@/shell/NotificationDock'
 import { useSidebarSection } from '@/shell/SidebarContext'
 import { useAudit } from '@/shared/lib/hooks/useAudit'
+import { post } from '@/shared/lib/api-client/api-client'
+import { buildAuditDiff } from '@/shared/lib/audit/buildAuditDiff'
 import LoadingSpinner from '@/shared/LoadingSpinner/LoadingSpinner'
 import ResizableGrid, { type Column, type SortConfig } from '@/shared/components/ResizableGrid/ResizableGrid'
 import AuditTable from '@/shared/components/AuditTable/AuditTable'
@@ -72,6 +74,15 @@ const TABS: { key: Tab; label: string }[] = [
 
 const MINIMUM_SECTION_FIELDS_ERROR = 'Minimum fields for binding authority section have not been met. Please processed minimum fields before proceeding.'
 const TIME_BASIS_OPTIONS = ['Claims-Made', 'Occurrence', 'Manifest']
+
+// REQ-BA-FE-F-148 — field labels for BA Updated audit diff
+const BA_FIELD_LABELS: Record<string, string> = {
+    coverholder: 'Coverholder',
+    inception_date: 'Inception Date',
+    expiry_date: 'Expiry Date',
+    year_of_account: 'Year of Account',
+    multi_year: 'Multi-Year',
+}
 
 function getNextDraftSectionReference(baseReference: string | null | undefined, sectionList: BASection[]) {
     if (!baseReference) return ''
@@ -272,6 +283,7 @@ export default function BAViewPage() {
     async function handleSaveBA() {
         if (!ba) return
         setSaving(true)
+        const prevBa: Record<string, unknown> = { ...ba }
         try {
             const updated = await updateBindingAuthority(baId, {
                 ...ba,
@@ -298,6 +310,14 @@ export default function BAViewPage() {
                 setSections((prev) => [...created, ...prev.filter((s) => s.id >= 0)])
             }
             addNotification('Binding authority saved.', 'success')
+            // REQ-BA-FE-F-148 — best-effort audit event on save with field diff
+            const _nextBa = updated as unknown as Record<string, unknown>
+            const _nextBaWithMultiYear = { ..._nextBa, multi_year: multiYear }
+            const _diffDesc = buildAuditDiff(prevBa, _nextBaWithMultiYear, BA_FIELD_LABELS)
+            post(`/api/binding-authorities/${baId}/audit`, {
+                action: 'BA Updated',
+                details: _diffDesc ? { description: _diffDesc } : {},
+            }).catch(() => undefined)
         } catch {
             addNotification('Could not save binding authority.', 'error')
         } finally {
@@ -307,11 +327,17 @@ export default function BAViewPage() {
 
     async function handleStatusChange(status: BAStatus) {
         if (!ba) return
+        const oldStatus = ba.status
         setSaving(true)
         try {
             const updated = await updateBindingAuthority(baId, { status })
             setBa(updated)
             addNotification('Status updated.', 'success')
+            // REQ-BA-FE-F-149 — best-effort BA status-change audit
+            post(`/api/binding-authorities/${baId}/audit`, {
+                action: 'BA Status Changed',
+                details: { description: `Status: ${oldStatus} → ${status}` },
+            }).catch(() => undefined)
         } catch {
             addNotification('Could not update status.', 'error')
         } finally {
@@ -1275,6 +1301,16 @@ export default function BAViewPage() {
                     <option key={item} value={item} />
                 ))}
             </datalist>
+
+            {/* Editable status badge */}
+            {ba && (
+                <div className="fixed bottom-20 right-4 z-40">
+                    <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium shadow-sm ${isDraft ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                        <span className={`h-2.5 w-2.5 rounded-full ${isDraft ? 'bg-green-500' : 'bg-amber-400'}`} aria-hidden="true" />
+                        <span>{isDraft ? 'Editable' : 'Read-only'}</span>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -231,3 +231,37 @@ describe('T-NotificationDock-R01: context provides notification operations', () 
         })
     })
 })
+
+// ---------------------------------------------------------------------------
+// R09 � Idempotent add by client id (prevents duplicate/flooding)
+// ---------------------------------------------------------------------------
+
+describe('T-NotificationDock-R09: addNotification is idempotent by client id', () => {
+    it('does not create a second server notification when the same id is added repeatedly', async () => {
+        type AddFn = ReturnType<typeof useNotifications>['addNotification']
+        let addFn: AddFn | undefined
+        function Probe() {
+            addFn = useNotifications().addNotification
+            return null
+        }
+        mockFetch.mockResolvedValue([])
+        mockCreate.mockResolvedValue({
+            id: 20,
+            message: 'Unsaved changes',
+            type: 'warning',
+            payload: { clientId: 'rating-unsaved' },
+        })
+        render(
+            <NotificationProvider>
+                <Probe />
+            </NotificationProvider>
+        )
+        await act(async () => { })
+        await act(async () => { await addFn!('Unsaved changes', 'warning', { id: 'rating-unsaved' }) })
+        await act(async () => { await addFn!('Unsaved changes', 'warning', { id: 'rating-unsaved' }) })
+        await act(async () => { await addFn!('Unsaved changes', 'warning', { id: 'rating-unsaved' }) })
+
+        // Only the first call reaches the server; the rest are de-duplicated.
+        expect(mockCreate).toHaveBeenCalledTimes(1)
+    })
+})

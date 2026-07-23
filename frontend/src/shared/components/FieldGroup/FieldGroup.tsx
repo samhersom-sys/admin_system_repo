@@ -19,7 +19,7 @@ interface FieldGroupProps {
 
 export default function FieldGroup({ title, children }: FieldGroupProps) {
     return (
-        <fieldset className="border border-gray-300 rounded-md p-3 bg-white">
+        <fieldset className="self-start w-full border border-gray-300 rounded-md p-3 bg-white">
             {title && (
                 <legend className="px-1 text-xs font-semibold text-gray-700 select-none">
                     {title}

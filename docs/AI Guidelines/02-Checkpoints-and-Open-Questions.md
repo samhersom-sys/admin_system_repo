@@ -61,6 +61,7 @@ Please confirm:
 1. Is this interpretation correct?
 2. Should [X] belong to this domain / workflow / service?
 3. Are there any corrections before I continue?
+4. Were any `*.entity.ts` files changed in this checkpoint? If yes, confirm `npm run db:sync` was run.
 
 I will not proceed until confirmed.
 ```
@@ -198,6 +199,7 @@ A task, fix, or feature is **done** when ALL of the following are true. The AI m
 | Backend smoke | Every route returns non-500 | `npm run test:backend -- api-smoke` |
 | Backend requirements | Zero failures, zero skips on committed features | `npm run test:backend` |
 | E2E smoke | Critical path spec passes | `npm run test:e2e` |
+| DB schema sync | If any `*.entity.ts` file was added or changed: `db:sync` run and confirmed | `npm run db:sync` |
 | Runtime validation | Every widget renders real data (not mock, not empty) when run against the live backend | Manual / E2E |
 
 **"npm test passed" is not done.** It is evidence that the UI handles mock data correctly. It says nothing about the backend.

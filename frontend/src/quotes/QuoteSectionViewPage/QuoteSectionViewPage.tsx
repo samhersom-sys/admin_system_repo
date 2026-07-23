@@ -19,6 +19,8 @@ import type { SidebarSection } from '@/shell/SidebarContext'
 import { useNotifications } from '@/shell/NotificationDock'
 import TabsNav from '@/shared/components/TabsNav/TabsNav'
 import type { TabItem } from '@/shared/components/TabsNav/TabsNav'
+import SearchableSelect from '@/shared/components/SearchableSelect/SearchableSelect'
+import FieldGroup from '@/shared/components/FieldGroup/FieldGroup'
 
 import {
     getQuote,
@@ -27,7 +29,10 @@ import {
     listCoverages,
     listParticipations,
     saveParticipations,
+    isQuoteEditable,
+    getCurrencies,
     getClassesOfBusiness,
+    getLossQualifiers,
     getRiskCodes,
     type Quote,
     type QuoteSection,
@@ -39,7 +44,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-type SectionTabKey = 'coverages' | 'deductions' | 'riskCodes' | 'participations'
+type SectionTabKey = 'coverages' | 'deductions' | 'riskCodes' | 'participations' | 'sectionFinancialSummary' | 'signings'
 
 interface TaxOverrideRow {
     country: string
@@ -53,6 +58,13 @@ interface RiskSplitRow {
     allocation: string
 }
 
+function computeDaysOnCover(inceptionDate: string | null | undefined, expiryDate: string | null | undefined): number | null {
+    if (!inceptionDate || !expiryDate) return null
+    const msPerDay = 86_400_000
+    const diff = Math.floor((new Date(expiryDate).getTime() - new Date(inceptionDate).getTime()) / msPerDay)
+    return diff >= 0 ? diff : null
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -62,7 +74,12 @@ const TABS: TabItem[] = [
     { key: 'deductions', label: 'Deductions' },
     { key: 'riskCodes', label: 'Risk Codes' },
     { key: 'participations', label: 'Participations' },
+    { key: 'sectionFinancialSummary', label: 'Section Financial Summary' },
+    { key: 'signings', label: 'Signings' },
 ]
+
+const CONTROL_CLASS = 'block w-full border border-gray-300 rounded bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-100 disabled:cursor-not-allowed'
+const CONTROL_SMALL_CLASS = 'block w-full border border-gray-300 rounded bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-gray-100 disabled:cursor-not-allowed'
 
 // ---------------------------------------------------------------------------
 // DeductionsTable — inline-editable table with resizable columns
@@ -146,7 +163,7 @@ function DeductionsTable({
                                                 {editable ? (
                                                     <input
                                                         type="text"
-                                                        className="input-field-sm"
+                                                        className={CONTROL_SMALL_CLASS}
                                                         value={row.country}
                                                         onChange={(e) =>
                                                             onChange((rs) =>
@@ -161,7 +178,7 @@ function DeductionsTable({
                                             <td>
                                                 {editable ? (
                                                     <select
-                                                        className="input-field-sm"
+                                                        className={CONTROL_SMALL_CLASS}
                                                         value={row.deductionType}
                                                         onChange={(e) =>
                                                             onChange((rs) =>
@@ -180,7 +197,7 @@ function DeductionsTable({
                                                 {editable ? (
                                                     <input
                                                         type="text"
-                                                        className="input-field-sm"
+                                                        className={CONTROL_SMALL_CLASS}
                                                         value={row.basis}
                                                         onChange={(e) =>
                                                             onChange((rs) =>
@@ -198,7 +215,7 @@ function DeductionsTable({
                                                         type="number"
                                                         min="0"
                                                         max="100"
-                                                        className="input-field-sm text-right"
+                                                        className={`${CONTROL_SMALL_CLASS} text-right`}
                                                         value={row.rate}
                                                         onChange={(e) =>
                                                             onChange((rs) =>
@@ -314,7 +331,7 @@ function RiskCodesTable({
                                             {editable ? (
                                                 riskCodeOptions.length > 0 ? (
                                                     <select
-                                                        className="input-field-sm"
+                                                        className={CONTROL_SMALL_CLASS}
                                                         value={row.riskCode}
                                                         onChange={(e) =>
                                                             onChange((rs) =>
@@ -330,7 +347,7 @@ function RiskCodesTable({
                                                 ) : (
                                                     <input
                                                         type="text"
-                                                        className="input-field-sm"
+                                                        className={CONTROL_SMALL_CLASS}
                                                         value={row.riskCode}
                                                         onChange={(e) =>
                                                             onChange((rs) =>
@@ -350,7 +367,7 @@ function RiskCodesTable({
                                                     min="0"
                                                     max="100"
                                                     step="0.01"
-                                                    className="input-field-sm text-right"
+                                                    className={`${CONTROL_SMALL_CLASS} text-right`}
                                                     value={row.allocation}
                                                     onChange={(e) =>
                                                         onChange((rs) =>
@@ -417,6 +434,8 @@ export default function QuoteSectionViewPage() {
     const [riskSplitRows, setRiskSplitRows] = useState<RiskSplitRow[]>([])
     const [riskCodeOptions, setRiskCodeOptions] = useState<string[]>([])
     const [classesOfBusiness, setClassesOfBusiness] = useState<string[]>([])
+    const [currencyOptions, setCurrencyOptions] = useState<string[]>([])
+    const [lossQualifierOptions, setLossQualifierOptions] = useState<string[]>([])
 
     // Participations tab state
     const [participations, setParticipations] = useState<Participation[]>([])
@@ -430,7 +449,7 @@ export default function QuoteSectionViewPage() {
     const [coverageSort, setCoverageSort] = useState<SortConfig>({ key: 'reference', direction: 'asc' })
     const [participationSort, setParticipationSort] = useState<SortConfig>({ key: 'market_name', direction: 'asc' })
 
-    const editable = quote?.status === 'Draft'
+    const editable = quote ? isQuoteEditable(quote.status) : false
 
     // ---------------------------------------------------------------------------
     // Load quote + section on mount (F-051)
@@ -449,7 +468,14 @@ export default function QuoteSectionViewPage() {
                 if (!matched) {
                     setNotFound(true)
                 } else {
-                    setSection(matched)
+                    setSection({
+                        ...matched,
+                        inception_date: matched.inception_date ?? q.inception_date ?? null,
+                        effective_date: matched.effective_date ?? matched.inception_date ?? q.inception_date ?? null,
+                        inception_time: matched.inception_time ?? q.inception_time ?? '00:00:00',
+                        effective_time: matched.effective_time ?? matched.inception_time ?? q.inception_time ?? '00:00:00',
+                        expiry_time: matched.expiry_time ?? q.expiry_time ?? '23:59:59',
+                    })
                     const pl = (matched.payload ?? {}) as Record<string, unknown>
                     if (Array.isArray(pl.taxOverrides)) {
                         setDeductionRows(pl.taxOverrides as TaxOverrideRow[])
@@ -488,6 +514,18 @@ export default function QuoteSectionViewPage() {
         getClassesOfBusiness()
             .then((items) => setClassesOfBusiness(items ?? []))
             .catch(() => setClassesOfBusiness([]))
+    }, [])
+
+    useEffect(() => {
+        getCurrencies()
+            .then((items) => setCurrencyOptions(items ?? []))
+            .catch(() => setCurrencyOptions([]))
+    }, [])
+
+    useEffect(() => {
+        getLossQualifiers()
+            .then((items) => setLossQualifierOptions(items ?? []))
+            .catch(() => setLossQualifierOptions([]))
     }, [])
 
     useEffect(() => {
@@ -538,9 +576,35 @@ export default function QuoteSectionViewPage() {
                 sum_insured_amount: section.sum_insured_amount,
                 premium_currency: section.premium_currency ?? undefined,
                 gross_premium: section.gross_premium,
+                gross_deductions: section.gross_deductions,
+                net_premium: section.net_premium,
+                tax_receivable: section.tax_receivable,
+                tax_payable: section.tax_payable,
+                gross_gross_premium_written: section.gross_gross_premium_written,
+                gross_gross_premium_signed: section.gross_gross_premium_signed,
+                gross_deductions_written: section.gross_deductions_written,
+                gross_deductions_signed: section.gross_deductions_signed,
+                gross_premium_written: section.gross_premium_written,
+                gross_premium_signed: section.gross_premium_signed,
+                deductions_written: section.deductions_written,
+                deductions_signed: section.deductions_signed,
+                net_premium_written: section.net_premium_written,
+                net_premium_signed: section.net_premium_signed,
+                tax_receivable_written: section.tax_receivable_written,
+                tax_receivable_signed: section.tax_receivable_signed,
+                tax_payable_written: section.tax_payable_written,
+                tax_payable_signed: section.tax_payable_signed,
+                annual_gross_premium: section.annual_gross_premium,
                 annual_net_premium: section.annual_net_premium,
                 written_order: section.written_order,
                 signed_order: section.signed_order,
+                time_basis: section.time_basis ?? null,
+                written_order_basis: section.written_order_basis ?? null,
+                signed_order_basis: section.signed_order_basis ?? null,
+                written_line_total: section.written_line_total ?? null,
+                signed_line_total: section.signed_line_total ?? null,
+                delegated_authority_ref: section.delegated_authority_ref ?? null,
+                delegated_authority_section_ref: section.delegated_authority_section_ref ?? null,
                 payload: {
                     ...(section.payload as Record<string, unknown>),
                     taxOverrides: deductionRows,
@@ -604,411 +668,303 @@ export default function QuoteSectionViewPage() {
             {/* ------------------------------------------------------------------ */}
             {/* Section details header (F-052) */}
             {/* ------------------------------------------------------------------ */}
-            <div className="flex flex-col gap-4">
-                <h2 className="text-lg font-semibold text-gray-900">Section Details</h2>
+            <div className="flex flex-col gap-3">
+                {actionError && <p className="text-sm text-red-600">{actionError}</p>}
 
-                {actionError && (
-                    <p className="text-sm text-red-600">{actionError}</p>
-                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-start">
+                    <FieldGroup title="Contract & Reference">
+                        <div className="flex flex-col gap-2">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Reference</label>
+                                <p className="text-sm text-gray-900">{section.reference}</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Class of Business</label>
+                                {editable ? (
+                                    <SearchableSelect id="quote-section-class-of-business" ariaLabel="Class of Business" value={section.class_of_business ?? ''} options={classesOfBusiness} onChange={(nextValue) => setSection((s) => s ? { ...s, class_of_business: nextValue } : s)} />
+                                ) : <p className="text-sm text-gray-900">{section.class_of_business ?? '—'}</p>}
+                            </div>
+                        </div>
+                    </FieldGroup>
 
-                {/* Two-column field group */}
-                <div className="grid grid-cols-2 gap-4">
-                    {/* Left column — dates & reference */}
-                    <div className="flex flex-col gap-3">
-                        {/* Reference — always read-only (F-052) */}
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Reference
-                            </label>
-                            <p className="text-sm text-gray-900">{section.reference}</p>
+                    <FieldGroup title="Delegated Authority">
+                        <div className="flex flex-col gap-2">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Delegated Authority Reference</label>
+                                {editable ? (
+                                    <input aria-label="Delegated Authority Reference" type="text" className={CONTROL_CLASS} value={section.delegated_authority_ref ?? ''} onChange={(e) => setSection((s) => s ? { ...s, delegated_authority_ref: e.target.value } : s)} />
+                                ) : <p className="text-sm text-gray-900">{section.delegated_authority_ref ?? '—'}</p>}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Delegated Authority Section Reference</label>
+                                {editable ? (
+                                    <input aria-label="Delegated Authority Section Reference" type="text" className={CONTROL_CLASS} value={section.delegated_authority_section_ref ?? ''} onChange={(e) => setSection((s) => s ? { ...s, delegated_authority_section_ref: e.target.value } : s)} />
+                                ) : <p className="text-sm text-gray-900">{section.delegated_authority_section_ref ?? '—'}</p>}
+                            </div>
                         </div>
+                    </FieldGroup>
 
-                        {/* Class of Business */}
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Class of Business
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="text"
-                                    list="quote-section-class-of-business-options"
-                                    className="input-field"
-                                    value={section.class_of_business ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, class_of_business: e.target.value } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900">{section.class_of_business ?? '—'}</p>
-                            )}
+                    <FieldGroup title="Limit">
+                        <div className="flex flex-col gap-2">
+                            <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Currency</label>
+                                    {editable ? (
+                                        <SearchableSelect id="quote-section-limit-currency" ariaLabel="Limit Currency" value={section.limit_currency ?? ''} options={currencyOptions} onChange={(nextValue) => setSection((s) => s ? { ...s, limit_currency: nextValue } : s)} />
+                                    ) : <input readOnly className={CONTROL_SMALL_CLASS} value={section.limit_currency ?? '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Limit Amount</label>
+                                    {editable ? (
+                                        <input type="number" className={CONTROL_SMALL_CLASS} value={section.limit_amount ?? ''} onChange={(e) => setSection((s) => s ? { ...s, limit_amount: Number(e.target.value) } : s)} />
+                                    ) : <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.limit_amount != null ? Number(section.limit_amount).toLocaleString() : '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Movement</label>
+                                    <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.limit_amount_movement != null ? Number(section.limit_amount_movement).toLocaleString() : '—'} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Limit Loss Qualifier</label>
+                                {editable ? (
+                                    <SearchableSelect id="quote-section-limit-loss-qualifier" ariaLabel="Limit Loss Qualifier" value={section.limit_loss_qualifier ?? ''} options={lossQualifierOptions} onChange={(nextValue) => setSection((s) => s ? { ...s, limit_loss_qualifier: nextValue } : s)} />
+                                ) : <p className="text-sm text-gray-900">{section.limit_loss_qualifier ?? '—'}</p>}
+                            </div>
                         </div>
+                    </FieldGroup>
 
-                        {/* Inception Date */}
+                    <FieldGroup title="Insured">
                         <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Inception Date
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="date"
-                                    className="input-field"
-                                    value={section.inception_date ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, inception_date: e.target.value } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900">{section.inception_date ?? '—'}</p>
-                            )}
+                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Insured</label>
+                            <p className="text-sm text-gray-900">{quote?.insured ?? '—'}</p>
                         </div>
+                    </FieldGroup>
 
-                        {/* Expiry Date */}
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Expiry Date
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="date"
-                                    className="input-field"
-                                    value={section.expiry_date ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, expiry_date: e.target.value } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900">{section.expiry_date ?? '—'}</p>
-                            )}
+                    <FieldGroup title="Annual Rating">
+                        <div className="flex flex-col gap-3">
+                            <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Currency</label>
+                                    {editable ? (
+                                        <SearchableSelect id="quote-section-premium-currency" ariaLabel="Premium Currency" value={section.premium_currency ?? ''} options={currencyOptions} onChange={(nextValue) => setSection((s) => s ? { ...s, premium_currency: nextValue } : s)} />
+                                    ) : <input readOnly className={CONTROL_SMALL_CLASS} value={section.premium_currency ?? '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Gross Premium</label>
+                                    {editable ? (
+                                        <input type="number" step="0.01" className={CONTROL_SMALL_CLASS} value={section.gross_premium ?? ''} onChange={(e) => setSection((s) => s ? { ...s, gross_premium: Number(e.target.value) } : s)} />
+                                    ) : <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.gross_premium != null ? Number(section.gross_premium).toLocaleString() : '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Movement</label>
+                                    <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.gross_premium_movement != null ? Number(section.gross_premium_movement).toLocaleString() : '—'} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Currency</label>
+                                    {editable ? (
+                                        <SearchableSelect id="quote-section-annual-gross-currency" ariaLabel="Annual Rated Gross Premium Currency" value={section.premium_currency ?? ''} options={currencyOptions} onChange={(nextValue) => setSection((s) => s ? { ...s, premium_currency: nextValue } : s)} />
+                                    ) : <input readOnly className={CONTROL_SMALL_CLASS} value={section.premium_currency ?? '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Annual Rated Gross Premium</label>
+                                    {editable ? (
+                                        <input type="number" step="0.01" className={CONTROL_SMALL_CLASS} value={section.annual_gross_premium ?? ''} onChange={(e) => setSection((s) => s ? { ...s, annual_gross_premium: Number(e.target.value) } : s)} />
+                                    ) : <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.annual_gross_premium != null ? Number(section.annual_gross_premium).toLocaleString() : '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Movement</label>
+                                    <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.annual_gross_premium_movement != null ? Number(section.annual_gross_premium_movement).toLocaleString() : '—'} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Currency</label>
+                                    {editable ? (
+                                        <SearchableSelect id="quote-section-annual-net-currency" ariaLabel="Annual Rated Net Premium Currency" value={section.premium_currency ?? ''} options={currencyOptions} onChange={(nextValue) => setSection((s) => s ? { ...s, premium_currency: nextValue } : s)} />
+                                    ) : <input readOnly className={CONTROL_SMALL_CLASS} value={section.premium_currency ?? '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Annual Rated Net Premium</label>
+                                    {editable ? (
+                                        <input type="number" step="0.01" className={CONTROL_SMALL_CLASS} value={section.annual_net_premium ?? ''} onChange={(e) => setSection((s) => s ? { ...s, annual_net_premium: Number(e.target.value) } : s)} />
+                                    ) : <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.annual_net_premium != null ? Number(section.annual_net_premium).toLocaleString() : '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Movement</label>
+                                    <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.annual_net_premium_movement != null ? Number(section.annual_net_premium_movement).toLocaleString() : '—'} />
+                                </div>
+                            </div>
                         </div>
+                    </FieldGroup>
 
-                        {/* Inception Time (F-052) */}
-                        <div>
-                            <label htmlFor="section-inception-time" className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Inception Time
-                            </label>
-                            {editable ? (
-                                <input
-                                    id="section-inception-time"
-                                    aria-label="Inception Time"
-                                    type="time"
-                                    step="1"
-                                    className="input-field"
-                                    value={section.inception_time ?? '00:00:00'}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, inception_time: e.target.value } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900">{section.inception_time ?? '—'}</p>
-                            )}
+                    <FieldGroup title="Dates">
+                        <div className="flex flex-col gap-3">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Inception Date</label>
+                                    {editable ? (
+                                        <input type="date" className={CONTROL_CLASS} value={section.inception_date ?? ''} onChange={(e) => setSection((s) => s ? { ...s, inception_date: e.target.value } : s)} />
+                                    ) : <p className="text-sm text-gray-900">{section.inception_date ?? '—'}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Inception Time</label>
+                                    {editable ? (
+                                        <input id="section-inception-time" aria-label="Inception Time" type="time" step="1" className={CONTROL_CLASS} value={section.inception_time ?? '00:00:00'} onChange={(e) => setSection((s) => s ? { ...s, inception_time: e.target.value } : s)} />
+                                    ) : <p className="text-sm text-gray-900">{section.inception_time ?? '—'}</p>}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Effective Date</label>
+                                    {editable ? (
+                                        <input type="date" className={CONTROL_CLASS} value={section.effective_date ?? ''} onChange={(e) => setSection((s) => s ? { ...s, effective_date: e.target.value } : s)} />
+                                    ) : <p className="text-sm text-gray-900">{section.effective_date ?? '—'}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Effective Time</label>
+                                    {editable ? (
+                                        <input id="section-effective-time" aria-label="Effective Time" type="time" step="1" className={CONTROL_CLASS} value={section.effective_time ?? '00:00:00'} onChange={(e) => setSection((s) => s ? { ...s, effective_time: e.target.value } : s)} />
+                                    ) : <p className="text-sm text-gray-900">{section.effective_time ?? '—'}</p>}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Expiry Date</label>
+                                    {editable ? (
+                                        <input type="date" className={CONTROL_CLASS} value={section.expiry_date ?? ''} onChange={(e) => setSection((s) => s ? { ...s, expiry_date: e.target.value } : s)} />
+                                    ) : <p className="text-sm text-gray-900">{section.expiry_date ?? '—'}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Expiry Time</label>
+                                    {editable ? (
+                                        <input id="section-expiry-time" aria-label="Expiry Time" type="time" step="1" className={CONTROL_CLASS} value={section.expiry_time ?? '23:59:59'} onChange={(e) => setSection((s) => s ? { ...s, expiry_time: e.target.value } : s)} />
+                                    ) : <p className="text-sm text-gray-900">{section.expiry_time ?? '—'}</p>}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Days on Cover</label>
+                                <p className="text-sm text-gray-900">{computeDaysOnCover(section.inception_date, section.expiry_date) ?? '—'}</p>
+                            </div>
                         </div>
+                    </FieldGroup>
 
-                        {/* Expiry Time (F-052) */}
-                        <div>
-                            <label htmlFor="section-expiry-time" className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Expiry Time
-                            </label>
-                            {editable ? (
-                                <input
-                                    id="section-expiry-time"
-                                    aria-label="Expiry Time"
-                                    type="time"
-                                    step="1"
-                                    className="input-field"
-                                    value={section.expiry_time ?? '23:59:59'}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, expiry_time: e.target.value } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900">{section.expiry_time ?? '—'}</p>
-                            )}
+                    <FieldGroup title="Order & Lines">
+                        <div className="flex flex-col gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Time Basis</label>
+                                {editable ? (
+                                    <input aria-label="Time Basis" type="text" className={CONTROL_CLASS} value={section.time_basis ?? ''} onChange={(e) => setSection((s) => s ? { ...s, time_basis: e.target.value } : s)} />
+                                ) : <p className="text-sm text-gray-900">{section.time_basis ?? '—'}</p>}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Written Order %</label>
+                                    {editable ? (
+                                        <input aria-label="Written Order %" type="number" step="0.01" min="0" max="100" className={CONTROL_CLASS} value={section.written_order ?? ''} onChange={(e) => setSection((s) => s ? { ...s, written_order: Number(e.target.value) } : s)} />
+                                    ) : <p className="text-sm text-gray-900 text-right">{section.written_order != null ? `${section.written_order}%` : '—'}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Written Order Basis</label>
+                                    {editable ? (
+                                        <input aria-label="Written Order Basis" type="text" className={CONTROL_CLASS} value={section.written_order_basis ?? ''} onChange={(e) => setSection((s) => s ? { ...s, written_order_basis: e.target.value } : s)} />
+                                    ) : <p className="text-sm text-gray-900">{section.written_order_basis ?? '—'}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Written Line Total</label>
+                                    {editable ? (
+                                        <input aria-label="Written Line Total" type="number" step="0.01" className={CONTROL_CLASS} value={section.written_line_total ?? ''} onChange={(e) => setSection((s) => s ? { ...s, written_line_total: Number(e.target.value) } : s)} />
+                                    ) : <p className="text-sm text-gray-900 text-right">{section.written_line_total != null ? Number(section.written_line_total).toLocaleString() : '—'}</p>}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Signed Order %</label>
+                                    {editable ? (
+                                        <input aria-label="Signed Order %" type="number" step="0.01" min="0" max="100" className={CONTROL_CLASS} value={section.signed_order ?? ''} onChange={(e) => setSection((s) => s ? { ...s, signed_order: Number(e.target.value) } : s)} />
+                                    ) : <p className="text-sm text-gray-900 text-right">{section.signed_order != null ? `${section.signed_order}%` : '—'}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Signed Order Basis</label>
+                                    {editable ? (
+                                        <input aria-label="Signed Order Basis" type="text" className={CONTROL_CLASS} value={section.signed_order_basis ?? ''} onChange={(e) => setSection((s) => s ? { ...s, signed_order_basis: e.target.value } : s)} />
+                                    ) : <p className="text-sm text-gray-900">{section.signed_order_basis ?? '—'}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Signed Line Total</label>
+                                    {editable ? (
+                                        <input aria-label="Signed Line Total" type="number" step="0.01" className={CONTROL_CLASS} value={section.signed_line_total ?? ''} onChange={(e) => setSection((s) => s ? { ...s, signed_line_total: Number(e.target.value) } : s)} />
+                                    ) : <p className="text-sm text-gray-900 text-right">{section.signed_line_total != null ? Number(section.signed_line_total).toLocaleString() : '—'}</p>}
+                                </div>
+                            </div>
                         </div>
+                    </FieldGroup>
 
-                        {/* Days on Cover (F-052) — read-only computed */}
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Days on Cover
-                            </label>
-                            <p className="text-sm text-gray-900">
-                                {section.inception_date && section.expiry_date
-                                    ? Math.max(0, Math.ceil((new Date(section.expiry_date).getTime() - new Date(section.inception_date).getTime()) / 86400000))
-                                    : '—'}
-                            </p>
+                    <FieldGroup title="Renewal">
+                        <div className="flex flex-col gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Renewal Date</label>
+                                <p className="text-sm text-gray-900">{quote?.renewal_date ?? '—'}</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Renewal Status</label>
+                                <p className="text-sm text-gray-900">{quote?.renewal_status ?? '—'}</p>
+                            </div>
                         </div>
-                    </div>
+                    </FieldGroup>
 
-                    {/* Right column — limits, premium, order */}
-                    <div className="flex flex-col gap-3">
-                        {/* Limit */}
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Limit Currency
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="text"
-                                    className="input-field"
-                                    value={section.limit_currency ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, limit_currency: e.target.value } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900">{section.limit_currency ?? '—'}</p>
-                            )}
+                    <FieldGroup title="Excess">
+                        <div className="flex flex-col gap-3">
+                            <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Currency</label>
+                                    {editable ? (
+                                        <SearchableSelect id="quote-section-excess-currency" ariaLabel="Excess Currency" value={section.excess_currency ?? ''} options={currencyOptions} onChange={(nextValue) => setSection((s) => s ? { ...s, excess_currency: nextValue } : s)} />
+                                    ) : <input readOnly className={CONTROL_SMALL_CLASS} value={section.excess_currency ?? '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Excess Amount</label>
+                                    {editable ? (
+                                        <input type="number" className={CONTROL_SMALL_CLASS} value={section.excess_amount ?? ''} onChange={(e) => setSection((s) => s ? { ...s, excess_amount: Number(e.target.value) } : s)} />
+                                    ) : <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.excess_amount != null ? Number(section.excess_amount).toLocaleString() : '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Movement</label>
+                                    <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.excess_amount_movement != null ? Number(section.excess_amount_movement).toLocaleString() : '—'} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Excess Loss Qualifier</label>
+                                {editable ? (
+                                    <SearchableSelect id="quote-section-excess-loss-qualifier" ariaLabel="Excess Loss Qualifier" value={section.excess_loss_qualifier ?? ''} options={lossQualifierOptions} onChange={(nextValue) => setSection((s) => s ? { ...s, excess_loss_qualifier: nextValue } : s)} />
+                                ) : <p className="text-sm text-gray-900">{section.excess_loss_qualifier ?? '—'}</p>}
+                            </div>
                         </div>
+                    </FieldGroup>
 
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Limit Amount
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="number"
-                                    className="input-field"
-                                    value={section.limit_amount ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, limit_amount: Number(e.target.value) } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900 text-right">
-                                    {section.limit_amount != null ? Number(section.limit_amount).toLocaleString() : '—'}
-                                </p>
-                            )}
+                    <FieldGroup title="Sum Insured">
+                        <div className="flex flex-col gap-3">
+                            <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Currency</label>
+                                    {editable ? (
+                                        <SearchableSelect id="quote-section-sum-insured-currency" ariaLabel="Sum Insured Currency" value={section.sum_insured_currency ?? ''} options={currencyOptions} onChange={(nextValue) => setSection((s) => s ? { ...s, sum_insured_currency: nextValue } : s)} />
+                                    ) : <input readOnly className={CONTROL_SMALL_CLASS} value={section.sum_insured_currency ?? '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Sum Insured Amount</label>
+                                    {editable ? (
+                                        <input type="number" className={CONTROL_SMALL_CLASS} value={section.sum_insured_amount ?? ''} onChange={(e) => setSection((s) => s ? { ...s, sum_insured_amount: Number(e.target.value) } : s)} />
+                                    ) : <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.sum_insured_amount != null ? Number(section.sum_insured_amount).toLocaleString() : '—'} />}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Movement</label>
+                                    <input readOnly className={`${CONTROL_SMALL_CLASS} text-right`} value={section.sum_insured_amount_movement != null ? Number(section.sum_insured_amount_movement).toLocaleString() : '—'} />
+                                </div>
+                            </div>
                         </div>
-
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Limit Loss Qualifier
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="text"
-                                    className="input-field"
-                                    value={section.limit_loss_qualifier ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, limit_loss_qualifier: e.target.value } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900">{section.limit_loss_qualifier ?? '—'}</p>
-                            )}
-                        </div>
-
-                        {/* Premium Currency */}
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Premium Currency
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="text"
-                                    className="input-field"
-                                    value={section.premium_currency ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, premium_currency: e.target.value } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900">{section.premium_currency ?? '—'}</p>
-                            )}
-                        </div>
-
-                        {/* Gross Premium */}
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Gross Premium
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    className="input-field"
-                                    value={section.gross_premium ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, gross_premium: Number(e.target.value) } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900 text-right">
-                                    {section.gross_premium != null ? Number(section.gross_premium).toLocaleString() : '—'}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Annual Net Premium (F-052) */}
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Annual Net Premium
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    className="input-field"
-                                    value={section.annual_net_premium ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, annual_net_premium: Number(e.target.value) } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900 text-right">
-                                    {section.annual_net_premium != null ? Number(section.annual_net_premium).toLocaleString() : '—'}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Written / Signed Order */}
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Written Order %
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    className="input-field"
-                                    value={section.written_order ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, written_order: Number(e.target.value) } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900 text-right">
-                                    {section.written_order != null ? `${section.written_order}%` : '—'}
-                                </p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Signed Order %
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    className="input-field"
-                                    value={section.signed_order ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, signed_order: Number(e.target.value) } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900 text-right">
-                                    {section.signed_order != null ? `${section.signed_order}%` : '—'}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Excess & Sum Insured — full-width group */}
-                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
-                    {/* Excess */}
-                    <div className="flex flex-col gap-3">
-                        <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Excess</h3>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Excess Currency
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="text"
-                                    className="input-field"
-                                    value={section.excess_currency ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, excess_currency: e.target.value } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900">{section.excess_currency ?? '—'}</p>
-                            )}
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Excess Amount
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="number"
-                                    className="input-field"
-                                    value={section.excess_amount ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, excess_amount: Number(e.target.value) } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900 text-right">
-                                    {section.excess_amount != null ? Number(section.excess_amount).toLocaleString() : '—'}
-                                </p>
-                            )}
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Excess Loss Qualifier
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="text"
-                                    className="input-field"
-                                    value={section.excess_loss_qualifier ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, excess_loss_qualifier: e.target.value } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900">{section.excess_loss_qualifier ?? '—'}</p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Sum Insured */}
-                    <div className="flex flex-col gap-3">
-                        <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Sum Insured</h3>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Sum Insured Currency
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="text"
-                                    className="input-field"
-                                    value={section.sum_insured_currency ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, sum_insured_currency: e.target.value } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900">{section.sum_insured_currency ?? '—'}</p>
-                            )}
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                                Sum Insured Amount
-                            </label>
-                            {editable ? (
-                                <input
-                                    type="number"
-                                    className="input-field"
-                                    value={section.sum_insured_amount ?? ''}
-                                    onChange={(e) =>
-                                        setSection((s) => s ? { ...s, sum_insured_amount: Number(e.target.value) } : s)
-                                    }
-                                />
-                            ) : (
-                                <p className="text-sm text-gray-900 text-right">
-                                    {section.sum_insured_amount != null ? Number(section.sum_insured_amount).toLocaleString() : '—'}
-                                </p>
-                            )}
-                        </div>
-                    </div>
+                    </FieldGroup>
                 </div>
             </div>
 
@@ -1036,10 +992,14 @@ export default function QuoteSectionViewPage() {
                                 { key: 'coverage', label: 'Coverage', sortable: true, defaultWidth: 200 },
                                 { key: 'effective_date', label: 'Effective Date', sortable: true, defaultWidth: 130 },
                                 { key: 'expiry_date', label: 'Expiry Date', defaultWidth: 130 },
-                                { key: 'annual_gross_premium', label: 'Annual Gross Premium', defaultWidth: 170 },
-                                { key: 'annual_net_premium', label: 'Annual Net Premium', defaultWidth: 170 },
                                 { key: 'limit_currency', label: 'Limit Currency', defaultWidth: 130 },
                                 { key: 'limit_amount', label: 'Limit Amount', defaultWidth: 140 },
+                                { key: 'sum_insured_currency', label: 'Sum Insured Currency', defaultWidth: 150 },
+                                { key: 'sum_insured', label: 'Sum Insured', defaultWidth: 130 },
+                                { key: 'annual_gross_premium', label: 'Annual Gross Premium', defaultWidth: 170 },
+                                { key: 'annual_net_premium', label: 'Annual Net Premium', defaultWidth: 170 },
+                                { key: 'gross_premium', label: 'Gross Premium', defaultWidth: 130 },
+                                { key: 'net_premium', label: 'Net Premium', defaultWidth: 120 },
                                 ...(editable ? [{
                                     key: 'actions',
                                     label: (
@@ -1055,11 +1015,11 @@ export default function QuoteSectionViewPage() {
                                                         section_id: Number(sectionId),
                                                         reference: '',
                                                         coverage: '',
-                                                        effective_date: null,
-                                                        expiry_date: null,
+                                                        effective_date: section.effective_date ?? section.inception_date ?? null,
+                                                        expiry_date: section.expiry_date ?? null,
                                                         annual_gross_premium: null,
                                                         annual_net_premium: null,
-                                                        limit_currency: null,
+                                                        limit_currency: section.limit_currency ?? null,
                                                         limit_amount: null,
                                                     },
                                                 ])
@@ -1097,6 +1057,10 @@ export default function QuoteSectionViewPage() {
                                 if (key === 'annual_net_premium') return cov.annual_net_premium?.toLocaleString() ?? '—'
                                 if (key === 'limit_currency') return cov.limit_currency ?? '—'
                                 if (key === 'limit_amount') return cov.limit_amount?.toLocaleString() ?? '—'
+                                if (key === 'sum_insured_currency') return cov.sum_insured_currency ?? '—'
+                                if (key === 'sum_insured') return cov.sum_insured?.toLocaleString() ?? '—'
+                                if (key === 'gross_premium') return cov.gross_premium?.toLocaleString() ?? '—'
+                                if (key === 'net_premium') return cov.net_premium?.toLocaleString() ?? '—'
                                 if (key === 'actions') {
                                     return (
                                         <button
@@ -1182,7 +1146,7 @@ export default function QuoteSectionViewPage() {
                                 return editable ? (
                                     <input
                                         type="text"
-                                        className="input-field-sm"
+                                        className={CONTROL_SMALL_CLASS}
                                         value={p.market_name ?? ''}
                                         onChange={(e) =>
                                             setParticipations((ps) =>
@@ -1199,7 +1163,7 @@ export default function QuoteSectionViewPage() {
                                         step="0.000001"
                                         min="0"
                                         max="100"
-                                        className="input-field-sm text-right"
+                                        className={`${CONTROL_SMALL_CLASS} text-right`}
                                         value={p.written_line ?? 0}
                                         onChange={(e) =>
                                             setParticipations((ps) =>
@@ -1216,7 +1180,7 @@ export default function QuoteSectionViewPage() {
                                         step="0.000001"
                                         min="0"
                                         max="100"
-                                        className="input-field-sm text-right"
+                                        className={`${CONTROL_SMALL_CLASS} text-right`}
                                         value={p.signed_line ?? 0}
                                         onChange={(e) =>
                                             setParticipations((ps) =>
@@ -1230,7 +1194,7 @@ export default function QuoteSectionViewPage() {
                                 return editable ? (
                                     <input
                                         type="text"
-                                        className="input-field-sm"
+                                        className={CONTROL_SMALL_CLASS}
                                         value={p.role ?? ''}
                                         onChange={(e) =>
                                             setParticipations((ps) =>
@@ -1244,7 +1208,7 @@ export default function QuoteSectionViewPage() {
                                 return editable ? (
                                     <input
                                         type="text"
-                                        className="input-field-sm"
+                                        className={CONTROL_SMALL_CLASS}
                                         value={p.reference ?? ''}
                                         onChange={(e) =>
                                             setParticipations((ps) =>
@@ -1258,7 +1222,7 @@ export default function QuoteSectionViewPage() {
                                 return editable ? (
                                     <input
                                         type="text"
-                                        className="input-field-sm"
+                                        className={CONTROL_SMALL_CLASS}
                                         value={p.notes ?? ''}
                                         onChange={(e) =>
                                             setParticipations((ps) =>
@@ -1335,11 +1299,62 @@ export default function QuoteSectionViewPage() {
                 </div>
             )}
 
+            {activeTab === 'sectionFinancialSummary' && (
+                <div className="grid grid-cols-1 gap-4">
+                    <div className="table-wrapper">
+                        <table className="app-table" style={{ tableLayout: 'fixed', width: '100%' }}>
+                            <thead>
+                                <tr>
+                                    <th>Measure</th>
+                                    <th className="text-right">Base</th>
+                                    <th className="text-right">Written</th>
+                                    <th className="text-right">Signed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {[
+                                    ['Gross Gross Premium', section.gross_gross_premium, section.gross_gross_premium_written, section.gross_gross_premium_signed],
+                                    ['Gross Deductions', section.gross_deductions, section.gross_deductions_written, section.gross_deductions_signed],
+                                    ['Gross Premium', section.gross_premium, section.gross_premium_written, section.gross_premium_signed],
+                                    ['Deductions', section.deductions, section.deductions_written, section.deductions_signed],
+                                    ['Gross Net Premium', section.net_premium, section.net_premium_written, section.net_premium_signed],
+                                    ['Tax Receivable', section.tax_receivable, section.tax_receivable_written, section.tax_receivable_signed],
+                                    ['Tax Payable', section.tax_payable, section.tax_payable_written, section.tax_payable_signed],
+                                ].map(([name, base, written, signed]) => (
+                                    <tr key={String(name)}>
+                                        <td>{String(name)}</td>
+                                        <td className="text-right">{typeof base === 'number' ? base.toLocaleString() : '—'}</td>
+                                        <td className="text-right">{typeof written === 'number' ? written.toLocaleString() : '—'}</td>
+                                        <td className="text-right">{typeof signed === 'number' ? signed.toLocaleString() : '—'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'signings' && (
+                <div className="rounded border border-gray-200 bg-white p-4 text-sm text-gray-500">
+                    Signings placeholder.
+                </div>
+            )}
+
             <datalist id="quote-section-class-of-business-options">
                 {classesOfBusiness.map((item) => (
                     <option key={item} value={item} />
                 ))}
             </datalist>
+
+            {/* Editable status badge */}
+            {quote && (
+                <div className="fixed bottom-20 right-4 z-40">
+                    <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium shadow-sm ${editable ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                        <span className={`h-2.5 w-2.5 rounded-full ${editable ? 'bg-green-500' : 'bg-amber-400'}`} aria-hidden="true" />
+                        <span>{editable ? 'Editable' : 'Read-only'}</span>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
