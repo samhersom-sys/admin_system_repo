@@ -94,22 +94,6 @@ const UAT_USERS = [
         role: 'client_admin',
     },
     {
-        username: 'uat_rd8p2x',
-        email: 'Rdarke01@gmail.com',
-        password: 'UatRd4#nQv7!',
-        fullName: 'R Darke',
-        orgCode: 'DEMO',
-        role: 'client_admin',
-    },
-    {
-        username: 'uat_at5n9q',
-        email: 'Anthony.Tage86@outlook.com',
-        password: 'UatAt6$mKj2!',
-        fullName: 'Anthony Tage',
-        orgCode: 'DEMO',
-        role: 'client_admin',
-    },
-    {
         username: 'uat_dv6w4p',
         email: 'Devansh251190@gmail.com',
         password: 'UatDv3#hRn8!',
