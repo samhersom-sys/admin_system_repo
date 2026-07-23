@@ -85,6 +85,10 @@ import { Claim } from '../entities/claim.entity'
 // Settings
 import { ProductGrainDefault } from '../entities/product-grain-default.entity'
 
+// Earnings configuration
+import { EarningPattern, EarningPatternPoint, EarningPatternRule } from '../entities/earning-pattern.entity'
+import { PolicyEarningPeriod } from '../earnings-config/policy-earning-period.entity'
+
 // Resolve .env.local from workspace root (4 levels up from backend/nest/src/config/)
 dotenv.config({ path: path.resolve(__dirname, '../../../../.env.local') })
 
@@ -164,6 +168,10 @@ export const typeOrmOptions: DataSourceOptions = {
 
     // Settings
     ProductGrainDefault,
+
+    // Earnings configuration
+    EarningPattern, EarningPatternPoint, EarningPatternRule,
+    PolicyEarningPeriod,
   ],
 
   // NEVER synchronize automatically — use db-sync.ts for fresh installs only

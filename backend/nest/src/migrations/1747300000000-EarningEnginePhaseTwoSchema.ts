@@ -18,6 +18,85 @@ import { MigrationInterface, QueryRunner } from 'typeorm'
 export class EarningEnginePhaseTwoSchema1747300000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         // -------------------------------------------------------------------
+        // 0. Create the entity-first earning-pattern tables for persistent
+        //    environments.  Fresh installs receive these from db:sync, but
+        //    UAT and production use migrations only.
+        // -------------------------------------------------------------------
+        await queryRunner.query(`
+            CREATE TABLE IF NOT EXISTS earning_patterns (
+                id          SERIAL       PRIMARY KEY,
+                org_code    VARCHAR(100) NOT NULL,
+                name        VARCHAR(255) NOT NULL,
+                pattern_type VARCHAR(50) NOT NULL,
+                earn_by     VARCHAR(20) NOT NULL DEFAULT 'day',
+                description TEXT,
+                is_active   BOOLEAN NOT NULL DEFAULT true,
+                created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                created_by  VARCHAR(255)
+            )
+        `)
+        await queryRunner.query(`
+            CREATE INDEX IF NOT EXISTS idx_earning_patterns_org_code
+                ON earning_patterns (org_code)
+        `)
+        await queryRunner.query(`
+            CREATE INDEX IF NOT EXISTS idx_earning_patterns_active
+                ON earning_patterns (is_active)
+        `)
+
+        await queryRunner.query(`
+            CREATE TABLE IF NOT EXISTS earning_pattern_points (
+                id                     SERIAL PRIMARY KEY,
+                pattern_id             INT NOT NULL,
+                pct_through_policy     NUMERIC(8,4) NOT NULL,
+                pct_earned_increment   NUMERIC(8,4) NOT NULL,
+                sort_order             INT NOT NULL DEFAULT 0,
+                created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT chk_earning_pattern_points_pct_through
+                    CHECK (pct_through_policy > 0 AND pct_through_policy <= 100),
+                CONSTRAINT chk_earning_pattern_points_pct_earned
+                    CHECK (pct_earned_increment > 0)
+            )
+        `)
+        await queryRunner.query(`
+            CREATE INDEX IF NOT EXISTS idx_earning_pattern_points_pattern_id
+                ON earning_pattern_points (pattern_id)
+        `)
+
+        await queryRunner.query(`
+            CREATE TABLE IF NOT EXISTS earning_pattern_rules (
+                id                SERIAL PRIMARY KEY,
+                org_code          VARCHAR(100) NOT NULL,
+                pattern_id        INT NOT NULL,
+                priority          INT NOT NULL DEFAULT 0,
+                class_of_business VARCHAR(100),
+                contract_type     VARCHAR(100),
+                include_incepted  BOOLEAN NOT NULL DEFAULT true,
+                is_active         BOOLEAN NOT NULL DEFAULT true,
+                created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                created_by        VARCHAR(255)
+            )
+        `)
+        await queryRunner.query(`
+            CREATE INDEX IF NOT EXISTS idx_earning_pattern_rules_org_code
+                ON earning_pattern_rules (org_code)
+        `)
+        await queryRunner.query(`
+            CREATE INDEX IF NOT EXISTS idx_earning_pattern_rules_pattern_id
+                ON earning_pattern_rules (pattern_id)
+        `)
+        await queryRunner.query(`
+            CREATE INDEX IF NOT EXISTS idx_earning_pattern_rules_priority
+                ON earning_pattern_rules (priority)
+        `)
+        await queryRunner.query(`
+            CREATE INDEX IF NOT EXISTS idx_earning_pattern_rules_active
+                ON earning_pattern_rules (is_active)
+        `)
+
+        // -------------------------------------------------------------------
         // 1. Drop product_id from earning_pattern_rules
         // -------------------------------------------------------------------
         await queryRunner.query(`
